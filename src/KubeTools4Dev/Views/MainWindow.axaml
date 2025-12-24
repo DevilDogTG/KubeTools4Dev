@@ -1,0 +1,33 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:KubeTools4Dev.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:views="using:KubeTools4Dev.Views"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+        x:Class="KubeTools4Dev.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Icon="avares://KubeTools4Dev/Assets/app-icon.png"
+        Title="ElysianMonitor">
+
+    <Grid RowDefinitions="Auto, *">
+        <!-- Header / Status Bar -->
+        <Border Grid.Row="0" Margin="10" Padding="10" Background="{DynamicResource SemiColorBackground0}" CornerRadius="4">
+             <StackPanel Orientation="Horizontal" Spacing="10">
+                 <TextBlock Text="K8s Status:" VerticalAlignment="Center" FontWeight="Bold"/>
+                 <TextBlock Text="{Binding ConnectionStatus}" VerticalAlignment="Center"/>
+                 <Button Content="Reconnect" Command="{Binding ConnectCommand}" IsVisible="{Binding !IsConnected}" Classes="Warning Small"/>
+             </StackPanel>
+        </Border>
+
+        <!-- Main Content -->
+        <TabControl Grid.Row="1" Margin="5">
+            <TabItem Header="Watch Pods">
+                <views:PodListView DataContext="{Binding PodList}"/>
+            </TabItem>
+            <TabItem Header="Services &amp; Port Forward">
+                <views:ServiceListView DataContext="{Binding ServiceList}"/>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>
