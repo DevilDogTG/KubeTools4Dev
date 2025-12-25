@@ -8,24 +8,24 @@
         x:Class="KubeTools4Dev.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="avares://KubeTools4Dev/Assets/app-icon.png"
-        Title="ElysianMonitor">
+        Title="Kubernetes Tools (for Developer)">
 
     <Grid RowDefinitions="Auto, *">
         <!-- Header / Status Bar -->
-        <Border Grid.Row="0" Margin="10" Padding="10" Background="{DynamicResource SemiColorBackground0}" CornerRadius="4">
+        <Border Grid.Row="0" Margin="5" Padding="3" Background="{DynamicResource SemiColorBackground0}" CornerRadius="4">
              <StackPanel Orientation="Horizontal" Spacing="10">
-                 <TextBlock Text="K8s Status:" VerticalAlignment="Center" FontWeight="Bold"/>
+                 <TextBlock Text="Status:" VerticalAlignment="Center" FontWeight="Bold"/>
                  <TextBlock Text="{Binding ConnectionStatus}" VerticalAlignment="Center"/>
                  <Button Content="Reconnect" Command="{Binding ConnectCommand}" IsVisible="{Binding !IsConnected}" Classes="Warning Small"/>
              </StackPanel>
         </Border>
 
         <!-- Main Content -->
-        <TabControl Grid.Row="1" Margin="5">
-            <TabItem Header="Watch Pods">
+        <TabControl Grid.Row="1" Margin="3">
+            <TabItem Header="Pods">
                 <views:PodListView DataContext="{Binding PodList}"/>
             </TabItem>
-            <TabItem Header="Services &amp; Port Forward">
+            <TabItem Header="Services">
                 <views:ServiceListView DataContext="{Binding ServiceList}"/>
             </TabItem>
         </TabControl>

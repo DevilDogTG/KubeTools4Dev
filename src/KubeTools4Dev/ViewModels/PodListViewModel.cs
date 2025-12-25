@@ -1,10 +1,8 @@
-using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using k8s.Models;
 using KubeTools4Dev.Core.Services;
-using KubeTools4Dev.Services;
+using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -15,33 +13,76 @@ using System.Threading.Tasks;
 
 namespace KubeTools4Dev.ViewModels;
 
+/// <summary>
+/// 
+/// </summary>
+/// <seealso cref="KubeTools4Dev.ViewModels.ViewModelBase" />
 public partial class PodListViewModel : ViewModelBase
 {
+    /// <summary>
+    /// The kube service
+    /// </summary>
     private readonly IKubernetesService _kubeService;
+    /// <summary>
+    /// The settings service
+    /// </summary>
     private readonly ISettingsService _settingsService;
+    /// <summary>
+    /// The logger
+    /// </summary>
     private readonly ILogger<PodListViewModel> _logger;
+    /// <summary>
+    /// The CTS
+    /// </summary>
     private CancellationTokenSource? _cts;
 
     // Master list of all pods
+    /// <summary>
+    /// All pods
+    /// </summary>
     private readonly List<PodViewModel> _allPods = new();
 
+    /// <summary>
+    /// The pods
+    /// </summary>
     [ObservableProperty]
     private ObservableCollection<PodViewModel> _pods = new();
 
+    /// <summary>
+    /// The filter text
+    /// </summary>
     [ObservableProperty]
     private string _filterText = "";
 
+    /// <summary>
+    /// The is loading
+    /// </summary>
     [ObservableProperty]
     private bool _isLoading;
 
+    /// <summary>
+    /// The last refresh time
+    /// </summary>
     [ObservableProperty]
     private string _lastRefreshTime = "Never";
 
+    /// <summary>
+    /// The refresh interval seconds
+    /// </summary>
     [ObservableProperty]
     private int _refreshIntervalSeconds = 5;
 
+    /// <summary>
+    /// The refresh timer
+    /// </summary>
     private readonly DispatcherTimer _refreshTimer;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PodListViewModel"/> class.
+    /// </summary>
+    /// <param name="kubeService">The kube service.</param>
+    /// <param name="settingsService">The settings service.</param>
+    /// <param name="logger">The logger.</param>
     public PodListViewModel(IKubernetesService kubeService, ISettingsService settingsService, ILogger<PodListViewModel> logger)
     {
         _kubeService = kubeService;
@@ -57,6 +98,9 @@ public partial class PodListViewModel : ViewModelBase
         _refreshTimer.Tick += (s, e) => TriggerRefresh();
     }
 
+    /// <summary>
+    /// Initializes the asynchronous.
+    /// </summary>
     public async Task InitializeAsync()
     {
         IsLoading = true;
@@ -90,18 +134,28 @@ public partial class PodListViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Increments the refresh interval.
+    /// </summary>
     [RelayCommand]
     private void IncrementRefreshInterval()
     {
         RefreshIntervalSeconds = Math.Clamp(RefreshIntervalSeconds + 1, 1, 60);
     }
 
+    /// <summary>
+    /// Decrements the refresh interval.
+    /// </summary>
     [RelayCommand]
     private void DecrementRefreshInterval()
     {
         RefreshIntervalSeconds = Math.Clamp(RefreshIntervalSeconds - 1, 1, 60);
     }
 
+    /// <summary>
+    /// Called when [refresh interval seconds changed].
+    /// </summary>
+    /// <param name="value">The value.</param>
     partial void OnRefreshIntervalSecondsChanged(int value)
     {
         if (_refreshTimer != null)
@@ -112,11 +166,18 @@ public partial class PodListViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Called when [filter text changed].
+    /// </summary>
+    /// <param name="value">The value.</param>
     partial void OnFilterTextChanged(string value)
     {
         UpdateFilteredList();
     }
 
+    /// <summary>
+    /// Updates the filtered list.
+    /// </summary>
     private void UpdateFilteredList()
     {
         var query = _allPods.AsEnumerable();
@@ -141,6 +202,9 @@ public partial class PodListViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Triggers the refresh.
+    /// </summary>
     private void TriggerRefresh()
     {
         // For now, just update the timestamp if we are "watching"
@@ -157,11 +221,18 @@ public partial class PodListViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Updates the refresh time.
+    /// </summary>
     private void UpdateRefreshTime()
     {
         LastRefreshTime = DateTime.Now.ToString("HH:mm:ss");
     }
 
+    /// <summary>
+    /// Watches the pods asynchronous.
+    /// </summary>
+    /// <param name="token">The token.</param>
     private async Task WatchPodsAsync(CancellationToken token)
     {
         while (!token.IsCancellationRequested)
@@ -219,98 +290,4 @@ public partial class PodListViewModel : ViewModelBase
             }
         }
     }
-}
-
-public partial class PodViewModel : ObservableObject
-{
-    private V1Pod _pod;
-
-    public PodViewModel(V1Pod pod)
-    {
-        _pod = pod;
-        Update(pod);
-    }
-
-    public void Update(V1Pod pod)
-    {
-        _pod = pod;
-        Name = pod.Metadata.Name;
-        Namespace = pod.Metadata.NamespaceProperty;
-
-        // Check for Terminating state (DeletionTimestamp is set)
-        if (pod.Metadata.DeletionTimestamp.HasValue)
-        {
-            Status = "Terminating";
-        }
-        else
-        {
-            Status = pod.Status.Phase;
-        }
-
-        // Age
-        Age = pod.Metadata.CreationTimestamp.HasValue
-            ? FormatAge(DateTime.UtcNow - pod.Metadata.CreationTimestamp.Value)
-            : "N/A";
-
-        // Restarts
-        if (pod.Status.ContainerStatuses != null)
-        {
-            Restarts = pod.Status.ContainerStatuses.Sum(c => c.RestartCount);
-        }
-        else
-        {
-            Restarts = 0;
-        }
-
-        // Last Restart
-        LastRestart = "-";
-        if (pod.Status.ContainerStatuses != null)
-        {
-            var lastTerminated = pod.Status.ContainerStatuses
-                .Select(c => c.LastState?.Terminated?.FinishedAt)
-                .Where(t => t.HasValue)
-                .OrderByDescending(t => t)
-                .FirstOrDefault();
-
-            if (lastTerminated.HasValue)
-            {
-                LastRestart = FormatAge(DateTime.UtcNow - lastTerminated.Value);
-            }
-        }
-
-        // Color
-        StatusColor = Status switch
-        {
-            "Running" => Brushes.SpringGreen,
-            "Succeeded" => Brushes.LightBlue,
-            "Pending" => Brushes.Orange,
-            "Failed" => Brushes.Red,
-            "Terminating" => Brushes.DarkOrange, // Distinct color for terminating
-            _ => Brushes.Gray
-        };
-    }
-
-    public void RefreshAge()
-    {
-        if (_pod.Metadata.CreationTimestamp.HasValue)
-        {
-            Age = FormatAge(DateTime.UtcNow - _pod.Metadata.CreationTimestamp.Value);
-        }
-    }
-
-    private string FormatAge(TimeSpan age)
-    {
-        if (age.TotalDays >= 1) return $"{(int)age.TotalDays}d{(int)age.Hours}h";
-        if (age.TotalHours >= 1) return $"{(int)age.TotalHours}h{(int)age.Minutes}m";
-        if (age.TotalMinutes >= 1) return $"{(int)age.TotalMinutes}m";
-        return $"{(int)age.TotalSeconds}s";
-    }
-
-    [ObservableProperty] private string _name;
-    [ObservableProperty] private string _namespace;
-    [ObservableProperty] private string _status;
-    [ObservableProperty] private string _age;
-    [ObservableProperty] private string _lastRestart;
-    [ObservableProperty] private int _restarts;
-    [ObservableProperty] private IBrush _statusColor = Brushes.Gray;
 }

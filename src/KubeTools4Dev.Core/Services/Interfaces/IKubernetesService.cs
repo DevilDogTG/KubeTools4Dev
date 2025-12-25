@@ -21,7 +21,7 @@ public interface IKubernetesService
     /// </summary>
     /// <param name="kubeConfigPath">The kube configuration path.</param>
     /// <returns></returns>
-    Task<bool> ConnectAsync(string? kubeConfigPath);
+    Task<bool> ConnectAsync(string? kubeConfigPath = null);
 
     /// <summary>
     /// Gets the pods asynchronous.

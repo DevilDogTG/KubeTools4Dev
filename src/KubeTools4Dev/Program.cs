@@ -1,10 +1,10 @@
 ﻿using Avalonia;
-using System;
-using Serilog;
-using System.IO;
 using Microsoft.Extensions.Configuration;
+using Serilog;
+using System;
+using System.IO;
 
-namespace ElysianMonitor;
+namespace KubeTools4Dev;
 
 class Program
 {

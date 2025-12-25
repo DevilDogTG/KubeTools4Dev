@@ -1,9 +1,7 @@
-using System;
-using System.IO;
+using KubeTools4Dev.Core.Models;
 using System.Text.Json;
-using System.Collections.Generic;
 
-namespace KubeTools4Dev.Services;
+namespace KubeTools4Dev.Core.Services;
 
 public interface ISettingsService
 {
@@ -47,8 +45,8 @@ public class SettingsService : ISettingsService
                     ExcludedServices = settings.ExcludedServices ?? new();
                 }
             }
-            catch 
-            { 
+            catch
+            {
                 // Ignore load errors, use defaults 
             }
         }
@@ -58,23 +56,17 @@ public class SettingsService : ISettingsService
     {
         try
         {
-            var settings = new SettingsModel 
-            { 
+            var settings = new SettingsModel
+            {
                 RefreshIntervalSeconds = RefreshIntervalSeconds,
                 ExcludedServices = ExcludedServices
             };
             var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(_filePath, json);
         }
-        catch 
-        { 
+        catch
+        {
             // Ignore save errors 
         }
-    }
-
-    private class SettingsModel
-    {
-        public int RefreshIntervalSeconds { get; set; }
-        public List<string> ExcludedServices { get; set; }
     }
 }

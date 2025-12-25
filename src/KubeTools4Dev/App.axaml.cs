@@ -3,10 +3,10 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using KubeTools4Dev.ViewModels;
 using KubeTools4Dev.Views;
-using Serilog;
 using Microsoft.Extensions.Logging;
+using Serilog;
 
-namespace ElysianMonitor;
+namespace KubeTools4Dev;
 
 public partial class App : Application
 {

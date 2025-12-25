@@ -2,6 +2,7 @@ using k8s;
 using k8s.Autorest;
 using k8s.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
+using KubeTools4Dev.Core.Shares;
 using Microsoft.Extensions.Logging;
 
 namespace KubeTools4Dev.Core.Services;
@@ -43,7 +44,7 @@ public class KubernetesService(ILogger<KubernetesService> logger) : IKubernetesS
     {
         try
         {
-            logger.LogInformation("Connecting to Kubernetes...");
+            logger.Info("Connecting to Kubernetes...");
             KubernetesClientConfiguration config;
             if (string.IsNullOrEmpty(kubeConfigPath))
             {
@@ -65,7 +66,7 @@ public class KubernetesService(ILogger<KubernetesService> logger) : IKubernetesS
         catch (Exception ex)
         {
             // Log error
-            logger.LogError(ex, "Failed to connect to Kubernetes");
+            logger.Error(ex, "Failed to connect to Kubernetes");
             Console.WriteLine($"Failed to connect to Kubernetes: {ex.Message}");
             _client = null;
             return false;
