@@ -1,24 +1,38 @@
+using k8s;
 using k8s.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
 using KubeTools4Dev.Core.Shares;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
-using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
+using System.Net.WebSockets;
 
 namespace KubeTools4Dev.Core.Services;
 
 /// <summary>
-/// 
+/// Port forwarding service using KubernetesClient library.
 /// </summary>
 /// <seealso cref="IPortForwardService" />
 public partial class PortForwardService(
+    IKubernetesService kubernetesService,
     ILogger<PortForwardService> logger
 ) : IPortForwardService
 {
     /// <summary>
-    /// The active forwards
+    /// The active forwards with their cancellation token sources.
     /// </summary>
-    private readonly ConcurrentDictionary<string, Process> _activeForwards = new();
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeForwards = new();
+
+    /// <summary>
+    /// Connection timeout for WebSocket connections.
+    /// </summary>
+    private static readonly TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Retry delay when errors occur.
+    /// </summary>
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(3);
 
     /// <summary>
     /// Starts the service port forward asynchronous.
@@ -32,143 +46,292 @@ public partial class PortForwardService(
     {
         var key = $"{namespaceName}/{serviceName}:{localPort}";
 
-        // Use kubectl port-forward directy
-        // Command: kubectl port-forward svc/{serviceName} {localPort}:{targetPort} -n {namespace}
-
-        // Resolve port string
-        string remotePortStr = targetPort switch
+        // Resolve port to integer
+        int remotePort = targetPort switch
         {
-            int iVal => iVal.ToString(),
-            string sVal => sVal,
-            IntOrString ios => ios.Value ?? ios.ToInt().ToString(),
-            _ => targetPort?.ToString() ?? string.Empty
+            int iVal => iVal,
+            string sVal => int.TryParse(sVal, out var parsed) ? parsed : throw new ArgumentException($"Invalid port: {sVal}"),
+            IntOrString ios => ios.Value != null ? int.Parse(ios.Value) : ios.ToInt(),
+            _ => throw new ArgumentException($"Unsupported port type: {targetPort?.GetType().Name}")
         };
 
-        // If it's a named port, kubectl usually handles it if we target the pod, but for service it might need numeric.
-        // However, user said "8088->8088" works. 
-        // Let's rely on kubectl's capability.
+        // Create a linked cancellation token source
+        var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _activeForwards[key] = linkedCts;
 
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            var processStartInfo = new ProcessStartInfo
+            while (!linkedCts.Token.IsCancellationRequested)
             {
-                FileName = "kubectl",
-                Arguments = $"port-forward svc/{serviceName} {localPort}:{remotePortStr} -n {namespaceName} --address 0.0.0.0",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
+                Socket? listener = null;
 
-            logger.LogInformation("Starting kubectl: {FileName} {Arguments}", processStartInfo.FileName, processStartInfo.Arguments);
-
-            var process = new Process { StartInfo = processStartInfo };
-
-            // Logging handlers
-            process.OutputDataReceived += (sender, args)
-                => LogKubectlInfo(serviceName, args.Data);
-            process.ErrorDataReceived += (sender, args)
-                => LogKubectlError(serviceName, args.Data);
-
-            if (!process.Start())
-            {
-                if (logger.IsEnabled(LogLevel.Error))
-                {
-                    logger.LogError("Failed to start kubectl process for {ServiceName}", serviceName);
-                }
-                await Task.Delay(3000, cancellationToken);
-                continue;
-            }
-
-            _activeForwards.AddOrUpdate(key, process, (k, oldProcess) => process);
-
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-
-            // Register cancellation to kill process
-            using var ctr = cancellationToken.Register(() =>
-            {
-                logger.LogInformation("Stopping port forward for {ServiceName}", serviceName);
                 try
                 {
-                    if (!process.HasExited)
+                    // Resolve pod from service
+                    var podName = await ResolvePodFromServiceAsync(serviceName, namespaceName, linkedCts.Token);
+                    if (string.IsNullOrEmpty(podName))
                     {
-                        process.Kill(true); // Kill tree if possible
-                        process.WaitForExit(1000);
+                        LogNoPodFound(serviceName, namespaceName);
+                        await Task.Delay(RetryDelay, linkedCts.Token);
+                        continue;
                     }
+
+                    LogPortForwardStarting(serviceName, podName, localPort, remotePort);
+
+                    // Create socket listener
+                    var ipEndPoint = new IPEndPoint(IPAddress.Any, localPort);
+                    listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                    listener.Bind(ipEndPoint);
+                    listener.Listen(100);
+
+                    LogPortForwardListening(localPort, podName, remotePort);
+
+                    // Accept connections and forward them - each connection gets its own WebSocket
+                    await AcceptAndForwardConnectionsAsync(listener, podName, namespaceName, remotePort, linkedCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
+                {
+                    LogPortInUse(localPort);
+                    break;
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Error stopping kubectl process");
+                    LogPortForwardError(serviceName, ex.Message);
+                    if (!linkedCts.Token.IsCancellationRequested)
+                    {
+                        await Task.Delay(RetryDelay, linkedCts.Token);
+                    }
                 }
-            });
+                finally
+                {
+                    try { listener?.Close(); } catch { }
+                }
+            }
+        }
+        finally
+        {
+            _activeForwards.TryRemove(key, out _);
+        }
+    }
 
-            // Loop to keep task alive until cancelled or process exits
+    /// <summary>
+    /// Resolves a pod name from a service by looking up pods matching the service's selector.
+    /// </summary>
+    private async Task<string?> ResolvePodFromServiceAsync(string serviceName, string namespaceName, CancellationToken cancellationToken)
+    {
+        var client = kubernetesService.Client;
+
+        // Get the service to find its selector
+        var service = await client.CoreV1.ReadNamespacedServiceAsync(serviceName, namespaceName, cancellationToken: cancellationToken);
+        var selector = service.Spec.Selector;
+
+        if (selector == null || selector.Count == 0)
+        {
+            return null;
+        }
+
+        // Build label selector string
+        var labelSelector = string.Join(",", selector.Select(kv => $"{kv.Key}={kv.Value}"));
+
+        // List pods matching the selector
+        var pods = await client.CoreV1.ListNamespacedPodAsync(
+            namespaceName,
+            labelSelector: labelSelector,
+            cancellationToken: cancellationToken);
+
+        // Return the first running pod
+        var runningPod = pods.Items
+            .FirstOrDefault(p => p.Status.Phase == "Running" &&
+                                  p.Status.ContainerStatuses?.All(c => c.Ready == true) == true);
+
+        return runningPod?.Metadata.Name;
+    }
+
+    /// <summary>
+    /// Accepts incoming connections and forwards each one with its own WebSocket tunnel.
+    /// </summary>
+    private async Task AcceptAndForwardConnectionsAsync(Socket listener, string podName, string namespaceName, int remotePort, CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
             try
             {
-                await process.WaitForExitAsync(cancellationToken);
+                // Accept connection
+                var handler = await listener.AcceptAsync(cancellationToken);
+                LogConnectionAccepted(podName, remotePort);
 
-                if (cancellationToken.IsCancellationRequested)
+                // Handle each connection in a separate task with its own WebSocket
+                _ = Task.Run(async () =>
                 {
-                    break; // Normal stop
-                }
-
-                if (process.ExitCode != 0)
-                {
-                    logger.LogWarning("kubectl exited with code {Code}. Restarting in 3s...", process.ExitCode);
-                }
-                else
-                {
-                    logger.LogWarning("kubectl exited. Restarting in 3s...");
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                break; // Normal stop
-            }
-            finally
-            {
-                // Ensure process is removed from active list if this specific instance is there?
-                // Actually, AddOrUpdate handles replacements.
-                // We should remove ONLY if we are breaking out of the loop (i.e. truly stopping).
-                // But inside the loop, we want it in the list.
-            }
-
-            // Wait before restart
-            try
-            {
-                await Task.Delay(3000, cancellationToken);
+                    await HandleSingleConnectionAsync(handler, podName, namespaceName, remotePort, cancellationToken);
+                }, cancellationToken);
             }
             catch (OperationCanceledException)
             {
                 break;
             }
+            catch (SocketException)
+            {
+                // Listener closed
+                break;
+            }
+            catch (ObjectDisposedException)
+            {
+                break;
+            }
         }
-
-        // Final cleanup
-        _activeForwards.TryRemove(key, out _);
     }
 
     /// <summary>
-    /// Stops all.
+    /// Handles a single connection with its own WebSocket tunnel to the pod.
+    /// </summary>
+    private async Task HandleSingleConnectionAsync(Socket handler, string podName, string namespaceName, int remotePort, CancellationToken cancellationToken)
+    {
+        WebSocket? webSocket = null;
+        StreamDemuxer? demuxer = null;
+
+        try
+        {
+            // Create WebSocket connection for this specific connection
+            using var timeoutCts = new CancellationTokenSource(ConnectionTimeout);
+            using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+            try
+            {
+                webSocket = await kubernetesService.Client
+                    .WebSocketNamespacedPodPortForwardAsync(
+                        podName,
+                        namespaceName,
+                        new[] { remotePort },
+                        "v4.channel.k8s.io",
+                        cancellationToken: connectCts.Token)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
+            {
+                LogConnectionTimeout(podName, $"Timed out connecting to pod {podName}:{remotePort}");
+                return;
+            }
+
+            // Create stream demuxer for port forwarding
+            demuxer = new StreamDemuxer(webSocket, StreamType.PortForward);
+            demuxer.Start();
+
+            // Get the stream for the port
+            var podStream = demuxer.GetStream((byte?)0, (byte?)0);
+
+            // Create tasks for bidirectional copy (like the official example)
+            var socketToPod = Task.Run(() => CopySocketToStream(handler, podStream, podName, cancellationToken), cancellationToken);
+            var podToSocket = Task.Run(() => CopyStreamToSocket(podStream, handler, podName, cancellationToken), cancellationToken);
+
+            // Wait for either direction to complete (connection closed)
+            await Task.WhenAny(socketToPod, podToSocket);
+        }
+        catch (WebSocketException ex)
+        {
+            LogWebSocketError(podName, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            LogConnectionError(podName, ex.Message);
+        }
+        finally
+        {
+            try { handler.Close(); } catch { }
+            try { demuxer?.Dispose(); } catch { }
+            try { webSocket?.Dispose(); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// Copies data from socket to stream (local -> pod).
+    /// </summary>
+    private void CopySocketToStream(Socket socket, Stream stream, string podName, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[4096];
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested && socket.Connected)
+            {
+                int bytesReceived = socket.Receive(buffer);
+                if (bytesReceived == 0)
+                {
+                    break; // Connection closed
+                }
+                stream.Write(buffer, 0, bytesReceived);
+                stream.Flush();
+            }
+        }
+        catch (SocketException ex)
+        {
+            LogStreamClosed(podName, "local->pod", ex.Message);
+        }
+        catch (IOException ex)
+        {
+            LogStreamClosed(podName, "local->pod", ex.Message);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Socket or stream disposed - normal during shutdown
+        }
+    }
+
+    /// <summary>
+    /// Copies data from stream to socket (pod -> local).
+    /// </summary>
+    private void CopyStreamToSocket(Stream stream, Socket socket, string podName, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[4096];
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested && socket.Connected)
+            {
+                int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                if (bytesRead == 0)
+                {
+                    break; // Stream closed
+                }
+                socket.Send(buffer, bytesRead, SocketFlags.None);
+            }
+        }
+        catch (SocketException ex)
+        {
+            LogStreamClosed(podName, "pod->local", ex.Message);
+        }
+        catch (IOException ex)
+        {
+            LogStreamClosed(podName, "pod->local", ex.Message);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Socket or stream disposed - normal during shutdown
+        }
+    }
+
+    /// <summary>
+    /// Stops all active port forwards.
     /// </summary>
     public void StopAll()
     {
         logger.Info("Stopping all port forwards...");
-        Parallel.ForEach(_activeForwards.ToArray(), activeForward =>
+
+        // Cancel all active forwards
+        foreach (var kvp in _activeForwards.ToArray())
         {
             try
             {
-                if (!activeForward.Value.HasExited)
-                {
-                    activeForward.Value.Kill(true);
-                }
+                kvp.Value.Cancel();
+                kvp.Value.Dispose();
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Failed to kill process for {Key}", activeForward.Key);
+                logger.LogWarning(ex, "Failed to cancel port forward for {Key}", kvp.Key);
             }
-        });
+        }
         _activeForwards.Clear();
     }
 }

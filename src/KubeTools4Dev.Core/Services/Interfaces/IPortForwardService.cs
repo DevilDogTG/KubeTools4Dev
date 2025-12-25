@@ -1,7 +1,7 @@
 ﻿namespace KubeTools4Dev.Core.Services.Interfaces;
 
 /// <summary>
-/// 
+/// Port forwarding service interface for forwarding local ports to Kubernetes pods.
 /// </summary>
 public interface IPortForwardService
 {
@@ -22,7 +22,7 @@ public interface IPortForwardService
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Stops all.
+    /// Stops all active port forwards.
     /// </summary>
     void StopAll();
 }

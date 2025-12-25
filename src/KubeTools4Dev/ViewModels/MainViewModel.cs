@@ -64,7 +64,7 @@ public partial class MainViewModel : ViewModelBase
 
         // Manual DI for simplicity in this specific scope
         _kubeService = new KubernetesService(loggerFactory.CreateLogger<KubernetesService>());
-        _portForwardService = new PortForwardService(loggerFactory.CreateLogger<PortForwardService>());
+        _portForwardService = new PortForwardService(_kubeService, loggerFactory.CreateLogger<PortForwardService>());
         _settingsService = new SettingsService();
 
         PodList = new PodListViewModel(
