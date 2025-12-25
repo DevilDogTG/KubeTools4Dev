@@ -1,6 +1,5 @@
 using DMNSN.Core;
 using k8s;
-using k8s.Autorest;
 using k8s.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -47,15 +46,9 @@ public class KubernetesService(
         try
         {
             logger.Information("Connecting to Kubernetes...");
-            KubernetesClientConfiguration config;
-            if (string.IsNullOrEmpty(kubeConfigPath))
-            {
-                config = KubernetesClientConfiguration.BuildDefaultConfig();
-            }
-            else
-            {
-                config = KubernetesClientConfiguration.BuildConfigFromConfigFile(kubeConfigPath);
-            }
+            KubernetesClientConfiguration config = string.IsNullOrEmpty(kubeConfigPath)
+                ? KubernetesClientConfiguration.BuildDefaultConfig()
+                : KubernetesClientConfiguration.BuildConfigFromConfigFile(kubeConfigPath);
 
             _client = new Kubernetes(config);
 
@@ -69,7 +62,6 @@ public class KubernetesService(
         {
             // Log error
             logger.Error(ex, "Failed to connect to Kubernetes");
-            Console.WriteLine($"Failed to connect to Kubernetes: {ex.Message}");
             _client = null;
             return false;
         }
@@ -83,18 +75,11 @@ public class KubernetesService(
     /// <exception cref="InvalidOperationException">Not connected</exception>
     public async Task<IEnumerable<V1Pod>> GetPodsAsync(string namespaceName = "default")
     {
-        if (_client == null) throw new InvalidOperationException("Not connected");
-
-        if (IsAllNamespaces(namespaceName))
-        {
-            var list = await _client.CoreV1.ListPodForAllNamespacesAsync();
-            return list.Items;
-        }
-        else
-        {
-            var list = await _client.CoreV1.ListNamespacedPodAsync(namespaceName);
-            return list.Items;
-        }
+        return (
+            IsAllNamespaces(namespaceName)
+                ? await Client.CoreV1.ListPodForAllNamespacesAsync()
+                : await Client.CoreV1.ListNamespacedPodAsync(namespaceName)
+            ).Items;
     }
 
     /// <summary>
@@ -105,18 +90,12 @@ public class KubernetesService(
     /// <exception cref="InvalidOperationException">Not connected</exception>
     public async Task<IEnumerable<V1Service>> GetServicesAsync(string namespaceName = "default")
     {
-        if (_client == null) throw new InvalidOperationException("Not connected");
-
-        if (IsAllNamespaces(namespaceName))
-        {
-            var list = await _client.CoreV1.ListServiceForAllNamespacesAsync();
-            return list.Items;
-        }
-        else
-        {
-            var list = await _client.CoreV1.ListNamespacedServiceAsync(namespaceName);
-            return list.Items.Where(s => s.Metadata.Name != "kubernetes");
-        }
+        return (
+            IsAllNamespaces(namespaceName)
+                ? await Client.CoreV1.ListServiceForAllNamespacesAsync()
+                : await Client.CoreV1.ListNamespacedServiceAsync(namespaceName)
+            ).Items
+            .Where(s => s.Metadata.Name != "kubernetes");
     }
 
     /// <summary>
@@ -126,24 +105,28 @@ public class KubernetesService(
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>An async enumerable of watch events.</returns>
     /// <exception cref="InvalidOperationException">Not connected</exception>
-    public async IAsyncEnumerable<(WatchEventType Type, V1Pod Item)> WatchPodsAsync(string namespaceName = "default", [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<(WatchEventType Type, V1Pod Item)> WatchPodsAsync(
+        string namespaceName = "default",
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+        CancellationToken cancellationToken = default)
     {
-        if (_client == null) throw new InvalidOperationException("Not connected");
-
-        Task<HttpOperationResponse<V1PodList>> responseTask;
-
         if (IsAllNamespaces(namespaceName))
         {
-            responseTask = _client.CoreV1.ListPodForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: cancellationToken);
+            await foreach (var (type, item) in Client.CoreV1
+                .WatchListPodForAllNamespacesAsync(cancellationToken: cancellationToken))
+            {
+                yield return (type, item);
+            }
         }
         else
         {
-            responseTask = _client.CoreV1.ListNamespacedPodWithHttpMessagesAsync(namespaceName, watch: true, cancellationToken: cancellationToken);
-        }
-
-        await foreach (var (type, item) in responseTask.WatchAsync<V1Pod, V1PodList>(cancellationToken: cancellationToken))
-        {
-            yield return (type, item);
+            await foreach (var (type, item) in Client.CoreV1
+                .WatchListNamespacedPodAsync(
+                    namespaceName,
+                    cancellationToken: cancellationToken))
+            {
+                yield return (type, item);
+            }
         }
     }
 
