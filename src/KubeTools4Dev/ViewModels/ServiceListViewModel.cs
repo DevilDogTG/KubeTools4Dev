@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 namespace KubeTools4Dev.ViewModels;
 
 /// <summary>
-/// 
+/// View model for the list of services.
 /// </summary>
 /// <seealso cref="ViewModelBase" />
 /// <remarks>

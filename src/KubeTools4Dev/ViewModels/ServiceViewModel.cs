@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace KubeTools4Dev.ViewModels;
 
 /// <summary>
-/// 
+/// View model for a single service.
 /// </summary>
 /// <seealso cref="CommunityToolkit.Mvvm.ComponentModel.ObservableObject" />
 public partial class ServiceViewModel : ObservableObject

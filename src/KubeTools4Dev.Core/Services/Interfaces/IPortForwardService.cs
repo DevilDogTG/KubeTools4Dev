@@ -13,7 +13,7 @@ public interface IPortForwardService
     /// <param name="targetPort">The target port.</param>
     /// <param name="localPort">The local port.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns></returns>
+    /// <returns>A task representing the asynchronous operation.</returns>
     Task StartServicePortForwardAsync(
         string serviceName,
         string namespaceName,

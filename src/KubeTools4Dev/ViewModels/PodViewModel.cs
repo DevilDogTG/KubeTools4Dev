@@ -7,7 +7,7 @@ using System.Linq;
 namespace KubeTools4Dev.ViewModels;
 
 /// <summary>
-/// 
+/// View model for a single pod.
 /// </summary>
 /// <seealso cref="CommunityToolkit.Mvvm.ComponentModel.ObservableObject" />
 public partial class PodViewModel : ObservableObject

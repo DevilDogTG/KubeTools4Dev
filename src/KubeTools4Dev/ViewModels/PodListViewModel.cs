@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 namespace KubeTools4Dev.ViewModels;
 
 /// <summary>
-/// 
+/// View model for the list of pods.
 /// </summary>
 /// <seealso cref="KubeTools4Dev.ViewModels.ViewModelBase" />
 public partial class PodListViewModel : ViewModelBase

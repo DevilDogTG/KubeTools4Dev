@@ -11,7 +11,9 @@ namespace KubeTools4Dev.Core.Services;
 /// Service for interacting with Kubernetes clusters.
 /// </summary>
 /// <seealso cref="IKubernetesService" />
-public class KubernetesService(ILogger<KubernetesService> logger) : IKubernetesService
+public class KubernetesService(
+    ILogger<KubernetesService> logger
+) : IKubernetesService
 {
     /// <summary>
     /// The client
@@ -39,7 +41,7 @@ public class KubernetesService(ILogger<KubernetesService> logger) : IKubernetesS
     /// Connects the asynchronous.
     /// </summary>
     /// <param name="kubeConfigPath">The kube configuration path.</param>
-    /// <returns></returns>
+    /// <returns><c>true</c> if connection was successful; otherwise, <c>false</c>.</returns>
     public async Task<bool> ConnectAsync(string? kubeConfigPath = null)
     {
         try
@@ -77,7 +79,7 @@ public class KubernetesService(ILogger<KubernetesService> logger) : IKubernetesS
     /// Gets the pods asynchronous.
     /// </summary>
     /// <param name="namespaceName">Name of the namespace.</param>
-    /// <returns></returns>
+    /// <returns>A list of pods in the specified namespace.</returns>
     /// <exception cref="InvalidOperationException">Not connected</exception>
     public async Task<IEnumerable<V1Pod>> GetPodsAsync(string namespaceName = "default")
     {
@@ -99,7 +101,7 @@ public class KubernetesService(ILogger<KubernetesService> logger) : IKubernetesS
     /// Gets the services asynchronous.
     /// </summary>
     /// <param name="namespaceName">Name of the namespace.</param>
-    /// <returns></returns>
+    /// <returns>A list of services in the specified namespace.</returns>
     /// <exception cref="InvalidOperationException">Not connected</exception>
     public async Task<IEnumerable<V1Service>> GetServicesAsync(string namespaceName = "default")
     {
@@ -122,7 +124,7 @@ public class KubernetesService(ILogger<KubernetesService> logger) : IKubernetesS
     /// </summary>
     /// <param name="namespaceName">Name of the namespace.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns></returns>
+    /// <returns>An async enumerable of watch events.</returns>
     /// <exception cref="InvalidOperationException">Not connected</exception>
     public async IAsyncEnumerable<(WatchEventType Type, V1Pod Item)> WatchPodsAsync(string namespaceName = "default", [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {

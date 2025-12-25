@@ -1,7 +1,7 @@
 ﻿namespace KubeTools4Dev.Core.Models;
 
 /// <summary>
-/// 
+/// Represents the application settings model.
 /// </summary>
 internal class SettingsModel
 {

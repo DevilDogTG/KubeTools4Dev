@@ -80,6 +80,9 @@ public partial class MainViewModel : ViewModelBase
         _ = ConnectCommand.ExecuteAsync(null);
     }
 
+    /// <summary>
+    /// Cleanups resources used by the view model.
+    /// </summary>
     public void Cleanup()
     {
         ServiceList?.Cleanup();

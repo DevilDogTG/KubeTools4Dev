@@ -41,6 +41,7 @@ public partial class PortForwardService(
     /// <param name="targetPort">The target port.</param>
     /// <param name="localPort">The local port.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public async Task StartServicePortForwardAsync(string serviceName, string namespaceName, object targetPort, int localPort, CancellationToken cancellationToken)
     {
         var key = $"{namespaceName}/{serviceName}:{localPort}";
@@ -304,6 +305,10 @@ public partial class PortForwardService(
     /// <summary>
     /// Resolves a pod name from a service by looking up pods matching the service's selector.
     /// </summary>
+    /// <param name="serviceName">Name of the service.</param>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The name of a running pod matching the service selector, or null if none found.</returns>
     private async Task<string?> ResolvePodFromServiceAsync(string serviceName, string namespaceName, CancellationToken cancellationToken)
     {
         var client = kubernetesService.Client;
