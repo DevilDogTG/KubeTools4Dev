@@ -1,7 +1,7 @@
+using DMNSN.Core;
 using k8s;
 using k8s.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
-using KubeTools4Dev.Core.Shares;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Net;
@@ -20,11 +20,6 @@ public partial class PortForwardService(
 ) : IPortForwardService
 {
     /// <summary>
-    /// The active forwards with their cancellation token sources.
-    /// </summary>
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeForwards = new();
-
-    /// <summary>
     /// Connection timeout for WebSocket connections.
     /// </summary>
     private static readonly TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(30);
@@ -34,6 +29,10 @@ public partial class PortForwardService(
     /// </summary>
     private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(3);
 
+    /// <summary>
+    /// The active forwards with their cancellation token sources.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeForwards = new();
     /// <summary>
     /// Starts the service port forward asynchronous.
     /// </summary>
@@ -119,36 +118,26 @@ public partial class PortForwardService(
     }
 
     /// <summary>
-    /// Resolves a pod name from a service by looking up pods matching the service's selector.
+    /// Stops all active port forwards.
     /// </summary>
-    private async Task<string?> ResolvePodFromServiceAsync(string serviceName, string namespaceName, CancellationToken cancellationToken)
+    public void StopAll()
     {
-        var client = kubernetesService.Client;
+        logger.Information("Stopping all port forwards...");
 
-        // Get the service to find its selector
-        var service = await client.CoreV1.ReadNamespacedServiceAsync(serviceName, namespaceName, cancellationToken: cancellationToken);
-        var selector = service.Spec.Selector;
-
-        if (selector == null || selector.Count == 0)
+        // Cancel all active forwards
+        foreach (var kvp in _activeForwards.ToArray())
         {
-            return null;
+            try
+            {
+                kvp.Value.Cancel();
+                kvp.Value.Dispose();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to cancel port forward for {Key}", kvp.Key);
+            }
         }
-
-        // Build label selector string
-        var labelSelector = string.Join(",", selector.Select(kv => $"{kv.Key}={kv.Value}"));
-
-        // List pods matching the selector
-        var pods = await client.CoreV1.ListNamespacedPodAsync(
-            namespaceName,
-            labelSelector: labelSelector,
-            cancellationToken: cancellationToken);
-
-        // Return the first running pod
-        var runningPod = pods.Items
-            .FirstOrDefault(p => p.Status.Phase == "Running" &&
-                                  p.Status.ContainerStatuses?.All(c => c.Ready == true) == true);
-
-        return runningPod?.Metadata.Name;
+        _activeForwards.Clear();
     }
 
     /// <summary>
@@ -183,67 +172,6 @@ public partial class PortForwardService(
             {
                 break;
             }
-        }
-    }
-
-    /// <summary>
-    /// Handles a single connection with its own WebSocket tunnel to the pod.
-    /// </summary>
-    private async Task HandleSingleConnectionAsync(Socket handler, string podName, string namespaceName, int remotePort, CancellationToken cancellationToken)
-    {
-        WebSocket? webSocket = null;
-        StreamDemuxer? demuxer = null;
-
-        try
-        {
-            // Create WebSocket connection for this specific connection
-            using var timeoutCts = new CancellationTokenSource(ConnectionTimeout);
-            using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-
-            try
-            {
-                webSocket = await kubernetesService.Client
-                    .WebSocketNamespacedPodPortForwardAsync(
-                        podName,
-                        namespaceName,
-                        new[] { remotePort },
-                        "v4.channel.k8s.io",
-                        cancellationToken: connectCts.Token)
-                    .ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
-            {
-                LogConnectionTimeout(podName, $"Timed out connecting to pod {podName}:{remotePort}");
-                return;
-            }
-
-            // Create stream demuxer for port forwarding
-            demuxer = new StreamDemuxer(webSocket, StreamType.PortForward);
-            demuxer.Start();
-
-            // Get the stream for the port
-            var podStream = demuxer.GetStream((byte?)0, (byte?)0);
-
-            // Create tasks for bidirectional copy (like the official example)
-            var socketToPod = Task.Run(() => CopySocketToStream(handler, podStream, podName, cancellationToken), cancellationToken);
-            var podToSocket = Task.Run(() => CopyStreamToSocket(podStream, handler, podName, cancellationToken), cancellationToken);
-
-            // Wait for either direction to complete (connection closed)
-            await Task.WhenAny(socketToPod, podToSocket);
-        }
-        catch (WebSocketException ex)
-        {
-            LogWebSocketError(podName, ex.Message);
-        }
-        catch (Exception ex)
-        {
-            LogConnectionError(podName, ex.Message);
-        }
-        finally
-        {
-            try { handler.Close(); } catch { }
-            try { demuxer?.Dispose(); } catch { }
-            try { webSocket?.Dispose(); } catch { }
         }
     }
 
@@ -313,25 +241,96 @@ public partial class PortForwardService(
     }
 
     /// <summary>
-    /// Stops all active port forwards.
+    /// Handles a single connection with its own WebSocket tunnel to the pod.
     /// </summary>
-    public void StopAll()
+    private async Task HandleSingleConnectionAsync(Socket handler, string podName, string namespaceName, int remotePort, CancellationToken cancellationToken)
     {
-        logger.Info("Stopping all port forwards...");
+        WebSocket? webSocket = null;
+        StreamDemuxer? demuxer = null;
 
-        // Cancel all active forwards
-        foreach (var kvp in _activeForwards.ToArray())
+        try
         {
+            // Create WebSocket connection for this specific connection
+            using var timeoutCts = new CancellationTokenSource(ConnectionTimeout);
+            using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
             try
             {
-                kvp.Value.Cancel();
-                kvp.Value.Dispose();
+                webSocket = await kubernetesService.Client
+                    .WebSocketNamespacedPodPortForwardAsync(
+                        podName,
+                        namespaceName,
+                        new[] { remotePort },
+                        "v4.channel.k8s.io",
+                        cancellationToken: connectCts.Token)
+                    .ConfigureAwait(false);
             }
-            catch (Exception ex)
+            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
             {
-                logger.LogWarning(ex, "Failed to cancel port forward for {Key}", kvp.Key);
+                LogConnectionTimeout(podName, $"Timed out connecting to pod {podName}:{remotePort}");
+                return;
             }
+
+            // Create stream demuxer for port forwarding
+            demuxer = new StreamDemuxer(webSocket, StreamType.PortForward);
+            demuxer.Start();
+
+            // Get the stream for the port
+            var podStream = demuxer.GetStream((byte?)0, (byte?)0);
+
+            // Create tasks for bidirectional copy (like the official example)
+            var socketToPod = Task.Run(() => CopySocketToStream(handler, podStream, podName, cancellationToken), cancellationToken);
+            var podToSocket = Task.Run(() => CopyStreamToSocket(podStream, handler, podName, cancellationToken), cancellationToken);
+
+            // Wait for either direction to complete (connection closed)
+            await Task.WhenAny(socketToPod, podToSocket);
         }
-        _activeForwards.Clear();
+        catch (WebSocketException ex)
+        {
+            LogWebSocketError(podName, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            LogConnectionError(podName, ex.Message);
+        }
+        finally
+        {
+            try { handler.Close(); } catch { }
+            try { demuxer?.Dispose(); } catch { }
+            try { webSocket?.Dispose(); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// Resolves a pod name from a service by looking up pods matching the service's selector.
+    /// </summary>
+    private async Task<string?> ResolvePodFromServiceAsync(string serviceName, string namespaceName, CancellationToken cancellationToken)
+    {
+        var client = kubernetesService.Client;
+
+        // Get the service to find its selector
+        var service = await client.CoreV1.ReadNamespacedServiceAsync(serviceName, namespaceName, cancellationToken: cancellationToken);
+        var selector = service.Spec.Selector;
+
+        if (selector == null || selector.Count == 0)
+        {
+            return null;
+        }
+
+        // Build label selector string
+        var labelSelector = string.Join(",", selector.Select(kv => $"{kv.Key}={kv.Value}"));
+
+        // List pods matching the selector
+        var pods = await client.CoreV1.ListNamespacedPodAsync(
+            namespaceName,
+            labelSelector: labelSelector,
+            cancellationToken: cancellationToken);
+
+        // Return the first running pod
+        var runningPod = pods.Items
+            .FirstOrDefault(p => p.Status.Phase == "Running" &&
+                                  p.Status.ContainerStatuses?.All(c => c.Ready == true) == true);
+
+        return runningPod?.Metadata.Name;
     }
 }

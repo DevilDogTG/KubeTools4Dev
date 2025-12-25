@@ -20,34 +20,32 @@ namespace KubeTools4Dev.ViewModels;
 public partial class PodListViewModel : ViewModelBase
 {
     /// <summary>
-    /// The kube service
-    /// </summary>
-    private readonly IKubernetesService _kubeService;
-    /// <summary>
-    /// The settings service
-    /// </summary>
-    private readonly ISettingsService _settingsService;
-    /// <summary>
-    /// The logger
-    /// </summary>
-    private readonly ILogger<PodListViewModel> _logger;
-    /// <summary>
-    /// The CTS
-    /// </summary>
-    private CancellationTokenSource? _cts;
-
-    // Master list of all pods
-    /// <summary>
     /// All pods
     /// </summary>
     private readonly List<PodViewModel> _allPods = new();
 
     /// <summary>
-    /// The pods
+    /// The kube service
     /// </summary>
-    [ObservableProperty]
-    private ObservableCollection<PodViewModel> _pods = new();
+    private readonly IKubernetesService _kubeService;
+    /// <summary>
+    /// The logger
+    /// </summary>
+    private readonly ILogger<PodListViewModel> _logger;
 
+    /// <summary>
+    /// The refresh timer
+    /// </summary>
+    private readonly DispatcherTimer _refreshTimer;
+
+    /// <summary>
+    /// The settings service
+    /// </summary>
+    private readonly ISettingsService _settingsService;
+    /// <summary>
+    /// The CTS
+    /// </summary>
+    private CancellationTokenSource? _cts;
     /// <summary>
     /// The filter text
     /// </summary>
@@ -67,15 +65,16 @@ public partial class PodListViewModel : ViewModelBase
     private string _lastRefreshTime = "Never";
 
     /// <summary>
+    /// The pods
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<PodViewModel> _pods = new();
+
+    /// <summary>
     /// The refresh interval seconds
     /// </summary>
     [ObservableProperty]
     private int _refreshIntervalSeconds = 5;
-
-    /// <summary>
-    /// The refresh timer
-    /// </summary>
-    private readonly DispatcherTimer _refreshTimer;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PodListViewModel"/> class.
@@ -135,6 +134,15 @@ public partial class PodListViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Decrements the refresh interval.
+    /// </summary>
+    [RelayCommand]
+    private void DecrementRefreshInterval()
+    {
+        RefreshIntervalSeconds = Math.Clamp(RefreshIntervalSeconds - 1, 1, 60);
+    }
+
+    /// <summary>
     /// Increments the refresh interval.
     /// </summary>
     [RelayCommand]
@@ -142,14 +150,13 @@ public partial class PodListViewModel : ViewModelBase
     {
         RefreshIntervalSeconds = Math.Clamp(RefreshIntervalSeconds + 1, 1, 60);
     }
-
     /// <summary>
-    /// Decrements the refresh interval.
+    /// Called when [filter text changed].
     /// </summary>
-    [RelayCommand]
-    private void DecrementRefreshInterval()
+    /// <param name="value">The value.</param>
+    partial void OnFilterTextChanged(string value)
     {
-        RefreshIntervalSeconds = Math.Clamp(RefreshIntervalSeconds - 1, 1, 60);
+        UpdateFilteredList();
     }
 
     /// <summary>
@@ -165,14 +172,23 @@ public partial class PodListViewModel : ViewModelBase
             _settingsService.Save();
         }
     }
-
     /// <summary>
-    /// Called when [filter text changed].
+    /// Triggers the refresh.
     /// </summary>
-    /// <param name="value">The value.</param>
-    partial void OnFilterTextChanged(string value)
+    private void TriggerRefresh()
     {
-        UpdateFilteredList();
+        // For now, just update the timestamp if we are "watching"
+        // If the watch is stuck, this won't help unless we re-fetch.
+        // User asked for "config interval to refresh". This usually implies re-fetching or ensuring liveliness.
+        // Let's re-fetch if the user wants. But usually Watch is better.
+        // Let's just update the "Age" of pods and "Last Updated" if needed.
+        // Actually, "Last Updated" should reflect data change.
+        // Let's update the AGE of pods periodically.
+        UpdateRefreshTime();
+        foreach (var pod in Pods)
+        {
+            pod.RefreshAge();
+        }
     }
 
     /// <summary>
@@ -201,26 +217,6 @@ public partial class PodListViewModel : ViewModelBase
             Pods.Add(p);
         }
     }
-
-    /// <summary>
-    /// Triggers the refresh.
-    /// </summary>
-    private void TriggerRefresh()
-    {
-        // For now, just update the timestamp if we are "watching"
-        // If the watch is stuck, this won't help unless we re-fetch.
-        // User asked for "config interval to refresh". This usually implies re-fetching or ensuring liveliness.
-        // Let's re-fetch if the user wants. But usually Watch is better.
-        // Let's just update the "Age" of pods and "Last Updated" if needed.
-        // Actually, "Last Updated" should reflect data change.
-        // Let's update the AGE of pods periodically.
-        UpdateRefreshTime();
-        foreach (var pod in Pods)
-        {
-            pod.RefreshAge();
-        }
-    }
-
     /// <summary>
     /// Updates the refresh time.
     /// </summary>

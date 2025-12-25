@@ -18,6 +18,11 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     private readonly KubernetesService _kubeService;
     /// <summary>
+    /// The logger
+    /// </summary>
+    private readonly ILogger<MainViewModel> _logger;
+
+    /// <summary>
     /// The port forward service
     /// </summary>
     private readonly IPortForwardService _portForwardService;
@@ -25,23 +30,6 @@ public partial class MainViewModel : ViewModelBase
     /// The settings service
     /// </summary>
     private readonly ISettingsService _settingsService;
-    /// <summary>
-    /// The logger
-    /// </summary>
-    private readonly ILogger<MainViewModel> _logger;
-
-    /// <summary>
-    /// The pod list
-    /// </summary>
-    [ObservableProperty]
-    private PodListViewModel _podList;
-
-    /// <summary>
-    /// The service list
-    /// </summary>
-    [ObservableProperty]
-    private ServiceListViewModel _serviceList;
-
     /// <summary>
     /// The connection status
     /// </summary>
@@ -54,6 +42,17 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isConnected;
 
+    /// <summary>
+    /// The pod list
+    /// </summary>
+    [ObservableProperty]
+    private PodListViewModel _podList;
+
+    /// <summary>
+    /// The service list
+    /// </summary>
+    [ObservableProperty]
+    private ServiceListViewModel _serviceList;
     /// <summary>
     /// Initializes a new instance of the <see cref="MainViewModel"/> class.
     /// </summary>
@@ -81,6 +80,11 @@ public partial class MainViewModel : ViewModelBase
         _ = ConnectCommand.ExecuteAsync(null);
     }
 
+    public void Cleanup()
+    {
+        ServiceList?.Cleanup();
+    }
+
     /// <summary>
     /// Connects Kubernetes instance command.
     /// </summary>
@@ -101,9 +105,5 @@ public partial class MainViewModel : ViewModelBase
             ConnectionStatus = "Connection Failed";
             IsConnected = false;
         }
-    }
-    public void Cleanup()
-    {
-        ServiceList?.Cleanup();
     }
 }

@@ -9,15 +9,110 @@ using System.Threading.Tasks;
 
 namespace KubeTools4Dev.ViewModels;
 
+/// <summary>
+/// 
+/// </summary>
+/// <seealso cref="CommunityToolkit.Mvvm.ComponentModel.ObservableObject" />
 public partial class ServiceViewModel : ObservableObject
 {
-    private readonly V1Service _service;
-    private readonly V1ServicePort _port;
+    /// <summary>
+    /// The pf service
+    /// </summary>
     private readonly IPortForwardService _pfService;
+
+    /// <summary>
+    /// The port
+    /// </summary>
+    private readonly V1ServicePort _port;
+
+    /// <summary>
+    /// The service
+    /// </summary>
+    private readonly V1Service _service;
+
+    /// <summary>
+    /// The settings service
+    /// </summary>
     private readonly ISettingsService _settingsService;
+
+    /// <summary>
+    /// The duration text
+    /// </summary>
+    [ObservableProperty]
+    private string _durationText = "";
+
+    /// <summary>
+    /// The duration timer
+    /// </summary>
+    private DispatcherTimer _durationTimer;
+
+    /// <summary>
+    /// The is excluded
+    /// </summary>
+    private bool _isExcluded;
+
+    /// <summary>
+    /// The is forwarding
+    /// </summary>
+    private bool _isForwarding;
+
+    /// <summary>
+    /// The local port
+    /// </summary>
+    [ObservableProperty]
+    private int _localPort;
+
+    /// <summary>
+    /// The name
+    /// </summary>
+    [ObservableProperty]
+    private string _name;
+
+    /// <summary>
+    /// The namespace
+    /// </summary>
+    [ObservableProperty]
+    private string _namespace;
+
+    /// <summary>
+    /// The pf CTS
+    /// </summary>
     private CancellationTokenSource? _pfCts;
+    /// <summary>
+    /// The settings key
+    /// </summary>
     private string _settingsKey;
 
+    /// <summary>
+    /// The start time
+    /// </summary>
+    private DateTime? _startTime;
+
+    /// <summary>
+    /// The status
+    /// </summary>
+    [ObservableProperty]
+    private string _status = "Stopped";
+
+    /// <summary>
+    /// The target port
+    /// </summary>
+    [ObservableProperty]
+    private object _targetPort;
+
+    /// <summary>
+    /// The target port display
+    /// </summary>
+    [ObservableProperty]
+    private string _targetPortDisplay;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ServiceViewModel"/> class.
+    /// </summary>
+    /// <param name="service">The service.</param>
+    /// <param name="port">The port.</param>
+    /// <param name="pfService">The pf service.</param>
+    /// <param name="settingsService">The settings service.</param>
     public ServiceViewModel(V1Service service, V1ServicePort port, IPortForwardService pfService, ISettingsService settingsService)
     {
         _service = service;
@@ -54,18 +149,12 @@ public partial class ServiceViewModel : ObservableObject
         };
     }
 
-    private DispatcherTimer _durationTimer;
-    private DateTime? _startTime;
-
-    [ObservableProperty] private string _durationText = "";
-
-    [ObservableProperty] private string _name;
-    [ObservableProperty] private string _namespace;
-    [ObservableProperty] private object _targetPort;
-    [ObservableProperty] private string _targetPortDisplay;
-    [ObservableProperty] private int _localPort;
-
-    private bool _isExcluded;
+    /// <summary>
+    /// Gets or sets a value indicating whether this instance is excluded.
+    /// </summary>
+    /// <value>
+    ///   <c>true</c> if this instance is excluded; otherwise, <c>false</c>.
+    /// </value>
     public bool IsExcluded
     {
         get => _isExcluded;
@@ -92,11 +181,12 @@ public partial class ServiceViewModel : ObservableObject
             }
         }
     }
-
-    [ObservableProperty]
-    private string _status = "Stopped";
-
-    private bool _isForwarding;
+    /// <summary>
+    /// Gets or sets a value indicating whether this instance is forwarding.
+    /// </summary>
+    /// <value>
+    ///   <c>true</c> if this instance is forwarding; otherwise, <c>false</c>.
+    /// </value>
     public bool IsForwarding
     {
         get => _isForwarding;
@@ -110,6 +200,9 @@ public partial class ServiceViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Starts the forwarding.
+    /// </summary>
     private async void StartForwarding()
     {
         Status = "Starting";
@@ -150,17 +243,23 @@ public partial class ServiceViewModel : ObservableObject
         }
     }
 
-    private void StopTimer()
-    {
-        _durationTimer.Stop();
-        DurationText = "";
-        _startTime = null;
-    }
-
+    /// <summary>
+    /// Stops the forwarding.
+    /// </summary>
     private void StopForwarding()
     {
         _pfCts?.Cancel();
         Status = "Stopped";
         StopTimer();
+    }
+
+    /// <summary>
+    /// Stops the timer.
+    /// </summary>
+    private void StopTimer()
+    {
+        _durationTimer.Stop();
+        DurationText = "";
+        _startTime = null;
     }
 }

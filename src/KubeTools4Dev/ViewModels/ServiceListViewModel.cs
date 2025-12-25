@@ -30,16 +30,23 @@ public partial class ServiceListViewModel(
 {
 
     /// <summary>
-    /// The services
-    /// </summary>
-    [ObservableProperty]
-    private ObservableCollection<ServiceViewModel> _services = [];
-
-    /// <summary>
     /// The is loading
     /// </summary>
     [ObservableProperty]
     private bool _isLoading;
+
+    /// <summary>
+    /// The services
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<ServiceViewModel> _services = [];
+    /// <summary>
+    /// Cleanups this instance.
+    /// </summary>
+    public void Cleanup()
+    {
+        portForwardService.StopAll();
+    }
 
     /// <summary>
     /// Initializes the asynchronous.
@@ -105,13 +112,5 @@ public partial class ServiceListViewModel(
                 svc.IsForwarding = false;
             }
         }
-    }
-
-    /// <summary>
-    /// Cleanups this instance.
-    /// </summary>
-    public void Cleanup()
-    {
-        portForwardService.StopAll();
     }
 }

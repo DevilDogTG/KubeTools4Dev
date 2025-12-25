@@ -13,9 +13,16 @@ namespace KubeTools4Dev.ViewModels;
 public partial class PodViewModel : ObservableObject
 {
     /// <summary>
-    /// The pod
+    /// The age
     /// </summary>
-    private V1Pod _pod;
+    [ObservableProperty]
+    private string _age = string.Empty;
+
+    /// <summary>
+    /// The last restart
+    /// </summary>
+    [ObservableProperty]
+    private string _lastRestart = string.Empty;
 
     /// <summary>
     /// The name
@@ -30,29 +37,20 @@ public partial class PodViewModel : ObservableObject
     private string _namespace = string.Empty;
 
     /// <summary>
-    /// The status
+    /// The pod
     /// </summary>
-    [ObservableProperty]
-    private string _status = string.Empty;
-
-    /// <summary>
-    /// The age
-    /// </summary>
-    [ObservableProperty]
-    private string _age = string.Empty;
-
-    /// <summary>
-    /// The last restart
-    /// </summary>
-    [ObservableProperty]
-    private string _lastRestart = string.Empty;
-
+    private V1Pod _pod;
     /// <summary>
     /// The restarts
     /// </summary>
     [ObservableProperty]
     private int _restarts = 0;
 
+    /// <summary>
+    /// The status
+    /// </summary>
+    [ObservableProperty]
+    private string _status = string.Empty;
     /// <summary>
     /// The status color
     /// </summary>
@@ -67,6 +65,17 @@ public partial class PodViewModel : ObservableObject
     {
         _pod = pod;
         Update(pod);
+    }
+
+    /// <summary>
+    /// Refreshes the age.
+    /// </summary>
+    public void RefreshAge()
+    {
+        if (_pod.Metadata.CreationTimestamp.HasValue)
+        {
+            Age = FormatAge(DateTime.UtcNow - _pod.Metadata.CreationTimestamp.Value);
+        }
     }
 
     /// <summary>
@@ -131,18 +140,6 @@ public partial class PodViewModel : ObservableObject
             _ => Brushes.Gray
         };
     }
-
-    /// <summary>
-    /// Refreshes the age.
-    /// </summary>
-    public void RefreshAge()
-    {
-        if (_pod.Metadata.CreationTimestamp.HasValue)
-        {
-            Age = FormatAge(DateTime.UtcNow - _pod.Metadata.CreationTimestamp.Value);
-        }
-    }
-
     /// <summary>
     /// Formats the age.
     /// </summary>
