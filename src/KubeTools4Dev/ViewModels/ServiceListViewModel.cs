@@ -40,6 +40,7 @@ public partial class ServiceListViewModel(
     /// </summary>
     [ObservableProperty]
     private ObservableCollection<ServiceViewModel> _services = [];
+
     /// <summary>
     /// Cleanups this instance.
     /// </summary>

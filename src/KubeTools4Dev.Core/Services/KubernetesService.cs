@@ -26,7 +26,8 @@ public class KubernetesService(
     /// The client.
     /// </value>
     /// <exception cref="InvalidOperationException">Not connected to Kubernetes</exception>
-    public IKubernetes Client => _client ?? throw new InvalidOperationException("Not connected to Kubernetes");
+    public IKubernetes Client => _client
+        ?? throw new InvalidOperationException("Not connected to Kubernetes");
 
     /// <summary>
     /// Gets a value indicating whether this instance is connected.
