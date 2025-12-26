@@ -38,7 +38,7 @@ class Program
         var defaultLogPath = baseConfig["Settings:General:LogPath"];
         if (!string.IsNullOrEmpty(defaultLogPath))
         {
-            inMemoryOverrides["Serilog:WriteTo:1:Args:path"] = defaultLogPath;
+            inMemoryOverrides["Serilog:WriteTo:0:Args:path"] = defaultLogPath;
         }
 
         if (File.Exists(userSettingsPath))
@@ -61,9 +61,9 @@ class Program
 
                     if (!string.IsNullOrEmpty(logPath))
                     {
-                        // Assuming File sink is index 1 based on appsettings.json "Using": [Console, File] and WriteTo array order.
+                        // Assuming File sink is index 0 based on appsettings.json "Using": [Serilog.Sinks.File] and WriteTo array order.
                         // Ideally we'd find the File sink args, but simple override works for known structure.
-                        inMemoryOverrides["Serilog:WriteTo:1:Args:path"] = logPath;
+                        inMemoryOverrides["Serilog:WriteTo:0:Args:path"] = logPath;
                     }
                 }
             }
