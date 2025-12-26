@@ -229,11 +229,11 @@ public partial class ServiceViewModel : ObservableObject
     [RelayCommand]
     private void OpenBrowser()
     {
-        if (_localPort > 0)
+        if (LocalPort > 0)
         {
             try
             {
-                var url = $"http://localhost:{_localPort}";
+                var url = $"http://localhost:{LocalPort}";
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = url,
