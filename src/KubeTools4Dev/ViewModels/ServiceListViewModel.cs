@@ -1,6 +1,7 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DMNSN.Core;
 using k8s;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -151,7 +152,7 @@ public partial class ServiceListViewModel(
                     _allServices.Remove(vm);
                     vm.IsForwarding = false; // Ensure background task stops
                 }
-                
+
                 if (staleVMs.Any())
                 {
                     UpdateFilteredList();
@@ -164,12 +165,19 @@ public partial class ServiceListViewModel(
         }
     }
 
+    /// <summary>
+    /// Updates the filtered list.
+    /// </summary>
     private void UpdateFilteredList()
     {
         // Simple list update, assume no filtering for now or add if needed later
-        var sorted = _allServices.OrderBy(s => s.Namespace).ThenBy(s => s.Name).ToList();
+        var sorted = _allServices
+            .OrderBy(s => s.Namespace)
+            .ThenBy(s => s.Name)
+            .ToList();
 
-        // Sync local collection
+        // Sync local collection with sorted list to minimize UI updates
+
         // 1. Remove items not in sorted
         for (int i = Services.Count - 1; i >= 0; i--)
         {
@@ -178,19 +186,33 @@ public partial class ServiceListViewModel(
                 Services.RemoveAt(i);
             }
         }
+
         // 2. Add or Move items
-        // Since we want to preserve order, we might need to clear and add if strict order is required.
-        // But to avoid UI flicker, let's try to be smart or just Clear/Add for simplicity as done in PodList
-        // However, we want to KEEP references to VMs if they already exist to preserve state (PortForwarding status)
-        // Since _allServices KEEPS the references if we update them in Watch, we can just repopulate if list changed size or order.
-
-        // Actually, easiest way given Avalonia's diffing capability usually handles it well, 
-        // but let's try to match existing items.
-
-        Services.Clear();
-        foreach (var item in sorted)
+        for (int i = 0; i < sorted.Count; i++)
         {
-            Services.Add(item);
+            var item = sorted[i];
+
+            // If we are at the end of the existing list, just add remaining
+            if (i >= Services.Count)
+            {
+                Services.Add(item);
+            }
+            // If the item at current position is different
+            else if (Services[i] != item)
+            {
+                // Check if the item exists later in the list
+                int oldIndex = Services.IndexOf(item);
+                if (oldIndex >= 0)
+                {
+                    // Move it to the current position
+                    Services.Move(oldIndex, i);
+                }
+                else
+                {
+                    // It's a new item, insert it
+                    Services.Insert(i, item);
+                }
+            }
         }
     }
 
@@ -213,68 +235,51 @@ public partial class ServiceListViewModel(
                         // Identify existing items for this service
                         // A Service might spawn multiple ViewModels (one per Port)
                         // We need to match by Name/Namespace
+                        var existingViewModels = _allServices.Where(s => s.Name == item.Metadata.Name && s.Namespace == item.Metadata.NamespaceProperty).ToList();
 
-                        var existingVMs = _allServices.Where(s => s.Name == item.Metadata.Name && s.Namespace == item.Metadata.NamespaceProperty).ToList();
-
-                        if (type == k8s.WatchEventType.Deleted)
+                        // Deleted
+                        if (type == WatchEventType.Deleted)
                         {
-                            foreach (var vm in existingVMs)
+                            foreach (var vm in existingViewModels)
                             {
                                 _allServices.Remove(vm);
                             }
                         }
+                        // Added or Modified.
                         else
                         {
-                            // Added or Modified.
-                            // If modified, ports could change.
-
-                            // 1. Update existing VMs
-                            foreach (var vm in existingVMs)
-                            {
-                                vm.Update(item);
-                            }
-
-                            // 2. Check for new ports or removed ports?
-                            // This is complex because we split 1 Service into N ViewModels.
-                            // Simplified approach: 
-                            // If Added, add all ports.
-                            // If Modified, strictly speaking we should reconcile ports.
-                            // For now, if we assume ports don't change often dynamically, we can just Update metadata.
-                            // But if they DO change, our list is stale.
-
-                            // Robust approach for Modified:
-                            // Remove all existing VMs for this service and re-add them?
-                            // BAD: Kills port forwarding state.
-
-                            // Middle ground:
                             // Find ports in new item.
                             if (item.Spec.Ports != null)
                             {
                                 var newPorts = item.Spec.Ports.Where(p => p.Protocol == "TCP").ToList();
-                                
-                                // Remove VMs for ports that no longer exist
-                                foreach (var vm in existingVMs.ToList())
+
+                                // Remove ViewModels for ports that no longer exist
+                                foreach (var viewModel in existingViewModels.ToList())
                                 {
-                                    // Check if vm.TargetPort (original port) still exists in newPorts
-                                    // vm.TargetPort is object, stored as int from port.Port
-                                    if (!newPorts.Any(p => p.Port == (int)vm.TargetPort))
+                                    // Check if viewModel.TargetPort (original port) still exists in newPorts
+                                    // viewModel.TargetPort is object, stored as int from port.Port
+                                    if (!newPorts.Any(p => p.Port == (int)viewModel.TargetPort))
                                     {
-                                        _allServices.Remove(vm);
+                                        _allServices.Remove(viewModel);
                                     }
                                 }
 
-                                // Add VMs for new ports
+                                // Add ViewModels for new ports
                                 foreach (var port in newPorts)
                                 {
                                     var newId = $"{item.Metadata.NamespaceProperty}/{item.Metadata.Name}:{port.Port}";
                                     if (!_allServices.Any(s => s.Id == newId))
                                     {
-                                         _allServices.Add(new ServiceViewModel(item, port, portForwardService, settingsService));
+                                        _allServices.Add(new ServiceViewModel(
+                                            item,
+                                            port,
+                                            portForwardService,
+                                            settingsService));
                                     }
                                 }
                             }
-                            
-                            if (existingVMs.Count == 0 && type == WatchEventType.Added)
+
+                            if (existingViewModels.Count == 0 && type == WatchEventType.Added)
                             {
                                 // Fresh add
                                 if (item.Spec.Ports != null)
@@ -284,7 +289,11 @@ public partial class ServiceListViewModel(
                                         var newId = $"{item.Metadata.NamespaceProperty}/{item.Metadata.Name}:{port.Port}";
                                         if (!_allServices.Any(s => s.Id == newId))
                                         {
-                                            _allServices.Add(new ServiceViewModel(item, port, portForwardService, settingsService));
+                                            _allServices.Add(new ServiceViewModel(
+                                                item,
+                                                port,
+                                                portForwardService,
+                                                settingsService));
                                         }
                                     }
                                 }
@@ -297,12 +306,12 @@ public partial class ServiceListViewModel(
             }
             catch (OperationCanceledException)
             {
+                logger.Warning("Service watch cancelled.");
                 break;
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Watch Service Error");
-                // Backoff
+                logger.Error(ex, "Watch Service Error");
                 await Task.Delay(5000, token);
             }
         }

@@ -131,12 +131,9 @@ public partial class ServiceViewModel : ObservableObject
 
         Name = service.Metadata.Name;
         Namespace = service.Metadata.NamespaceProperty;
-        // Fix: Include target port in key to handle multi-port services correctly
         _settingsKey = $"{Namespace}/{Name}:{port.Port}";
 
-        // User requests to use the Service Port as the destination by default, 
-        // mimicking 'kubectl port-forward svc/name 8088:8088' behavior.
-        // Original logic was: TargetPort = port.TargetPort; 
+        // Use the Service Port as the destination by default
         TargetPort = port.Port;
         LocalPort = port.Port; // Default to same port
 
