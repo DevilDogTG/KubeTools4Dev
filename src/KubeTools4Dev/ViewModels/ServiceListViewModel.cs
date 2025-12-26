@@ -37,7 +37,7 @@ public partial class ServiceListViewModel(
     /// </summary>
     private readonly List<ServiceViewModel> _allServices = [];
     /// <summary>
-    /// The CTS
+    /// The cancellation token source used to manage cancellation of the service watcher.
     /// </summary>
     private CancellationTokenSource? _cts;
 
