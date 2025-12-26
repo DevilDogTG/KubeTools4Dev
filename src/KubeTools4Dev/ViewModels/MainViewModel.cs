@@ -90,6 +90,12 @@ public partial class MainViewModel : ViewModelBase
 
 
     /// <summary>
+    /// The cluster name
+    /// </summary>
+    [ObservableProperty]
+    private string _clusterName = string.Empty;
+
+    /// <summary>
     /// Connects Kubernetes instance command.
     /// </summary>
     [RelayCommand]
@@ -97,10 +103,11 @@ public partial class MainViewModel : ViewModelBase
     {
         _logger.Debug("Connecting to Kubernetes cluster");
         ConnectionStatus = "Connecting...";
-        bool success = await _kubeService.ConnectAsync();
-        if (success)
+        var currentContext = await _kubeService.ConnectAsync();
+        if (!string.IsNullOrEmpty(currentContext))
         {
             _logger.Debug("Connected to Kubernetes cluster successfully");
+            ClusterName = currentContext;
             ConnectionStatus = "Connected to Kubernetes";
             IsConnected = true;
             await PodList.InitializeAsync();
@@ -110,6 +117,7 @@ public partial class MainViewModel : ViewModelBase
         {
             _logger.Warning("Failed to connect to Kubernetes cluster");
             ConnectionStatus = "Connection Failed";
+            ClusterName = "N/A";
             IsConnected = false;
         }
     }

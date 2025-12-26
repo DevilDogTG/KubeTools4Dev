@@ -41,8 +41,8 @@ public class KubernetesService(
     /// Connects the asynchronous.
     /// </summary>
     /// <param name="kubeConfigPath">The kube configuration path.</param>
-    /// <returns><c>true</c> if connection was successful; otherwise, <c>false</c>.</returns>
-    public async Task<bool> ConnectAsync(string? kubeConfigPath = null)
+    /// <returns>Current context name</returns>
+    public async Task<string> ConnectAsync(string? kubeConfigPath = null)
     {
         try
         {
@@ -57,14 +57,14 @@ public class KubernetesService(
             await _client.Version.GetCodeAsync();
 
             logger.LogInformation("Connected to Kubernetes successfully.");
-            return true;
+            return config.CurrentContext;
         }
         catch (Exception ex)
         {
             // Log error
             logger.Error(ex, "Failed to connect to Kubernetes");
             _client = null;
-            return false;
+            return string.Empty;
         }
     }
 
@@ -123,6 +123,38 @@ public class KubernetesService(
         {
             await foreach (var (type, item) in Client.CoreV1
                 .WatchListNamespacedPodAsync(
+                    namespaceName,
+                    cancellationToken: cancellationToken))
+            {
+                yield return (type, item);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Watches the services asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>An async enumerable of watch events.</returns>
+    /// <exception cref="InvalidOperationException">Not connected</exception>
+    public async IAsyncEnumerable<(WatchEventType Type, V1Service Item)> WatchServicesAsync(
+        string namespaceName = "default",
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+        CancellationToken cancellationToken = default)
+    {
+        if (IsAllNamespaces(namespaceName))
+        {
+            await foreach (var (type, item) in Client.CoreV1
+                .WatchListServiceForAllNamespacesAsync(cancellationToken: cancellationToken))
+            {
+                yield return (type, item);
+            }
+        }
+        else
+        {
+            await foreach (var (type, item) in Client.CoreV1
+                .WatchListNamespacedServiceAsync(
                     namespaceName,
                     cancellationToken: cancellationToken))
             {

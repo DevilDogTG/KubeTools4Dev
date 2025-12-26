@@ -28,8 +28,8 @@ public interface IKubernetesService
     /// Connects the asynchronous.
     /// </summary>
     /// <param name="kubeConfigPath">The kube configuration path.</param>
-    /// <returns><c>true</c> if connection was successful; otherwise, <c>false</c>.</returns>
-    Task<bool> ConnectAsync(string? kubeConfigPath = null);
+    /// <returns>Current context name</returns>
+    Task<string> ConnectAsync(string? kubeConfigPath = null);
 
     /// <summary>
     /// Gets the pods asynchronous.
@@ -52,6 +52,16 @@ public interface IKubernetesService
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>An async enumerable of watch events.</returns>
     IAsyncEnumerable<(WatchEventType Type, V1Pod Item)> WatchPodsAsync(
+        string namespaceName = "default",
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Watches the services asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>An async enumerable of watch events.</returns>
+    IAsyncEnumerable<(WatchEventType Type, V1Service Item)> WatchServicesAsync(
         string namespaceName = "default",
         CancellationToken cancellationToken = default);
 }

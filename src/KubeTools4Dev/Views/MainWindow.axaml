@@ -13,11 +13,20 @@
     <Grid RowDefinitions="Auto, *">
         <!-- Header / Status Bar -->
         <Border Grid.Row="0" Margin="5" Padding="3" Background="{DynamicResource SemiColorBackground0}" CornerRadius="4">
-             <StackPanel Orientation="Horizontal" Spacing="10">
-                 <TextBlock Text="Status:" VerticalAlignment="Center" FontWeight="Bold"/>
-                 <TextBlock Text="{Binding ConnectionStatus}" VerticalAlignment="Center"/>
-                 <Button Content="Reconnect" Command="{Binding ConnectCommand}" IsVisible="{Binding !IsConnected}" Classes="Warning Small"/>
-             </StackPanel>
+             <Grid ColumnDefinitions="Auto, *, Auto">
+                 <StackPanel Orientation="Horizontal" Spacing="10" Grid.Column="0">
+                     <TextBlock Text="Status:" VerticalAlignment="Center" FontWeight="Bold"/>
+                     <TextBlock Text="{Binding ConnectionStatus}" VerticalAlignment="Center"/>
+                     <Button Content="Reconnect" Command="{Binding ConnectCommand}" IsVisible="{Binding !IsConnected}" Classes="Warning Small"/>
+                 </StackPanel>
+
+                 <TextBlock Grid.Column="2" 
+                            Text="{Binding ClusterName, StringFormat='Cluster: {0}'}" 
+                            VerticalAlignment="Center" 
+                            FontWeight="SemiBold"
+                            Margin="10,0"
+                            IsVisible="{Binding IsConnected}"/>
+             </Grid>
         </Border>
 
         <!-- Main Content -->
