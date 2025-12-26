@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace KubeTools4Dev.ViewModels;
 
@@ -60,7 +59,15 @@ public partial class SettingsViewModel : ViewModelBase
     /// The log path
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CurrentLogPath))]
     private string _logPath = string.Empty;
+
+    /// <summary>
+    /// Gets the current effective log path.
+    /// </summary>
+    public string CurrentLogPath => !string.IsNullOrWhiteSpace(LogPath)
+        ? LogPath
+        : _settingsService.GetDefaultLogPath();
 
     /// <summary>
     /// The refresh interval seconds
@@ -100,26 +107,6 @@ public partial class SettingsViewModel : ViewModelBase
         "Error",
         "Fatal"
     ];
-
-    /// <summary>
-    /// Browses the log path.
-    /// </summary>
-    [RelayCommand]
-    private static async Task BrowseLogPath()
-    {
-        // Since we removed window, we need another way to get StorageProvider or pass it in.
-        // For Tab based, we usually can't easily get window without TopLevel.
-        // Let's rely on TopLevel.GetTopLevel() if we had a view reference, but VM shouldn't know View.
-        // Alternative: Inject a service or use a weak reference to a visual root?
-        // Or just simplify: Text Box input only for now to avoid complexity of finding TopLevel in VM without View.
-        // Alternatively, pass it in command parameter?
-        // Let's disable Browse for now or assume manual entry, OR try to resolve TopLevel later.
-        // Wait, BrowseLogPath used _window.StorageProvider.
-        // Let's leave BrowseLogPath empty or comment out for this iteration as "Text Input only" 
-        // until we implement a proper DialogService or pass Control to command.
-
-        // _logger.Warning("BrowseLogPath not implemented for Tab view yet.");
-    }
 
     /// <summary>
     /// Opens the about dialog.
@@ -191,7 +178,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         // General
         LogLevel = _settingsService.General.LogLevel;
-        LogPath = _settingsService.General.LogPath ?? "";
+        LogPath = _settingsService.General.LogPath ?? _settingsService.GetDefaultLogPath();
 
         // Pods
         RefreshIntervalSeconds = _settingsService.Pods.RefreshIntervalSeconds;

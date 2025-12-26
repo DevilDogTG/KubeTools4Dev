@@ -31,4 +31,10 @@ public interface ISettingsService
     /// Occurs when [settings changed].
     /// </summary>
     event Action SettingsChanged;
+
+    /// <summary>
+    /// Gets the default log path from appsettings.json.
+    /// </summary>
+    /// <returns>The default log path.</returns>
+    string GetDefaultLogPath();
 }

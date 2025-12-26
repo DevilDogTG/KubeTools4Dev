@@ -47,6 +47,11 @@ public class SettingsService : ISettingsService
     private SettingsModel _settings = new();
 
     /// <summary>
+    /// The default log path found in appsettings.json
+    /// </summary>
+    private string _defaultLogPath = string.Empty;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="SettingsService" /> class.
     /// </summary>
     /// <param name="logger">The logger.</param>
@@ -74,6 +79,9 @@ public class SettingsService : ISettingsService
 
     /// <inheritdoc />
     public event Action? SettingsChanged;
+
+    /// <inheritdoc />
+    public string GetDefaultLogPath() => _defaultLogPath;
 
     /// <summary>
     /// Saves the current settings to persistent storage.
@@ -109,6 +117,33 @@ public class SettingsService : ISettingsService
             if (defaultSettings != null)
             {
                 _settings = defaultSettings;
+            }
+
+            // Extract default log path
+            // Extract default log path
+            // 1. Check Settings:General:LogPath first (Preferred source of truth)
+            var generalLogPath = _settings.General?.LogPath;
+            if (!string.IsNullOrEmpty(generalLogPath)) 
+            {
+               _defaultLogPath = generalLogPath;
+            }
+            else 
+            {
+                // 2. Fallback to Serilog config
+                var writeTo = config.GetSection("Serilog:WriteTo").GetChildren();
+                foreach (var sink in writeTo)
+                {
+                    if (sink["Name"] == "File")
+                    {
+                        var args = sink.GetSection("Args");
+                        var path = args["path"];
+                        if (!string.IsNullOrEmpty(path))
+                        {
+                            _defaultLogPath = path;
+                        }
+                        break;
+                    }
+                }
             }
         }
         catch (Exception ex)

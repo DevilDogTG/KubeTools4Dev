@@ -30,9 +30,16 @@ class Program
         // 2. Load User Settings (Manual/Direct Read to get values, as ConfigBuilder doesn't merge robustly across arbitrary files well without structure matching)
         // Actually, we can just load the file config IF we ensured the file has "Settings" section. 
         // But here we need to map Settings:General:LogLevel -> Serilog:MinimumLevel:Default
-        
+
         var userSettingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "KubeTools4Dev", "settings.json");
         var inMemoryOverrides = new System.Collections.Generic.Dictionary<string, string?>();
+
+        // Apply Default LogPath from baseConfig
+        var defaultLogPath = baseConfig["Settings:General:LogPath"];
+        if (!string.IsNullOrEmpty(defaultLogPath))
+        {
+            inMemoryOverrides["Serilog:WriteTo:1:Args:path"] = defaultLogPath;
+        }
 
         if (File.Exists(userSettingsPath))
         {
@@ -41,7 +48,7 @@ class Program
                 var json = File.ReadAllText(userSettingsPath);
                 var settingsNode = System.Text.Json.Nodes.JsonNode.Parse(json);
                 var generalParams = settingsNode?["General"];
-                
+
                 if (generalParams != null)
                 {
                     var logLevel = generalParams["LogLevel"]?.ToString();
@@ -51,7 +58,7 @@ class Program
                     {
                         inMemoryOverrides["Serilog:MinimumLevel:Default"] = logLevel;
                     }
-                    
+
                     if (!string.IsNullOrEmpty(logPath))
                     {
                         // Assuming File sink is index 1 based on appsettings.json "Using": [Console, File] and WriteTo array order.
@@ -81,7 +88,7 @@ class Program
 
         try
         {
-            Log.Information("Starting ElysianMonitor...");
+            Log.Information("Starting KubeTools4Dev...");
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
         catch (Exception ex)
