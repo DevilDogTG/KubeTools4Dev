@@ -60,7 +60,7 @@ public class SettingsService : ISettingsService
     /// <summary>
     /// Gets or sets the list of excluded services.
     /// </summary>
-    public List<string> ExcludedServices { get; set; } = new();
+    public List<string> ExcludedServices { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the refresh interval in seconds.
@@ -102,7 +102,7 @@ public class SettingsService : ISettingsService
                 if (settings != null)
                 {
                     RefreshIntervalSeconds = settings.RefreshIntervalSeconds;
-                    ExcludedServices = settings.ExcludedServices ?? new();
+                    ExcludedServices = settings.ExcludedServices ?? [];
                 }
             }
             catch

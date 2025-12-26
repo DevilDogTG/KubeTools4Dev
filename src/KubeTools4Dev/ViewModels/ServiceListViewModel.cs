@@ -17,7 +17,6 @@ namespace KubeTools4Dev.ViewModels;
 /// <summary>
 /// View model for the list of services.
 /// </summary>
-/// <seealso cref="ViewModelBase" />
 /// <remarks>
 /// Initializes a new instance of the <see cref="ServiceListViewModel" /> class.
 /// </remarks>
@@ -41,6 +40,12 @@ public partial class ServiceListViewModel(
     /// The CTS
     /// </summary>
     private CancellationTokenSource? _cts;
+
+    /// <summary>
+    /// The filter text
+    /// </summary>
+    [ObservableProperty]
+    private string _filterText = string.Empty;
 
     /// <summary>
     /// The is loading
@@ -123,6 +128,15 @@ public partial class ServiceListViewModel(
     }
 
     /// <summary>
+    /// Called when [filter text changed].
+    /// </summary>
+    /// <param name="value">The value.</param>
+    partial void OnFilterTextChanged(string value)
+    {
+        UpdateFilteredList();
+    }
+
+    /// <summary>
     /// Reconciles the stale services.
     /// </summary>
     private async Task ReconcileStaleServices()
@@ -135,17 +149,18 @@ public partial class ServiceListViewModel(
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 // Find VMs that are no longer in the cluster
-                var staleVMs = _allServices
-                    .Where(vm => !currentKeys.Contains($"{vm.Namespace}/{vm.Name}"))
+                var staleViewModels = _allServices
+                    .Where(viewModel =>
+                        !currentKeys.Contains($"{viewModel.Namespace}/{viewModel.Name}"))
                     .ToList();
 
-                foreach (var vm in staleVMs)
+                foreach (var vm in staleViewModels)
                 {
                     _allServices.Remove(vm);
                     vm.IsForwarding = false; // Ensure background task stops
                 }
 
-                if (staleVMs.Any())
+                if (staleViewModels.Count != 0)
                 {
                     UpdateFilteredList();
                 }
@@ -173,21 +188,6 @@ public partial class ServiceListViewModel(
     }
 
     /// <summary>
-    /// The filter text
-    /// </summary>
-    [ObservableProperty]
-    private string _filterText = string.Empty;
-
-    /// <summary>
-    /// Called when [filter text changed].
-    /// </summary>
-    /// <param name="value">The value.</param>
-    partial void OnFilterTextChanged(string value)
-    {
-        UpdateFilteredList();
-    }
-
-    /// <summary>
     /// Updates the filtered list.
     /// </summary>
     private void UpdateFilteredList()
@@ -196,9 +196,13 @@ public partial class ServiceListViewModel(
 
         if (!string.IsNullOrWhiteSpace(FilterText))
         {
-            query = query.Where(s => 
-                (s.Name?.Contains(FilterText, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (s.Namespace?.Contains(FilterText, StringComparison.OrdinalIgnoreCase) ?? false));
+            query = query.Where(s =>
+                (s.Name?.Contains(
+                    FilterText,
+                    StringComparison.OrdinalIgnoreCase) ?? false)
+                || (s.Namespace?.Contains(
+                    FilterText,
+                    StringComparison.OrdinalIgnoreCase) ?? false));
         }
 
         var sorted = query
