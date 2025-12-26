@@ -96,7 +96,14 @@ public partial class ServiceListViewModel(
                 {
                     await _watchTask;
                 }
-                catch (Exception) { }
+                catch (OperationCanceledException)
+                {
+                    logger.Information("The watch task is cancelled");
+                }
+                catch (Exception ex)
+                {
+                    logger.Error(ex, "Error while waiting for previous watch task to complete");
+                }
             }
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
@@ -204,9 +211,9 @@ public partial class ServiceListViewModel(
                 }
             });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogWarning(ex, "Failed to reconcile stale services");
+            logger.Warning("Failed to reconcile stale services");
         }
     }
 
@@ -293,13 +300,39 @@ public partial class ServiceListViewModel(
     /// <param name="token">The token.</param>
     private async Task WatchServicesAsync(CancellationToken token)
     {
+        var reconcileFailureCount = 0;
+        const int MaxReconcileFailures = 5;
         while (!token.IsCancellationRequested)
         {
             try
             {
                 // Prune stale services before starting/restarting watch
                 // This handles cases where we missed DELETED events (e.g. disconnect)
-                await ReconcileStaleServices();
+                try
+                {
+                    await ReconcileStaleServices();
+                    reconcileFailureCount = 0;
+                }
+                catch (OperationCanceledException)
+                {
+                    // Preserve cancellation semantics
+                    throw;
+                }
+                catch (Exception)
+                {
+                    reconcileFailureCount++;
+                    LogReconcileStaleServicesFailed(
+                        reconcileFailureCount,
+                        MaxReconcileFailures);
+                    if (reconcileFailureCount >= MaxReconcileFailures)
+                    {
+                        logger.Error("Stopping service watch after repeated reconciliation failures.");
+                        break;
+                    }
+                    // Wait briefly before retrying reconciliation
+                    await Task.Delay(5000, token);
+                    continue;
+                }
 
                 await foreach (var (type, item) in kubeService.WatchServicesAsync("", cancellationToken: token))
                 {
@@ -332,8 +365,8 @@ public partial class ServiceListViewModel(
                                 // Remove ViewModels for ports that no longer exist
                                 foreach (var viewModel in existingViewModels.ToList())
                                 {
-                                    // Check if viewModel.TargetPort (original port) still exists in newPorts
-                                    // viewModel.TargetPort is object, stored as int from port.Port
+                                    // Check if the service port represented by viewModel.TargetPort still exists in newPorts
+                                    // viewModel.TargetPort stores the Service port (port.Port) as an int boxed as object, not the pod's targetPort
                                     if (!newPorts.Any(p => p.Port == (int)viewModel.TargetPort))
                                     {
                                         viewModel.PropertyChanged -= OnServicePropertyChanged;

@@ -41,8 +41,8 @@ public class KubernetesService(
     /// Connects the asynchronous.
     /// </summary>
     /// <param name="kubeConfigPath">The kube configuration path.</param>
-    /// <returns><c>true</c> if connection was successful; otherwise, <c>false</c>.</returns>
-    public async Task<bool> ConnectAsync(string? kubeConfigPath = null)
+    /// <returns>Current context name</returns>
+    public async Task<string> ConnectAsync(string? kubeConfigPath = null)
     {
         try
         {
@@ -57,14 +57,14 @@ public class KubernetesService(
             await _client.Version.GetCodeAsync();
 
             logger.LogInformation("Connected to Kubernetes successfully.");
-            return true;
+            return config.CurrentContext;
         }
         catch (Exception ex)
         {
             // Log error
             logger.Error(ex, "Failed to connect to Kubernetes");
             _client = null;
-            return false;
+            return string.Empty;
         }
     }
 
