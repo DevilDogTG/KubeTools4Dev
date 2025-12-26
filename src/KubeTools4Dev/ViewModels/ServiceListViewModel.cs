@@ -29,7 +29,8 @@ public partial class ServiceListViewModel(
     IKubernetesService kubeService,
     IPortForwardService portForwardService,
     ISettingsService settingsService,
-    ILogger<ServiceListViewModel> logger
+    ILogger<ServiceListViewModel> logger,
+    ILoggerFactory loggerFactory
 ) : ViewModelBase
 {
     /// <summary>
@@ -115,7 +116,7 @@ public partial class ServiceListViewModel(
 
                 foreach (var port in svc.Spec.Ports.Where(p => p.Protocol == "TCP"))
                 {
-                    var vm = new ServiceViewModel(svc, port, portForwardService, settingsService);
+                    var vm = new ServiceViewModel(loggerFactory.CreateLogger<ServiceViewModel>(), svc, port, portForwardService, settingsService);
                     vm.PropertyChanged += OnServicePropertyChanged;
                     _allServices.Add(vm);
                 }
@@ -200,9 +201,12 @@ public partial class ServiceListViewModel(
 
                 foreach (var vm in staleViewModels)
                 {
+                    if (vm.IsForwarding)
+                    {
+                        vm.IsForwarding = false; // Ensure background task stops while VM is still active
+                    }
                     vm.PropertyChanged -= OnServicePropertyChanged;
                     _allServices.Remove(vm);
-                    vm.IsForwarding = false; // Ensure background task stops
                 }
 
                 if (staleViewModels.Count != 0)
@@ -381,6 +385,7 @@ public partial class ServiceListViewModel(
                                     if (!_allServices.Any(s => s.Id == newId))
                                     {
                                         var newVm = new ServiceViewModel(
+                                            loggerFactory.CreateLogger<ServiceViewModel>(),
                                             item,
                                             port,
                                             portForwardService,

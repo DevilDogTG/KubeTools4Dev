@@ -1,8 +1,10 @@
 ﻿using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DMNSN.Core;
 using k8s.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,13 +14,18 @@ namespace KubeTools4Dev.ViewModels;
 /// <summary>
 /// View model for a single service.
 /// </summary>
-/// <seealso cref="CommunityToolkit.Mvvm.ComponentModel.ObservableObject" />
+/// <seealso cref="ObservableObject" />
 public partial class ServiceViewModel : ObservableObject
 {
     /// <summary>
     /// The duration timer
     /// </summary>
     private readonly DispatcherTimer _durationTimer;
+
+    /// <summary>
+    /// The logger
+    /// </summary>
+    private readonly ILogger<ServiceViewModel> _logger;
 
     /// <summary>
     /// The pf service
@@ -50,6 +57,11 @@ public partial class ServiceViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private string _durationText = "";
+    /// <summary>
+    /// The forwarding task
+    /// </summary>
+    private Task? _forwardingTask;
+
     /// <summary>
     /// The is excluded
     /// </summary>
@@ -108,16 +120,19 @@ public partial class ServiceViewModel : ObservableObject
     /// <summary>
     /// Initializes a new instance of the <see cref="ServiceViewModel" /> class.
     /// </summary>
+    /// <param name="logger">The logger.</param>
     /// <param name="service">The service.</param>
     /// <param name="port">The port.</param>
     /// <param name="pfService">The pf service.</param>
     /// <param name="settingsService">The settings service.</param>
     public ServiceViewModel(
+        ILogger<ServiceViewModel> logger,
         V1Service service,
         V1ServicePort port,
         IPortForwardService pfService,
         ISettingsService settingsService)
     {
+        _logger = logger;
         _service = service;
         _port = port;
         _pfService = pfService;
@@ -223,9 +238,9 @@ public partial class ServiceViewModel : ObservableObject
                     UseShellExecute = true
                 });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Ignore errors opening browser
+                _logger.Error(ex, ex.Message);
             }
         }
     }
@@ -237,12 +252,27 @@ public partial class ServiceViewModel : ObservableObject
     {
         Status = "Starting";
         _pfCancellationTokenSource?.Cancel();
+
+        if (_forwardingTask != null)
+        {
+            try
+            {
+                await _forwardingTask;
+            }
+            catch (Exception)
+            {
+                _logger.Information("Waitting old task, prevent race condition.");
+            }
+        }
         _pfCancellationTokenSource?.Dispose();
+
         _pfCancellationTokenSource = new CancellationTokenSource();
+        var token = _pfCancellationTokenSource.Token;
+
         try
         {
             // Run in background
-            _ = Task.Run(async () =>
+            _forwardingTask = Task.Run(async () =>
             {
                 try
                 {
@@ -255,7 +285,7 @@ public partial class ServiceViewModel : ObservableObject
                         _durationTimer.Start();
                     });
 
-                    await _pfService.StartServicePortForwardAsync(Name, Namespace, TargetPort, LocalPort, _pfCancellationTokenSource.Token);
+                    await _pfService.StartServicePortForwardAsync(Name, Namespace, TargetPort, LocalPort, token);
                 }
                 catch (Exception)
                 {
@@ -278,11 +308,36 @@ public partial class ServiceViewModel : ObservableObject
     /// <summary>
     /// Stops the forwarding.
     /// </summary>
+    /// <summary>
+    /// Stops the forwarding.
+    /// </summary>
     private void StopForwarding()
     {
         _pfCancellationTokenSource?.Cancel();
-        _pfCancellationTokenSource?.Dispose();
+
+        // Don't dispose immediately, let the task finish or next StartForwarding handle it
+        // Or we can fire-and-forget a cleanup if we want to be strict, but for now relying on next StartForwarding is safer than disposed exception.
+        // But to avoid "leak" if never started again, we can try to await if possible, but this is sync.
+        // We will just Cancel here. The next StartForwarding or Cleanup (if we added it) would Dispose.
+        // Actually, let's replicate the safe cleanup pattern: Use a local reference to clean up asynchronously.
+        var ctsToDispose = _pfCancellationTokenSource;
+        var taskToAwait = _forwardingTask;
+
         _pfCancellationTokenSource = null;
+        _forwardingTask = null;
+
+        if (ctsToDispose != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                if (taskToAwait != null)
+                {
+                    try { await taskToAwait; } catch { }
+                }
+                ctsToDispose.Dispose();
+            });
+        }
+
         Status = "Stopped";
         StopTimer();
     }

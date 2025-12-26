@@ -20,7 +20,6 @@
         </Style>
         <Style Selector="Button.Danger:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="#FFB71C1C"/>
-            <Setter Property="Foreground" Value="White"/>
         </Style>
         <Style Selector="Button.Danger:disabled /template/ ContentPresenter">
             <Setter Property="Background" Value="#1F000000"/> <!-- Faded black/gray -->
