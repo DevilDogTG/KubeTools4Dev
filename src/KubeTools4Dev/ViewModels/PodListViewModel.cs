@@ -15,8 +15,9 @@ namespace KubeTools4Dev.ViewModels;
 /// <summary>
 /// View model for the list of pods.
 /// </summary>
-/// <seealso cref="KubeTools4Dev.ViewModels.ViewModelBase" />
-public partial class PodListViewModel : ViewModelBase
+/// <seealso cref="IDisposable" />
+/// <seealso cref="ViewModelBase" />
+public partial class PodListViewModel : ViewModelBase, IDisposable
 {
     /// <summary>
     /// All pods
@@ -44,7 +45,7 @@ public partial class PodListViewModel : ViewModelBase
     /// <summary>
     /// The CTS
     /// </summary>
-    private CancellationTokenSource? _cts;
+    private CancellationTokenSource? _cancellationTokenSource;
     /// <summary>
     /// The filter text
     /// </summary>
@@ -97,20 +98,18 @@ public partial class PodListViewModel : ViewModelBase
             Interval = TimeSpan.FromSeconds(RefreshIntervalSeconds)
         };
 
-        _refreshTimer.Tick += (s, e) => TriggerRefresh();
+        _refreshTimer.Tick += OnRefreshTimerTick;
 
         _settingsService.SettingsChanged += OnSettingsChanged;
     }
 
-    private void OnSettingsChanged()
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
+    /// </summary>
+    public void Dispose()
     {
-        // Update interval
-        var newInterval = _settingsService.Pods.RefreshIntervalSeconds;
-        if (RefreshIntervalSeconds != newInterval)
-        {
-            RefreshIntervalSeconds = newInterval;
-            // OnRefreshIntervalSecondsChanged handles timer update automatically
-        }
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 
     /// <summary>
@@ -134,8 +133,8 @@ public partial class PodListViewModel : ViewModelBase
             UpdateRefreshTime();
 
             // Start Watch
-            _cts = new CancellationTokenSource();
-            _ = WatchPodsAsync(_cts.Token);
+            _cancellationTokenSource = new CancellationTokenSource();
+            _ = WatchPodsAsync(_cancellationTokenSource.Token);
 
             _refreshTimer.Start();
         }
@@ -146,6 +145,22 @@ public partial class PodListViewModel : ViewModelBase
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Releases unmanaged and - optionally - managed resources.
+    /// </summary>
+    /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _settingsService.SettingsChanged -= OnSettingsChanged;
+            _refreshTimer.Stop();
+            _refreshTimer.Tick -= OnRefreshTimerTick;
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource?.Dispose();
         }
     }
 
@@ -166,6 +181,7 @@ public partial class PodListViewModel : ViewModelBase
     {
         RefreshIntervalSeconds = Math.Clamp(RefreshIntervalSeconds + 1, 1, 60);
     }
+
     /// <summary>
     /// Called when [filter text changed].
     /// </summary>
@@ -189,6 +205,26 @@ public partial class PodListViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Called when [refresh timer tick].
+    /// </summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+    private void OnRefreshTimerTick(object? sender, EventArgs e) => TriggerRefresh();
+
+    /// <summary>
+    /// Called when [settings changed].
+    /// </summary>
+    private void OnSettingsChanged()
+    {
+        // Update interval
+        var newInterval = _settingsService.Pods.RefreshIntervalSeconds;
+        if (RefreshIntervalSeconds != newInterval)
+        {
+            RefreshIntervalSeconds = newInterval;
+            // OnRefreshIntervalSecondsChanged handles timer update automatically
+        }
+    }
     /// <summary>
     /// Triggers the refresh.
     /// </summary>
