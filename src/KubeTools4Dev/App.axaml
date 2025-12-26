@@ -8,5 +8,22 @@
     <Application.Styles>
         <themes:MaterialTheme BaseTheme="Dark" PrimaryColor="Blue" SecondaryColor="Lime" />
         <StyleInclude Source="avares://Material.Avalonia.DataGrid/DataGrid.xaml" />
+        
+        <Style Selector="Button.Primary">
+            <Setter Property="Background" Value="{DynamicResource PrimaryHueMidBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryHueMidForegroundBrush}"/>
+        </Style>
+        
+        <Style Selector="Button.Danger">
+            <Setter Property="Background" Value="#FFD32F2F"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.Danger:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#FFB71C1C"/>
+             <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.Danger:disabled /template/ ContentPresenter">
+             <Setter Property="Background" Value="#1F000000"/> <!-- Faded black/gray -->
+        </Style>
     </Application.Styles>
 </Application>
