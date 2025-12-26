@@ -1,7 +1,10 @@
 ﻿using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using DMNSN.Core;
 using k8s.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,9 +14,19 @@ namespace KubeTools4Dev.ViewModels;
 /// <summary>
 /// View model for a single service.
 /// </summary>
-/// <seealso cref="CommunityToolkit.Mvvm.ComponentModel.ObservableObject" />
+/// <seealso cref="ObservableObject" />
 public partial class ServiceViewModel : ObservableObject
 {
+    /// <summary>
+    /// The duration timer
+    /// </summary>
+    private readonly DispatcherTimer _durationTimer;
+
+    /// <summary>
+    /// The logger
+    /// </summary>
+    private readonly ILogger<ServiceViewModel> _logger;
+
     /// <summary>
     /// The pf service
     /// </summary>
@@ -30,6 +43,11 @@ public partial class ServiceViewModel : ObservableObject
     private readonly V1Service _service;
 
     /// <summary>
+    /// The settings key
+    /// </summary>
+    private readonly string _settingsKey;
+
+    /// <summary>
     /// The settings service
     /// </summary>
     private readonly ISettingsService _settingsService;
@@ -39,11 +57,10 @@ public partial class ServiceViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private string _durationText = "";
-
     /// <summary>
-    /// The duration timer
+    /// The forwarding task
     /// </summary>
-    private DispatcherTimer _durationTimer;
+    private Task? _forwardingTask;
 
     /// <summary>
     /// The is excluded
@@ -74,14 +91,9 @@ public partial class ServiceViewModel : ObservableObject
     private string _namespace;
 
     /// <summary>
-    /// The pf CTS
+    /// The pf cancellation token source
     /// </summary>
-    private CancellationTokenSource? _pfCts;
-    /// <summary>
-    /// The settings key
-    /// </summary>
-    private string _settingsKey;
-
+    private CancellationTokenSource? _pfCancellationTokenSource;
     /// <summary>
     /// The start time
     /// </summary>
@@ -106,18 +118,21 @@ public partial class ServiceViewModel : ObservableObject
     private string _targetPortDisplay;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ServiceViewModel"/> class.
+    /// Initializes a new instance of the <see cref="ServiceViewModel" /> class.
     /// </summary>
+    /// <param name="logger">The logger.</param>
     /// <param name="service">The service.</param>
     /// <param name="port">The port.</param>
     /// <param name="pfService">The pf service.</param>
     /// <param name="settingsService">The settings service.</param>
     public ServiceViewModel(
+        ILogger<ServiceViewModel> logger,
         V1Service service,
         V1ServicePort port,
         IPortForwardService pfService,
         ISettingsService settingsService)
     {
+        _logger = logger;
         _service = service;
         _port = port;
         _pfService = pfService;
@@ -125,12 +140,9 @@ public partial class ServiceViewModel : ObservableObject
 
         Name = service.Metadata.Name;
         Namespace = service.Metadata.NamespaceProperty;
-        // Fix: Include target port in key to handle multi-port services correctly
         _settingsKey = $"{Namespace}/{Name}:{port.Port}";
 
-        // User requests to use the Service Port as the destination by default, 
-        // mimicking 'kubectl port-forward svc/name 8088:8088' behavior.
-        // Original logic was: TargetPort = port.TargetPort; 
+        // Use the Service Port as the destination by default
         TargetPort = port.Port;
         LocalPort = port.Port; // Default to same port
 
@@ -151,6 +163,14 @@ public partial class ServiceViewModel : ObservableObject
             }
         };
     }
+
+    /// <summary>
+    /// Gets the unique identifier.
+    /// </summary>
+    /// <value>
+    /// The identifier.
+    /// </value>
+    public string Id => $"{Namespace}/{Name}:{TargetPort}";
 
     /// <summary>
     /// Gets or sets a value indicating whether this instance is excluded.
@@ -175,11 +195,8 @@ public partial class ServiceViewModel : ObservableObject
                 }
                 else
                 {
-                    if (_settingsService.ExcludedServices.Contains(_settingsKey))
-                    {
-                        _settingsService.ExcludedServices.Remove(_settingsKey);
-                        _settingsService.Save();
-                    }
+                    _settingsService.ExcludedServices.Remove(_settingsKey);
+                    _settingsService.Save();
                 }
             }
         }
@@ -205,16 +222,57 @@ public partial class ServiceViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Opens the browser.
+    /// </summary>
+    [RelayCommand]
+    private void OpenBrowser()
+    {
+        if (LocalPort > 0)
+        {
+            try
+            {
+                var url = $"http://localhost:{LocalPort}";
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, ex.Message);
+            }
+        }
+    }
+
+    /// <summary>
     /// Starts the forwarding.
     /// </summary>
     private async void StartForwarding()
     {
         Status = "Starting";
-        _pfCts = new CancellationTokenSource();
+        _pfCancellationTokenSource?.Cancel();
+
+        if (_forwardingTask != null)
+        {
+            try
+            {
+                await _forwardingTask;
+            }
+            catch (Exception)
+            {
+                _logger.Information("Waitting old task, prevent race condition.");
+            }
+        }
+        _pfCancellationTokenSource?.Dispose();
+
+        _pfCancellationTokenSource = new CancellationTokenSource();
+        var token = _pfCancellationTokenSource.Token;
+
         try
         {
             // Run in background
-            _ = Task.Run(async () =>
+            _forwardingTask = Task.Run(async () =>
             {
                 try
                 {
@@ -227,7 +285,7 @@ public partial class ServiceViewModel : ObservableObject
                         _durationTimer.Start();
                     });
 
-                    await _pfService.StartServicePortForwardAsync(Name, Namespace, TargetPort, LocalPort, _pfCts.Token);
+                    await _pfService.StartServicePortForwardAsync(Name, Namespace, TargetPort, LocalPort, token);
                 }
                 catch (Exception)
                 {
@@ -250,13 +308,39 @@ public partial class ServiceViewModel : ObservableObject
     /// <summary>
     /// Stops the forwarding.
     /// </summary>
+    /// <summary>
+    /// Stops the forwarding.
+    /// </summary>
     private void StopForwarding()
     {
-        _pfCts?.Cancel();
+        _pfCancellationTokenSource?.Cancel();
+
+        // Don't dispose immediately, let the task finish or next StartForwarding handle it
+        // Or we can fire-and-forget a cleanup if we want to be strict, but for now relying on next StartForwarding is safer than disposed exception.
+        // But to avoid "leak" if never started again, we can try to await if possible, but this is sync.
+        // We will just Cancel here. The next StartForwarding or Cleanup (if we added it) would Dispose.
+        // Actually, let's replicate the safe cleanup pattern: Use a local reference to clean up asynchronously.
+        var ctsToDispose = _pfCancellationTokenSource;
+        var taskToAwait = _forwardingTask;
+
+        _pfCancellationTokenSource = null;
+        _forwardingTask = null;
+
+        if (ctsToDispose != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                if (taskToAwait != null)
+                {
+                    try { await taskToAwait; } catch { }
+                }
+                ctsToDispose.Dispose();
+            });
+        }
+
         Status = "Stopped";
         StopTimer();
     }
-
     /// <summary>
     /// Stops the timer.
     /// </summary>
