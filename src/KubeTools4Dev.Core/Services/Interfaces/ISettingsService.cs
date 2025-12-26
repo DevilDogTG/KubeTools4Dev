@@ -26,4 +26,9 @@ public interface ISettingsService
     /// Saves the current settings to persistent storage.
     /// </summary>
     void Save();
+
+    /// <summary>
+    /// Occurs when [settings changed].
+    /// </summary>
+    event Action SettingsChanged;
 }

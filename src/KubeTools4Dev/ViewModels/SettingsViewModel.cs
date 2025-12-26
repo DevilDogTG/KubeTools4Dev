@@ -20,6 +20,12 @@ public partial class SettingsViewModel : ViewModelBase
         _settingsService = settingsService;
         _logger = logger;
         LoadSettings();
+        _settingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged()
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Invoke(LoadSettings);
     }
 
     [ObservableProperty]

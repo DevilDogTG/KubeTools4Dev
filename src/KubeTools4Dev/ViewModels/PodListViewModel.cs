@@ -96,7 +96,21 @@ public partial class PodListViewModel : ViewModelBase
         {
             Interval = TimeSpan.FromSeconds(RefreshIntervalSeconds)
         };
+
         _refreshTimer.Tick += (s, e) => TriggerRefresh();
+        
+        _settingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged()
+    {
+        // Update interval
+        var newInterval = _settingsService.Pods.RefreshIntervalSeconds;
+        if (RefreshIntervalSeconds != newInterval)
+        {
+            RefreshIntervalSeconds = newInterval;
+            // OnRefreshIntervalSecondsChanged handles timer update automatically
+        }
     }
 
     /// <summary>

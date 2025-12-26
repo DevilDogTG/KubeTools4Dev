@@ -7,57 +7,59 @@
              x:Class="KubeTools4Dev.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
     <Grid RowDefinitions="*, Auto" Margin="10">
-        <TabControl Grid.Row="0">
-            <!-- General Tab -->
-            <TabItem Header="General">
-                <StackPanel Spacing="10" Margin="5">
-                    <TextBlock Text="Logging Configuration" FontWeight="Bold" />
-                    
-                    <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto" Margin="0,0,0,10">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Log Level:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding LogLevels}" SelectedItem="{Binding LogLevel}" HorizontalAlignment="Stretch"/>
 
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Log Path:" VerticalAlignment="Center" Margin="0,10,10,0"/>
-                        <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*, Auto" Margin="0,10,0,0">
-                            <TextBox Grid.Column="0" Text="{Binding LogPath}" Watermark="Default Path"/>
-                            <!-- Browse button disabled for now as we don't have window ref easily in VM for this refactor -->
-                            <!-- <Button Grid.Column="1" Content="..." Command="{Binding BrowseLogPathCommand}" Margin="5,0,0,0"/> -->
-                        </Grid>
-                    </Grid>
-                </StackPanel>
-            </TabItem>
-
-            <!-- Pods Tab -->
-            <TabItem Header="Pods">
-                <StackPanel Spacing="10" Margin="5">
-                    <TextBlock Text="Refresh Settings" FontWeight="Bold" />
-                    
-                    <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Refresh Interval (Seconds):" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding RefreshIntervalSeconds}" Minimum="1" Maximum="3600" />
+        <ScrollViewer Grid.Row="0">
+            <StackPanel Spacing="20">
+                <!-- General Section -->
+                <Border Classes="Card" Theme="{StaticResource CardBorder}" Padding="15">
+                     <StackPanel Spacing="10">
+                        <TextBlock Text="General" Classes="H4" FontWeight="Bold"/>
+                        <TextBlock Text="Logging Configuration" FontWeight="SemiBold" />
                         
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Watch Retry Delay (ms):" VerticalAlignment="Center" Margin="0,10,10,0"/>
-                        <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding WatchRetryDelayMilliseconds}" Minimum="100" Maximum="60000" Margin="0,10,0,0"/>
-                    </Grid>
-                </StackPanel>
-            </TabItem>
+                        <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Log Level:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding LogLevels}" SelectedItem="{Binding LogLevel}" HorizontalAlignment="Stretch"/>
 
-            <!-- Services Tab -->
-            <TabItem Header="Services">
-                <StackPanel Spacing="10" Margin="5">
-                    <TextBlock Text="Filtering Rules (Comma Separated)" FontWeight="Bold" />
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Log Path:" VerticalAlignment="Center" Margin="0,10,10,0"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding LogPath}" Watermark="Default Path" Margin="0,10,0,0"/>
+                        </Grid>
+                     </StackPanel>
+                </Border>
 
-                    <TextBlock Text="Hidden Service Names:" />
-                    <TextBox Text="{Binding HiddenServiceNamesText}" AcceptsReturn="True" Height="60" Watermark="e.g. kubernetes, kube-dns"/>
+                <!-- Pods Section -->
+                <Border Classes="Card" Theme="{StaticResource CardBorder}" Padding="15">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Pods" Classes="H4" FontWeight="Bold"/>
+                        <TextBlock Text="Refresh Settings" FontWeight="SemiBold" />
+                        
+                        <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Refresh Interval (Seconds):" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding RefreshIntervalSeconds}" Minimum="1" Maximum="3600" />
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Watch Retry Delay (ms):" VerticalAlignment="Center" Margin="0,10,10,0"/>
+                            <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding WatchRetryDelayMilliseconds}" Minimum="100" Maximum="60000" Margin="0,10,0,0"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
 
-                    <TextBlock Text="Hidden Service Types:" />
-                    <TextBox Text="{Binding HiddenServiceTypesText}" AcceptsReturn="True" Height="60" Watermark="e.g. ExternalName, ClusterIP"/>
+                <!-- Services Section -->
+                <Border Classes="Card" Theme="{StaticResource CardBorder}" Padding="15">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Services" Classes="H4" FontWeight="Bold"/>
+                        <TextBlock Text="Filtering &amp; Exclusion Rules (Comma/Newline Separated)" FontWeight="SemiBold" />
 
-                    <TextBlock Text="Excluded Services (Auto-Port-Forward):" />
-                    <TextBox Text="{Binding ExcludedServicesText}" AcceptsReturn="True" Height="60" Watermark="Services excluded from auto-forwarding"/>
-                </StackPanel>
-            </TabItem>
-        </TabControl>
+                        <TextBlock Text="Hidden Service Names:" />
+                        <TextBox Text="{Binding HiddenServiceNamesText}" AcceptsReturn="True" Height="60" Watermark="e.g. kubernetes, kube-dns"/>
+
+                        <TextBlock Text="Hidden Service Types:" />
+                        <TextBox Text="{Binding HiddenServiceTypesText}" AcceptsReturn="True" Height="60" Watermark="e.g. ExternalName, ClusterIP"/>
+
+                        <TextBlock Text="Excluded Services (Auto-Port-Forward):" />
+                        <TextBox Text="{Binding ExcludedServicesText}" AcceptsReturn="True" Height="60" Watermark="Services excluded from auto-forwarding"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
 
         <!-- Buttons -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,10,0,0">

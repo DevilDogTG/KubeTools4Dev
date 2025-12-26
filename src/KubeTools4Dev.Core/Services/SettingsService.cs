@@ -1,4 +1,3 @@
-using DMNSN.Core;
 using KubeTools4Dev.Core.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
@@ -10,6 +9,7 @@ namespace KubeTools4Dev.Core.Services;
 /// <summary>
 /// Service for managing application settings, persisting them to a JSON file.
 /// </summary>
+/// <seealso cref="KubeTools4Dev.Core.Services.Interfaces.ISettingsService" />
 /// <seealso cref="ISettingsService" />
 public class SettingsService : ISettingsService
 {
@@ -72,6 +72,9 @@ public class SettingsService : ISettingsService
     /// <inheritdoc />
     public ServicesSettings Services => _settings.Services;
 
+    /// <inheritdoc />
+    public event Action SettingsChanged;
+
     /// <summary>
     /// Saves the current settings to persistent storage.
     /// </summary>
@@ -81,6 +84,7 @@ public class SettingsService : ISettingsService
         {
             var json = JsonSerializer.Serialize(_settings, CachedJsonSerializerOptions);
             File.WriteAllText(_filePath, json);
+            SettingsChanged?.Invoke();
         }
         catch (Exception ex)
         {
@@ -123,7 +127,7 @@ public class SettingsService : ISettingsService
                 if (userSettings != null)
                 {
                     _settings = userSettings;
-                    
+
                     // Re-instantiate if nulls (e.g. corrupted file)
                     _settings.General ??= new GeneralSettings();
                     _settings.Pods ??= new PodsSettings();
