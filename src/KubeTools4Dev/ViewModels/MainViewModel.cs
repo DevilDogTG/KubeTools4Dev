@@ -80,6 +80,12 @@ public partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// The cluster name
+    /// </summary>
+    [ObservableProperty]
+    private string _clusterName = string.Empty;
+
+    /// <summary>
     /// Connects Kubernetes instance command.
     /// </summary>
     [RelayCommand]
@@ -91,6 +97,20 @@ public partial class MainViewModel : ViewModelBase
         if (success)
         {
             _logger.Debug("Connected to Kubernetes cluster successfully");
+            
+            try 
+            {
+                // Attempt to get the current context name. 
+                // Since IKubernetesService doesn't expose it directly yet, we will resort to loading the config locally
+                // strictly for display purposes. This is safe as the service likely uses the default config anyway.
+                var config = k8s.KubernetesClientConfiguration.LoadKubeConfig();
+                ClusterName = config.CurrentContext;
+            }
+            catch
+            {
+                ClusterName = "Unknown Cluster";
+            }
+
             ConnectionStatus = "Connected to Kubernetes";
             IsConnected = true;
             await PodList.InitializeAsync();

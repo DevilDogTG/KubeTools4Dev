@@ -127,7 +127,22 @@
                                     Width="100"/>
                 <DataGridTextColumn Header="Duration"
                                     Binding="{Binding DurationText}"
-                                    IsReadOnly="True" Width="80"/>
+                                    IsReadOnly="True"
+                                    Width="100"/>
+
+                <DataGridTemplateColumn Width="70" Header="Open">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="🌐" 
+                                    Command="{Binding OpenBrowserCommand}"
+                                    IsEnabled="{Binding IsForwarding}"
+                                    HorizontalAlignment="Center"
+                                    Margin="2"
+                                    Padding="5,2"
+                                    ToolTip.Tip="Open in Browser"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
     </Grid>

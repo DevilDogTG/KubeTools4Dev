@@ -54,4 +54,14 @@ public interface IKubernetesService
     IAsyncEnumerable<(WatchEventType Type, V1Pod Item)> WatchPodsAsync(
         string namespaceName = "default",
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Watches the services asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>An async enumerable of watch events.</returns>
+    IAsyncEnumerable<(WatchEventType Type, V1Service Item)> WatchServicesAsync(
+        string namespaceName = "default",
+        CancellationToken cancellationToken = default);
 }

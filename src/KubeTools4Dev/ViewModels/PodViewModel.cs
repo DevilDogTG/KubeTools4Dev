@@ -148,6 +148,9 @@ public partial class PodViewModel : ObservableObject
     /// <returns></returns>
     private static string FormatAge(TimeSpan age)
     {
+        // Clamp to zero to avoid negative times (clock skew)
+        if (age < TimeSpan.Zero) age = TimeSpan.Zero;
+
         if (age.TotalDays >= 1) return $"{(int)age.TotalDays}d{(int)age.Hours}h";
         if (age.TotalHours >= 1) return $"{(int)age.TotalHours}h{(int)age.Minutes}m";
         if (age.TotalMinutes >= 1) return $"{(int)age.TotalMinutes}m";

@@ -1,5 +1,6 @@
 ﻿using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using k8s.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
 using System;
@@ -205,6 +206,43 @@ public partial class ServiceViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Updates the specified service.
+    /// </summary>
+    /// <param name="service">The service.</param>
+    public void Update(V1Service service)
+    {
+        // Update basic properties if they changed
+        // Note: Name and Namespace usually don't change for the same object identity in K8s (UID)
+        // But if we are matching by Name/Namespace, we are good.
+        // We might want to update status or other metadata if we tracked it.
+        // For now, mostly just keeping the object reference fresh if needed.
+    }
+
+    /// <summary>
+    /// Opens the browser.
+    /// </summary>
+    [RelayCommand]
+    private void OpenBrowser()
+    {
+        if (_localPort > 0)
+        {
+            try
+            {
+                var url = $"http://localhost:{_localPort}";
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception)
+            {
+                // Ignore errors opening browser
+            }
+        }
+    }
+
+    /// <summary>
     /// Starts the forwarding.
     /// </summary>
     private async void StartForwarding()
@@ -256,7 +294,6 @@ public partial class ServiceViewModel : ObservableObject
         Status = "Stopped";
         StopTimer();
     }
-
     /// <summary>
     /// Stops the timer.
     /// </summary>
