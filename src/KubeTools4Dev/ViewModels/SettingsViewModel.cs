@@ -139,17 +139,13 @@ public partial class SettingsViewModel : ViewModelBase
             return [];
         }
 
-        var items = input.Split([',', '\r', '\n'], System.StringSplitOptions.RemoveEmptyEntries);
-        var list = new List<string>();
-        foreach (var item in items)
-        {
-            var trimmed = item.Trim();
-            if (!string.IsNullOrEmpty(trimmed))
-            {
-                list.Add(trimmed);
-            }
-        }
-        return list;
+        var items = input.Split(
+            [',', '\r', '\n'],
+            StringSplitOptions.RemoveEmptyEntries);
+
+        return [.. items
+            .Select(item => item.Trim())
+            .Where(trimmed => !string.IsNullOrEmpty(trimmed))];
     }
 
     /// <summary>

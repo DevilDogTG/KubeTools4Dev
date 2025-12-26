@@ -130,18 +130,15 @@ public class SettingsService : ISettingsService
             {
                 // 2. Fallback to Serilog config
                 var writeTo = config.GetSection("Serilog:WriteTo").GetChildren();
-                foreach (var sink in writeTo)
+                foreach (var sink in writeTo.Where(sink => sink["Name"] == "File"))
                 {
-                    if (sink["Name"] == "File")
+                    var args = sink.GetSection("Args");
+                    var path = args["path"];
+                    if (!string.IsNullOrEmpty(path))
                     {
-                        var args = sink.GetSection("Args");
-                        var path = args["path"];
-                        if (!string.IsNullOrEmpty(path))
-                        {
-                            _defaultLogPath = path;
-                        }
-                        break;
+                        _defaultLogPath = path;
                     }
+                    break;
                 }
             }
         }
