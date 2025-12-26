@@ -6,7 +6,6 @@ using KubeTools4Dev.Core.Services.Interfaces;
 using KubeTools4Dev.ViewModels;
 using KubeTools4Dev.Views;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Serilog;
 using System;
 

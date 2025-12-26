@@ -24,16 +24,6 @@ public partial class MainViewModel : ViewModelBase
     private readonly ILogger<MainViewModel> _logger;
 
     /// <summary>
-    /// The port forward service
-    /// </summary>
-    private readonly IPortForwardService _portForwardService;
-
-    /// <summary>
-    /// The settings service
-    /// </summary>
-    private readonly ISettingsService _settingsService;
-
-    /// <summary>
     /// The connection status
     /// </summary>
     [ObservableProperty]
@@ -58,25 +48,19 @@ public partial class MainViewModel : ViewModelBase
     private ServiceListViewModel _serviceList;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="MainViewModel"/> class.
+    /// Initializes a new instance of the <see cref="MainViewModel" /> class.
     /// </summary>
     /// <param name="kubeService">The kube service.</param>
-    /// <param name="portForwardService">The port forward service.</param>
-    /// <param name="settingsService">The settings service.</param>
     /// <param name="podListViewModel">The pod list view model.</param>
     /// <param name="serviceListViewModel">The service list view model.</param>
     /// <param name="logger">The logger.</param>
     public MainViewModel(
         IKubernetesService kubeService,
-        IPortForwardService portForwardService,
-        ISettingsService settingsService,
         PodListViewModel podListViewModel,
         ServiceListViewModel serviceListViewModel,
         ILogger<MainViewModel> logger)
     {
         _kubeService = kubeService;
-        _portForwardService = portForwardService;
-        _settingsService = settingsService;
         _logger = logger;
 
         PodList = podListViewModel;

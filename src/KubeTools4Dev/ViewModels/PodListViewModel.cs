@@ -1,7 +1,6 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using KubeTools4Dev.Core.Services;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using System;
@@ -77,16 +76,19 @@ public partial class PodListViewModel : ViewModelBase
     private int _refreshIntervalSeconds = 5;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="PodListViewModel"/> class.
+    /// Initializes a new instance of the <see cref="PodListViewModel" /> class.
     /// </summary>
+    /// <param name="logger">The logger.</param>
     /// <param name="kubeService">The kube service.</param>
     /// <param name="settingsService">The settings service.</param>
-    /// <param name="logger">The logger.</param>
-    public PodListViewModel(IKubernetesService kubeService, ISettingsService settingsService, ILogger<PodListViewModel> logger)
+    public PodListViewModel(
+        ILogger<PodListViewModel> logger,
+        IKubernetesService kubeService,
+        ISettingsService settingsService)
     {
+        _logger = logger;
         _kubeService = kubeService;
         _settingsService = settingsService;
-        _logger = logger;
 
         _refreshIntervalSeconds = _settingsService.RefreshIntervalSeconds;
 
@@ -172,6 +174,7 @@ public partial class PodListViewModel : ViewModelBase
             _settingsService.Save();
         }
     }
+
     /// <summary>
     /// Triggers the refresh.
     /// </summary>
@@ -217,6 +220,7 @@ public partial class PodListViewModel : ViewModelBase
             Pods.Add(p);
         }
     }
+
     /// <summary>
     /// Updates the refresh time.
     /// </summary>
@@ -265,6 +269,7 @@ public partial class PodListViewModel : ViewModelBase
                         UpdateFilteredList();
                     });
                 }
+                await Task.Delay(3000, token);
             }
             catch (OperationCanceledException)
             {
@@ -273,16 +278,6 @@ public partial class PodListViewModel : ViewModelBase
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Watch Error");
-            }
-
-            // Wait before restart
-            try
-            {
-                await Task.Delay(3000, token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
             }
         }
     }

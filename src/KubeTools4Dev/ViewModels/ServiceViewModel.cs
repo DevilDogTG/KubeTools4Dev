@@ -1,7 +1,6 @@
 ﻿using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using k8s.Models;
-using KubeTools4Dev.Core.Services;
 using KubeTools4Dev.Core.Services.Interfaces;
 using System;
 using System.Threading;
@@ -113,7 +112,11 @@ public partial class ServiceViewModel : ObservableObject
     /// <param name="port">The port.</param>
     /// <param name="pfService">The pf service.</param>
     /// <param name="settingsService">The settings service.</param>
-    public ServiceViewModel(V1Service service, V1ServicePort port, IPortForwardService pfService, ISettingsService settingsService)
+    public ServiceViewModel(
+        V1Service service,
+        V1ServicePort port,
+        IPortForwardService pfService,
+        ISettingsService settingsService)
     {
         _service = service;
         _port = port;
@@ -181,6 +184,7 @@ public partial class ServiceViewModel : ObservableObject
             }
         }
     }
+
     /// <summary>
     /// Gets or sets a value indicating whether this instance is forwarding.
     /// </summary>

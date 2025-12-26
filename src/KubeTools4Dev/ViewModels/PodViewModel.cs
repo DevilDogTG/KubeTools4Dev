@@ -140,6 +140,7 @@ public partial class PodViewModel : ObservableObject
             _ => Brushes.Gray
         };
     }
+
     /// <summary>
     /// Formats the age.
     /// </summary>
