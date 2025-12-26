@@ -75,9 +75,10 @@ public partial class ServiceViewModel : ObservableObject
     private string _namespace;
 
     /// <summary>
-    /// The pf CTS
+    /// The pf cancellation token source
     /// </summary>
-    private CancellationTokenSource? _pfCts;
+    private CancellationTokenSource? _pfCancellationTokenSource;
+
     /// <summary>
     /// The settings key
     /// </summary>
@@ -107,12 +108,7 @@ public partial class ServiceViewModel : ObservableObject
     private string _targetPortDisplay;
 
     /// <summary>
-    /// Gets the unique identifier.
-    /// </summary>
-    public string Id => $"{Namespace}/{Name}:{TargetPort}";
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ServiceViewModel"/> class.
+    /// Initializes a new instance of the <see cref="ServiceViewModel" /> class.
     /// </summary>
     /// <param name="service">The service.</param>
     /// <param name="port">The port.</param>
@@ -154,6 +150,14 @@ public partial class ServiceViewModel : ObservableObject
             }
         };
     }
+
+    /// <summary>
+    /// Gets the unique identifier.
+    /// </summary>
+    /// <value>
+    /// The identifier.
+    /// </value>
+    public string Id => $"{Namespace}/{Name}:{TargetPort}";
 
     /// <summary>
     /// Gets or sets a value indicating whether this instance is excluded.
@@ -208,19 +212,6 @@ public partial class ServiceViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Updates the specified service.
-    /// </summary>
-    /// <param name="service">The service.</param>
-    public void Update(V1Service service)
-    {
-        // Update basic properties if they changed
-        // Note: Name and Namespace usually don't change for the same object identity in K8s (UID)
-        // But if we are matching by Name/Namespace, we are good.
-        // We might want to update status or other metadata if we tracked it.
-        // For now, mostly just keeping the object reference fresh if needed.
-    }
-
-    /// <summary>
     /// Opens the browser.
     /// </summary>
     [RelayCommand]
@@ -250,7 +241,7 @@ public partial class ServiceViewModel : ObservableObject
     private async void StartForwarding()
     {
         Status = "Starting";
-        _pfCts = new CancellationTokenSource();
+        _pfCancellationTokenSource = new CancellationTokenSource();
         try
         {
             // Run in background
@@ -267,7 +258,7 @@ public partial class ServiceViewModel : ObservableObject
                         _durationTimer.Start();
                     });
 
-                    await _pfService.StartServicePortForwardAsync(Name, Namespace, TargetPort, LocalPort, _pfCts.Token);
+                    await _pfService.StartServicePortForwardAsync(Name, Namespace, TargetPort, LocalPort, _pfCancellationTokenSource.Token);
                 }
                 catch (Exception)
                 {
@@ -292,7 +283,7 @@ public partial class ServiceViewModel : ObservableObject
     /// </summary>
     private void StopForwarding()
     {
-        _pfCts?.Cancel();
+        _pfCancellationTokenSource?.Cancel();
         Status = "Stopped";
         StopTimer();
     }

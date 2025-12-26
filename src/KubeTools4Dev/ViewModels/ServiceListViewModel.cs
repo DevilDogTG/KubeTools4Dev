@@ -19,8 +19,9 @@ namespace KubeTools4Dev.ViewModels;
 /// </summary>
 /// <seealso cref="ViewModelBase" />
 /// <remarks>
-/// Initializes a new instance of the <see cref="ServiceListViewModel"/> class.
+/// Initializes a new instance of the <see cref="ServiceListViewModel" /> class.
 /// </remarks>
+/// <seealso cref="ViewModelBase" />
 /// <param name="kubeService">The kube service.</param>
 /// <param name="portForwardService">The port forward service.</param>
 /// <param name="settingsService">The settings service.</param>
@@ -32,7 +33,13 @@ public partial class ServiceListViewModel(
     ILogger<ServiceListViewModel> logger
 ) : ViewModelBase
 {
+    /// <summary>
+    /// All services
+    /// </summary>
     private readonly List<ServiceViewModel> _allServices = [];
+    /// <summary>
+    /// The CTS
+    /// </summary>
     private CancellationTokenSource? _cts;
 
     /// <summary>
@@ -116,21 +123,6 @@ public partial class ServiceListViewModel(
     }
 
     /// <summary>
-    /// Stops all.
-    /// </summary>
-    [RelayCommand]
-    private async Task StopAll()
-    {
-        foreach (var svc in Services)
-        {
-            if (svc.IsForwarding)
-            {
-                svc.IsForwarding = false;
-            }
-        }
-    }
-
-    /// <summary>
     /// Reconciles the stale services.
     /// </summary>
     private async Task ReconcileStaleServices()
@@ -162,6 +154,21 @@ public partial class ServiceListViewModel(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to reconcile stale services");
+        }
+    }
+
+    /// <summary>
+    /// Stops all.
+    /// </summary>
+    [RelayCommand]
+    private async Task StopAll()
+    {
+        foreach (var svc in Services)
+        {
+            if (svc.IsForwarding)
+            {
+                svc.IsForwarding = false;
+            }
         }
     }
 
@@ -216,6 +223,10 @@ public partial class ServiceListViewModel(
         }
     }
 
+    /// <summary>
+    /// Watches the services asynchronous.
+    /// </summary>
+    /// <param name="token">The token.</param>
     private async Task WatchServicesAsync(CancellationToken token)
     {
         while (!token.IsCancellationRequested)
