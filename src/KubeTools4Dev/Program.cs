@@ -21,10 +21,59 @@ class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        var configuration = new ConfigurationBuilder()
+        // 1. Load Base Configuration
+        var baseConfig = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
             .Build();
+
+        // 2. Load User Settings (Manual/Direct Read to get values, as ConfigBuilder doesn't merge robustly across arbitrary files well without structure matching)
+        // Actually, we can just load the file config IF we ensured the file has "Settings" section. 
+        // But here we need to map Settings:General:LogLevel -> Serilog:MinimumLevel:Default
+        
+        var userSettingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "KubeTools4Dev", "settings.json");
+        var inMemoryOverrides = new System.Collections.Generic.Dictionary<string, string?>();
+
+        if (File.Exists(userSettingsPath))
+        {
+            try
+            {
+                var json = File.ReadAllText(userSettingsPath);
+                var settingsNode = System.Text.Json.Nodes.JsonNode.Parse(json);
+                var generalParams = settingsNode?["General"];
+                
+                if (generalParams != null)
+                {
+                    var logLevel = generalParams["LogLevel"]?.ToString();
+                    var logPath = generalParams["LogPath"]?.ToString();
+
+                    if (!string.IsNullOrEmpty(logLevel))
+                    {
+                        inMemoryOverrides["Serilog:MinimumLevel:Default"] = logLevel;
+                    }
+                    
+                    if (!string.IsNullOrEmpty(logPath))
+                    {
+                        // Assuming File sink is index 1 based on appsettings.json "Using": [Console, File] and WriteTo array order.
+                        // Ideally we'd find the File sink args, but simple override works for known structure.
+                        inMemoryOverrides["Serilog:WriteTo:1:Args:path"] = logPath;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Fallback/Ignore if settings corrupt, just log to console roughly or standard init
+                Console.WriteLine($"Failed to read user settings for logging config: {ex.Message}");
+            }
+        }
+
+        // 3. Build Final Configuration
+        var builder = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .AddInMemoryCollection(inMemoryOverrides);
+
+        var configuration = builder.Build();
 
         Log.Logger = new LoggerConfiguration()
             .ReadFrom.Configuration(configuration)

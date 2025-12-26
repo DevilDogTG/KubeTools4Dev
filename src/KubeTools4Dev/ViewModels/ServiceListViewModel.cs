@@ -61,7 +61,9 @@ public partial class ServiceListViewModel(
             var services = await kubeService.GetServicesAsync();
 
             // Filter out internal kubernetes service or headless
-            var relevantServices = services.Where(s => s.Metadata.Name != "kubernetes" && s.Spec.Type != "ExternalName");
+            var relevantServices = services.Where(s => 
+                !settingsService.Services.HiddenServiceNames.Contains(s.Metadata.Name) && 
+                !settingsService.Services.HiddenServiceTypes.Contains(s.Spec.Type));
 
             Services.Clear();
             foreach (var svc in relevantServices)

@@ -90,7 +90,7 @@ public partial class PodListViewModel : ViewModelBase
         _kubeService = kubeService;
         _settingsService = settingsService;
 
-        _refreshIntervalSeconds = _settingsService.RefreshIntervalSeconds;
+        _refreshIntervalSeconds = _settingsService.Pods.RefreshIntervalSeconds;
 
         _refreshTimer = new DispatcherTimer
         {
@@ -170,7 +170,7 @@ public partial class PodListViewModel : ViewModelBase
         if (_refreshTimer != null)
         {
             _refreshTimer.Interval = TimeSpan.FromSeconds(value);
-            _settingsService.RefreshIntervalSeconds = value;
+            _settingsService.Pods.RefreshIntervalSeconds = value;
             _settingsService.Save();
         }
     }

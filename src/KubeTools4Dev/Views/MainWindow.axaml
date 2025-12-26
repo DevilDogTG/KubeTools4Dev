@@ -28,6 +28,9 @@
             <TabItem Header="Services">
                 <views:ServiceListView DataContext="{Binding ServiceList}"/>
             </TabItem>
+            <TabItem Header="Settings">
+                <views:SettingsView DataContext="{Binding Settings}"/>
+            </TabItem>
         </TabControl>
     </Grid>
 </Window>

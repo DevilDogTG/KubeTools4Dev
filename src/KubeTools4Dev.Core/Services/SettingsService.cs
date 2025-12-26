@@ -1,6 +1,7 @@
 using DMNSN.Core;
 using KubeTools4Dev.Core.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
@@ -39,12 +40,17 @@ public class SettingsService : ISettingsService
     /// The logger
     /// </summary>
     private readonly ILogger _logger;
+
+    /// <summary>
+    /// The actual settings model.
+    /// </summary>
+    private SettingsModel _settings = new();
+
     /// <summary>
     /// Initializes a new instance of the <see cref="SettingsService" /> class.
     /// </summary>
     /// <param name="logger">The logger.</param>
-    public SettingsService(
-        ILogger<SettingsService> logger)
+    public SettingsService(ILogger<SettingsService> logger)
     {
         _logger = logger;
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -57,15 +63,14 @@ public class SettingsService : ISettingsService
         Load();
     }
 
-    /// <summary>
-    /// Gets or sets the list of excluded services.
-    /// </summary>
-    public List<string> ExcludedServices { get; set; } = new();
+    /// <inheritdoc />
+    public GeneralSettings General => _settings.General;
 
-    /// <summary>
-    /// Gets or sets the refresh interval in seconds.
-    /// </summary>
-    public int RefreshIntervalSeconds { get; set; } = 5;
+    /// <inheritdoc />
+    public PodsSettings Pods => _settings.Pods;
+
+    /// <inheritdoc />
+    public ServicesSettings Services => _settings.Services;
 
     /// <summary>
     /// Saves the current settings to persistent storage.
@@ -74,17 +79,12 @@ public class SettingsService : ISettingsService
     {
         try
         {
-            var settings = new SettingsModel
-            {
-                RefreshIntervalSeconds = RefreshIntervalSeconds,
-                ExcludedServices = ExcludedServices
-            };
-            var json = JsonSerializer.Serialize(settings, CachedJsonSerializerOptions);
+            var json = JsonSerializer.Serialize(_settings, CachedJsonSerializerOptions);
             File.WriteAllText(_filePath, json);
         }
-        catch
+        catch (Exception ex)
         {
-            _logger.Warning("Failed to save settings.");
+            _logger.LogError(ex, "Failed to save settings.");
         }
     }
 
@@ -93,21 +93,46 @@ public class SettingsService : ISettingsService
     /// </summary>
     private void Load()
     {
+        // 1. Load Defaults from appsettings.json (Current Directory)
+        try
+        {
+            var config = new ConfigurationBuilder()
+                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+                .Build();
+
+            var defaultSettings = config.GetSection("Settings").Get<SettingsModel>();
+            if (defaultSettings != null)
+            {
+                _settings = defaultSettings;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load default settings from appsettings.json.");
+        }
+
+        // 2. Load User Overrides from AppData
         if (File.Exists(_filePath))
         {
             try
             {
                 var json = File.ReadAllText(_filePath);
-                var settings = JsonSerializer.Deserialize<SettingsModel>(json);
-                if (settings != null)
+                var userSettings = JsonSerializer.Deserialize<SettingsModel>(json);
+
+                if (userSettings != null)
                 {
-                    RefreshIntervalSeconds = settings.RefreshIntervalSeconds;
-                    ExcludedServices = settings.ExcludedServices ?? new();
+                    _settings = userSettings;
+                    
+                    // Re-instantiate if nulls (e.g. corrupted file)
+                    _settings.General ??= new GeneralSettings();
+                    _settings.Pods ??= new PodsSettings();
+                    _settings.Services ??= new ServicesSettings();
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                _logger.Information("Failed to load settings, using defaults.");
+                _logger.LogWarning(ex, "Failed to load user settings, using defaults.");
             }
         }
     }

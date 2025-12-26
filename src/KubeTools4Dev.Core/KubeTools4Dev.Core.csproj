@@ -11,6 +11,9 @@
     <PackageReference Include="DMNSN.Core" Version="10.0.1-dev.4" />
     <PackageReference Include="KubernetesClient" Version="18.0.13" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.1" />
   </ItemGroup>
 
 </Project>
