@@ -1,8 +1,10 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using k8s.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,23 +14,41 @@ namespace KubeTools4Dev.ViewModels;
 /// <summary>
 /// View model for the list of services.
 /// </summary>
-/// <seealso cref="ViewModelBase" />
 /// <remarks>
-/// Initializes a new instance of the <see cref="ServiceListViewModel"/> class.
+/// Initializes a new instance of the <see cref="ServiceListViewModel" /> class.
 /// </remarks>
-/// <param name="kubeService">The kube service.</param>
-/// <param name="portForwardService">The port forward service.</param>
-/// <param name="settingsService">The settings service.</param>
-/// <param name="logger">The logger.</param>
+/// <seealso cref="ViewModelBase" />
 public partial class ServiceListViewModel : ViewModelBase
 {
+    /// <summary>
+    /// The kube service
+    /// </summary>
     private readonly IKubernetesService _kubeService;
+    /// <summary>
+    /// The port forward service
+    /// </summary>
     private readonly IPortForwardService _portForwardService;
+    /// <summary>
+    /// The settings service
+    /// </summary>
     private readonly ISettingsService _settingsService;
+    /// <summary>
+    /// The logger
+    /// </summary>
     private readonly ILogger<ServiceListViewModel> _logger;
-    
-    private System.Collections.Generic.List<k8s.Models.V1Service> _allServices = new();
 
+    /// <summary>
+    /// All services
+    /// </summary>
+    private readonly List<V1Service> _allServices = [];
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ServiceListViewModel" /> class.
+    /// </summary>
+    /// <param name="kubeService">The kube service.</param>
+    /// <param name="portForwardService">The port forward service.</param>
+    /// <param name="settingsService">The settings service.</param>
+    /// <param name="logger">The logger.</param>
     public ServiceListViewModel(
         IKubernetesService kubeService,
         IPortForwardService portForwardService,
@@ -39,7 +59,7 @@ public partial class ServiceListViewModel : ViewModelBase
         _portForwardService = portForwardService;
         _settingsService = settingsService;
         _logger = logger;
-        
+
         _settingsService.SettingsChanged += OnSettingsChanged;
     }
 
@@ -53,7 +73,7 @@ public partial class ServiceListViewModel : ViewModelBase
     /// The services
     /// </summary>
     [ObservableProperty]
-    private ObservableCollection<ServiceViewModel> _services = new();
+    private ObservableCollection<ServiceViewModel> _services = [];
 
     /// <summary>
     /// Cleanups this instance.
@@ -90,6 +110,9 @@ public partial class ServiceListViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Updates the list.
+    /// </summary>
     private void UpdateList()
     {
         // Filter out internal kubernetes service or headless
@@ -107,7 +130,7 @@ public partial class ServiceListViewModel : ViewModelBase
         // ServiceViewModel controls the logic. If we drop it, the Task might continue but we lose control?
         // ServiceViewModel.Cleanup/Dispose?
         // Ideally we should sync existing items.
-        
+
         // Simple Sync Strategy:
         // 1. Identify services to show.
         // 2. Add missing ones.
@@ -120,9 +143,9 @@ public partial class ServiceListViewModel : ViewModelBase
         // We need unique keys for services + ports
         // ServiceViewModel uses "{Namespace}/{Name}:{Port}" as key?
         // Let's iterate and build desired list of VMs.
-        
+
         var desiredVMs = new System.Collections.Generic.List<ServiceViewModel>();
-        
+
         foreach (var svc in relevantList)
         {
             if (svc.Spec.Ports == null) continue;
@@ -130,7 +153,7 @@ public partial class ServiceListViewModel : ViewModelBase
             {
                 // Check if we already have this VM
                 var existingWrapper = Services.FirstOrDefault(vm => vm.Name == svc.Metadata.Name && vm.Namespace == svc.Metadata.NamespaceProperty && vm.TargetPortDisplay == port.Port.ToString());
-                
+
                 if (existingWrapper != null)
                 {
                     // Update settings-dependent properties
@@ -142,7 +165,7 @@ public partial class ServiceListViewModel : ViewModelBase
                         // Update property without triggering Save loop? 
                         // For now, let's just re-set. If it triggers save, it's redundant but safe-ish unless infinite loop.
                         // But SettingsService.Save triggers SettingsChanged... infinite loop risk!
-                        
+
                         // We need to update the backing field or have a "Refresh()" method on VM that doesn't save.
                     }
                     desiredVMs.Add(existingWrapper);
@@ -156,23 +179,26 @@ public partial class ServiceListViewModel : ViewModelBase
 
         // Apply to ObserveableCollection
         Services.Clear(); // This nukes visual state. To do it better:
-        // But for now, simple approach. Problem: Existing VMs with running forwards must be preserved.
-        // Filter logic:
-        
+                          // But for now, simple approach. Problem: Existing VMs with running forwards must be preserved.
+                          // Filter logic:
+
         var toRemove = Services.Where(s => !desiredVMs.Contains(s)).ToList();
-        foreach(var item in toRemove) {
+        foreach (var item in toRemove)
+        {
             // item.Cleanup()?
             Services.Remove(item);
         }
 
-        foreach(var item in desiredVMs) {
-            if (!Services.Contains(item)) {
+        foreach (var item in desiredVMs)
+        {
+            if (!Services.Contains(item))
+            {
                 Services.Add(item);
             }
         }
-        
+
         // Now notify "Refresh" on items?
-        foreach(var item in Services)
+        foreach (var item in Services)
         {
             // We need to notify IsExcluded changed.
             // But VM setter writes to Settings. 
@@ -180,37 +206,26 @@ public partial class ServiceListViewModel : ViewModelBase
             // Let's add that.
         }
     }
-    
-    // Quick fix: Since we can't easily add ReloadSettings in this Replace call (Need to edit ServiceViewModel),
-    // and infinite loop is real risk.
-    // If Settings changed -> OnSettingsChanged -> UpdateList -> (if we set property) -> Save -> OnSettingsChanged loop.
-    // We MUST NOT set property if the value matches settings.
-    // ServiceViewModel.IsExcluded setter checks: if (value) add else remove.
-    // If it's already in settings, and we set true, it tries to Add. Add checks Contains. If contains, does nothing?
-    // Let's check ServiceViewModel setter logic.
-    // If checks prevent Save(), we are good.
-    // ServiceViewModel.IsExcluded setter:
-    // val = value. 
-    // if value { if !Contains { Add; Save; } }
-    // if !value { if Contains { Remove; Save; } }
-    // So if state matches Settings, Save() is NOT called. Loop broken. Safe.
-    
+
+    /// <summary>
+    /// Called when [settings changed].
+    /// </summary>
     private void OnSettingsChanged()
     {
-         Avalonia.Threading.Dispatcher.UIThread.Invoke(() => 
-         {
-             UpdateList();
-             foreach(var svc in Services)
-             {
-                 // Create key to check
-                 var key = $"{svc.Namespace}/{svc.Name}:{svc.TargetPortDisplay}"; // TargetPortDisplay is Port.ToString()
-                 bool shouldBeExcluded = _settingsService.Services.ExcludedServices.Contains(key);
-                 if (svc.IsExcluded != shouldBeExcluded)
-                 {
-                     svc.IsExcluded = shouldBeExcluded; // Should be safe due to checks in setter
-                 }
-             }
-         });
+        Avalonia.Threading.Dispatcher.UIThread.Invoke(() =>
+        {
+            UpdateList();
+            foreach (var svc in Services)
+            {
+                // Create key to check
+                var key = $"{svc.Namespace}/{svc.Name}:{svc.TargetPortDisplay}"; // TargetPortDisplay is Port.ToString()
+                bool shouldBeExcluded = _settingsService.Services.ExcludedServices.Contains(key);
+                if (svc.IsExcluded != shouldBeExcluded)
+                {
+                    svc.IsExcluded = shouldBeExcluded; // Should be safe due to checks in setter
+                }
+            }
+        });
     }
 
     /// <summary>

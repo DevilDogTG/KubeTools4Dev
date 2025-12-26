@@ -73,7 +73,7 @@ public class SettingsService : ISettingsService
     public ServicesSettings Services => _settings.Services;
 
     /// <inheritdoc />
-    public event Action SettingsChanged;
+    public event Action? SettingsChanged;
 
     /// <summary>
     /// Saves the current settings to persistent storage.

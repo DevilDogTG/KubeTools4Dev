@@ -11,13 +11,23 @@ using System;
 
 namespace KubeTools4Dev;
 
+/// <summary>
+/// Main application class.
+/// </summary>
+/// <seealso cref="Avalonia.Application" />
 public partial class App : Application
 {
+    /// <summary>
+    /// Initializes the application by loading XAML etc.
+    /// </summary>
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
     }
 
+    /// <summary>
+    /// Called when [framework initialization completed].
+    /// </summary>
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -43,6 +53,10 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Configures the services.
+    /// </summary>
+    /// <param name="services">The services.</param>
     private void ConfigureServices(IServiceCollection services)
     {
         // Logging

@@ -15,6 +15,11 @@ namespace KubeTools4Dev.ViewModels;
 public partial class ServiceViewModel : ObservableObject
 {
     /// <summary>
+    /// The duration timer
+    /// </summary>
+    private readonly DispatcherTimer _durationTimer;
+
+    /// <summary>
     /// The pf service
     /// </summary>
     private readonly IPortForwardService _pfService;
@@ -30,6 +35,11 @@ public partial class ServiceViewModel : ObservableObject
     private readonly V1Service _service;
 
     /// <summary>
+    /// The settings key
+    /// </summary>
+    private readonly string _settingsKey;
+
+    /// <summary>
     /// The settings service
     /// </summary>
     private readonly ISettingsService _settingsService;
@@ -39,12 +49,6 @@ public partial class ServiceViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private string _durationText = "";
-
-    /// <summary>
-    /// The duration timer
-    /// </summary>
-    private DispatcherTimer _durationTimer;
-
     /// <summary>
     /// The is excluded
     /// </summary>
@@ -77,11 +81,6 @@ public partial class ServiceViewModel : ObservableObject
     /// The pf CTS
     /// </summary>
     private CancellationTokenSource? _pfCts;
-    /// <summary>
-    /// The settings key
-    /// </summary>
-    private string _settingsKey;
-
     /// <summary>
     /// The start time
     /// </summary>
@@ -175,11 +174,8 @@ public partial class ServiceViewModel : ObservableObject
                 }
                 else
                 {
-                    if (_settingsService.Services.ExcludedServices.Contains(_settingsKey))
-                    {
-                        _settingsService.Services.ExcludedServices.Remove(_settingsKey);
-                        _settingsService.Save();
-                    }
+                    _settingsService.Services.ExcludedServices.Remove(_settingsKey);
+                    _settingsService.Save();
                 }
             }
         }
