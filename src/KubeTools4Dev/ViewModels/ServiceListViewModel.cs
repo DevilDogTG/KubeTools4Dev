@@ -1,6 +1,7 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DMNSN.Core;
 using k8s;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -135,10 +136,13 @@ public partial class ServiceListViewModel : ViewModelBase
                 {
                     await _watchTask;
                 }
-                catch (OperationCanceledException) { }
+                catch (OperationCanceledException)
+                {
+                    _logger.Debug("Previous watch task was canceled.");
+                }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error while waiting for previous watch task to complete");
+                    _logger.Error(ex, "Error while waiting for previous watch task to complete");
                 }
             }
             _cancellationTokenSource?.Dispose();

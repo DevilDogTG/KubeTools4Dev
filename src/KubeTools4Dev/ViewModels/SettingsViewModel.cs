@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using KubeTools4Dev.Core.Services.Interfaces;
 using KubeTools4Dev.Models;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -161,15 +162,10 @@ public partial class SettingsViewModel : ViewModelBase
         {
             // Avoid duplicates
             var trimmed = NewExcludedService.Trim();
-            bool exists = false;
-            foreach (var item in ExcludedServices)
-            {
-                if (item.Value.Equals(trimmed, System.StringComparison.OrdinalIgnoreCase))
-                {
-                    exists = true;
-                    break;
-                }
-            }
+            bool exists = ExcludedServices.Any(item =>
+                item.Value.Equals(
+                    trimmed,
+                    StringComparison.OrdinalIgnoreCase));
 
             if (!exists)
             {
@@ -197,7 +193,7 @@ public partial class SettingsViewModel : ViewModelBase
         // Services
         var sourceList = _settingsService.Services.ExcludedServices ?? [];
 
-        // Remove items not in source
+        // Remove items not in service
         for (int i = ExcludedServices.Count - 1; i >= 0; i--)
         {
             if (!sourceList.Contains(ExcludedServices[i].Value))
@@ -207,12 +203,11 @@ public partial class SettingsViewModel : ViewModelBase
         }
 
         // Add items not in current list
-        foreach (var s in sourceList)
+        foreach (var service in sourceList
+            .Where(service =>
+                !ExcludedServices.Any(x => x.Value == service)))
         {
-            if (!ExcludedServices.Any(x => x.Value == s))
-            {
-                ExcludedServices.Add(new ExclusionItem(s));
-            }
+            ExcludedServices.Add(new ExclusionItem(service));
         }
 
         HiddenServiceNamesText = string.Join(", ", _settingsService.Services.HiddenServiceNames);

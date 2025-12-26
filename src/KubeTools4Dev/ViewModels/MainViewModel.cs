@@ -72,7 +72,7 @@ public partial class MainViewModel : ViewModelBase
 
         PodList = podListViewModel;
         ServiceList = serviceListViewModel;
-        Settings = settingsViewModel; // Add this param to constructor next
+        Settings = settingsViewModel;
 
         // Auto-connect on start
         _ = ConnectCommand.ExecuteAsync(null);
@@ -86,8 +86,6 @@ public partial class MainViewModel : ViewModelBase
         _logger.Information("Starting cleanup application");
         ServiceList?.Cleanup();
     }
-
-
 
     /// <summary>
     /// The cluster name
