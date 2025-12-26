@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using KubeTools4Dev.Core.Services;
+using DMNSN.Core;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
@@ -16,7 +16,8 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>
     /// The kube service
     /// </summary>
-    private readonly KubernetesService _kubeService;
+    private readonly IKubernetesService _kubeService;
+
     /// <summary>
     /// The logger
     /// </summary>
@@ -26,10 +27,12 @@ public partial class MainViewModel : ViewModelBase
     /// The port forward service
     /// </summary>
     private readonly IPortForwardService _portForwardService;
+
     /// <summary>
     /// The settings service
     /// </summary>
     private readonly ISettingsService _settingsService;
+
     /// <summary>
     /// The connection status
     /// </summary>
@@ -53,28 +56,31 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     [ObservableProperty]
     private ServiceListViewModel _serviceList;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="MainViewModel"/> class.
     /// </summary>
-    /// <param name="loggerFactory">The logger factory.</param>
-    public MainViewModel(ILoggerFactory loggerFactory)
+    /// <param name="kubeService">The kube service.</param>
+    /// <param name="portForwardService">The port forward service.</param>
+    /// <param name="settingsService">The settings service.</param>
+    /// <param name="podListViewModel">The pod list view model.</param>
+    /// <param name="serviceListViewModel">The service list view model.</param>
+    /// <param name="logger">The logger.</param>
+    public MainViewModel(
+        IKubernetesService kubeService,
+        IPortForwardService portForwardService,
+        ISettingsService settingsService,
+        PodListViewModel podListViewModel,
+        ServiceListViewModel serviceListViewModel,
+        ILogger<MainViewModel> logger)
     {
-        _logger = loggerFactory.CreateLogger<MainViewModel>();
+        _kubeService = kubeService;
+        _portForwardService = portForwardService;
+        _settingsService = settingsService;
+        _logger = logger;
 
-        // Manual DI for simplicity in this specific scope
-        _kubeService = new KubernetesService(loggerFactory.CreateLogger<KubernetesService>());
-        _portForwardService = new PortForwardService(_kubeService, loggerFactory.CreateLogger<PortForwardService>());
-        _settingsService = new SettingsService();
-
-        PodList = new PodListViewModel(
-            _kubeService,
-            _settingsService,
-            loggerFactory.CreateLogger<PodListViewModel>());
-        ServiceList = new ServiceListViewModel(
-            _kubeService,
-            _portForwardService,
-            _settingsService,
-            loggerFactory.CreateLogger<ServiceListViewModel>());
+        PodList = podListViewModel;
+        ServiceList = serviceListViewModel;
 
         // Auto-connect on start
         _ = ConnectCommand.ExecuteAsync(null);
@@ -85,6 +91,7 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     public void Cleanup()
     {
+        _logger.Information("Starting cleanup application");
         ServiceList?.Cleanup();
     }
 
@@ -94,10 +101,12 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private async Task Connect()
     {
+        _logger.Debug("Connecting to Kubernetes cluster");
         ConnectionStatus = "Connecting...";
         bool success = await _kubeService.ConnectAsync();
         if (success)
         {
+            _logger.Debug("Connected to Kubernetes cluster successfully");
             ConnectionStatus = "Connected to Kubernetes";
             IsConnected = true;
             await PodList.InitializeAsync();
@@ -105,6 +114,7 @@ public partial class MainViewModel : ViewModelBase
         }
         else
         {
+            _logger.Warning("Failed to connect to Kubernetes cluster");
             ConnectionStatus = "Connection Failed";
             IsConnected = false;
         }

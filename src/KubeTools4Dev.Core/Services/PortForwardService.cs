@@ -96,6 +96,7 @@ public partial class PortForwardService(
                     var ipEndPoint = new IPEndPoint(
                         address: IPAddress.Any,
                         port: localPort);
+
                     listener = new Socket(
                         AddressFamily.InterNetwork,
                         SocketType.Stream,

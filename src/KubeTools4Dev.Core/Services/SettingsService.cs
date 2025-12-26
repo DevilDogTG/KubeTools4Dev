@@ -1,28 +1,10 @@
+using DMNSN.Core;
 using KubeTools4Dev.Core.Models;
+using KubeTools4Dev.Core.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace KubeTools4Dev.Core.Services;
-
-/// <summary>
-/// Interface for managing application settings.
-/// </summary>
-public interface ISettingsService
-{
-    /// <summary>
-    /// Gets or sets the refresh interval in seconds.
-    /// </summary>
-    int RefreshIntervalSeconds { get; set; }
-
-    /// <summary>
-    /// Gets or sets the list of excluded services.
-    /// </summary>
-    List<string> ExcludedServices { get; set; }
-
-    /// <summary>
-    /// Saves the current settings to persistent storage.
-    /// </summary>
-    void Save();
-}
 
 /// <summary>
 /// Service for managing application settings, persisting them to a JSON file.
@@ -31,14 +13,22 @@ public interface ISettingsService
 public class SettingsService : ISettingsService
 {
     /// <summary>
-    /// The folder name for settings storage.
-    /// </summary>
-    private const string FolderName = "ElysianMonitor";
-
-    /// <summary>
     /// The file name for settings storage.
     /// </summary>
     private const string FileName = "settings.json";
+
+    /// <summary>
+    /// The folder name for settings storage.
+    /// </summary>
+    private const string FolderName = "KubeTools4Dev";
+
+    /// <summary>
+    /// The cached json serializer options
+    /// </summary>
+    private static readonly JsonSerializerOptions CachedJsonSerializerOptions = new()
+    {
+        WriteIndented = true
+    };
 
     /// <summary>
     /// The full file path for settings storage.
@@ -46,20 +36,17 @@ public class SettingsService : ISettingsService
     private readonly string _filePath;
 
     /// <summary>
-    /// Gets or sets the refresh interval in seconds.
+    /// The logger
     /// </summary>
-    public int RefreshIntervalSeconds { get; set; } = 5;
-
+    private readonly ILogger _logger;
     /// <summary>
-    /// Gets or sets the list of excluded services.
+    /// Initializes a new instance of the <see cref="SettingsService" /> class.
     /// </summary>
-    public List<string> ExcludedServices { get; set; } = new();
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="SettingsService"/> class.
-    /// </summary>
-    public SettingsService()
+    /// <param name="logger">The logger.</param>
+    public SettingsService(
+        ILogger<SettingsService> logger)
     {
+        _logger = logger;
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         var folder = Path.Combine(appData, FolderName);
         if (!Directory.Exists(folder))
@@ -68,6 +55,37 @@ public class SettingsService : ISettingsService
         }
         _filePath = Path.Combine(folder, FileName);
         Load();
+    }
+
+    /// <summary>
+    /// Gets or sets the list of excluded services.
+    /// </summary>
+    public List<string> ExcludedServices { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the refresh interval in seconds.
+    /// </summary>
+    public int RefreshIntervalSeconds { get; set; } = 5;
+
+    /// <summary>
+    /// Saves the current settings to persistent storage.
+    /// </summary>
+    public void Save()
+    {
+        try
+        {
+            var settings = new SettingsModel
+            {
+                RefreshIntervalSeconds = RefreshIntervalSeconds,
+                ExcludedServices = ExcludedServices
+            };
+            var json = JsonSerializer.Serialize(settings, CachedJsonSerializerOptions);
+            File.WriteAllText(_filePath, json);
+        }
+        catch
+        {
+            _logger.Warning("Failed to save settings.");
+        }
     }
 
     /// <summary>
@@ -89,29 +107,8 @@ public class SettingsService : ISettingsService
             }
             catch
             {
-                // Ignore load errors, use defaults 
+                _logger.Information("Failed to load settings, using defaults.");
             }
-        }
-    }
-
-    /// <summary>
-    /// Saves the current settings to persistent storage.
-    /// </summary>
-    public void Save()
-    {
-        try
-        {
-            var settings = new SettingsModel
-            {
-                RefreshIntervalSeconds = RefreshIntervalSeconds,
-                ExcludedServices = ExcludedServices
-            };
-            var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_filePath, json);
-        }
-        catch
-        {
-            // Ignore save errors 
         }
     }
 }

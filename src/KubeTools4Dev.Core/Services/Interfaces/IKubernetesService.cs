@@ -9,6 +9,14 @@ namespace KubeTools4Dev.Core.Services.Interfaces;
 public interface IKubernetesService
 {
     /// <summary>
+    /// Gets the client.
+    /// </summary>
+    /// <value>
+    /// The client.
+    /// </value>
+    IKubernetes Client { get; }
+
+    /// <summary>
     /// Gets a value indicating whether this instance is connected.
     /// </summary>
     /// <value>
@@ -31,14 +39,6 @@ public interface IKubernetesService
     Task<IEnumerable<V1Pod>> GetPodsAsync(string namespaceName = "default");
 
     /// <summary>
-    /// Watches the pods asynchronous.
-    /// </summary>
-    /// <param name="namespaceName">Name of the namespace.</param>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>An async enumerable of watch events.</returns>
-    IAsyncEnumerable<(WatchEventType Type, V1Pod Item)> WatchPodsAsync(string namespaceName = "default", CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Gets the services asynchronous.
     /// </summary>
     /// <param name="namespaceName">Name of the namespace.</param>
@@ -46,10 +46,12 @@ public interface IKubernetesService
     Task<IEnumerable<V1Service>> GetServicesAsync(string namespaceName = "default");
 
     /// <summary>
-    /// Gets the client.
+    /// Watches the pods asynchronous.
     /// </summary>
-    /// <value>
-    /// The client.
-    /// </value>
-    IKubernetes Client { get; }
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>An async enumerable of watch events.</returns>
+    IAsyncEnumerable<(WatchEventType Type, V1Pod Item)> WatchPodsAsync(
+        string namespaceName = "default",
+        CancellationToken cancellationToken = default);
 }
