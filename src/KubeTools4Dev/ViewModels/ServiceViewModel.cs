@@ -107,6 +107,11 @@ public partial class ServiceViewModel : ObservableObject
     private string _targetPortDisplay;
 
     /// <summary>
+    /// Gets the unique identifier.
+    /// </summary>
+    public string Id => $"{Namespace}/{Name}:{TargetPort}";
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ServiceViewModel"/> class.
     /// </summary>
     /// <param name="service">The service.</param>

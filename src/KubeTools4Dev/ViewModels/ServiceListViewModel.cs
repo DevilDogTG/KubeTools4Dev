@@ -70,6 +70,10 @@ public partial class ServiceListViewModel(
             // Filter out internal kubernetes service or headless
             var relevantServices = services.Where(s => s.Metadata.Name != "kubernetes" && s.Spec.Type != "ExternalName");
 
+            // Stop existing watch if any
+            _cts?.Cancel();
+            _cts = new CancellationTokenSource();
+
             _allServices.Clear();
             foreach (var svc in relevantServices)
             {
@@ -83,7 +87,6 @@ public partial class ServiceListViewModel(
             UpdateFilteredList();
 
             // Start Watch
-            _cts = new CancellationTokenSource();
             _ = WatchServicesAsync(_cts.Token);
         }
         catch (Exception ex)
@@ -248,7 +251,7 @@ public partial class ServiceListViewModel(
                             if (item.Spec.Ports != null)
                             {
                                 var newPorts = item.Spec.Ports.Where(p => p.Protocol == "TCP").ToList();
-
+                                
                                 // Remove VMs for ports that no longer exist
                                 foreach (var vm in existingVMs.ToList())
                                 {
@@ -263,13 +266,14 @@ public partial class ServiceListViewModel(
                                 // Add VMs for new ports
                                 foreach (var port in newPorts)
                                 {
-                                    if (!_allServices.Any(s => s.Name == item.Metadata.Name && s.Namespace == item.Metadata.NamespaceProperty && (int)s.TargetPort == port.Port))
+                                    var newId = $"{item.Metadata.NamespaceProperty}/{item.Metadata.Name}:{port.Port}";
+                                    if (!_allServices.Any(s => s.Id == newId))
                                     {
-                                        _allServices.Add(new ServiceViewModel(item, port, portForwardService, settingsService));
+                                         _allServices.Add(new ServiceViewModel(item, port, portForwardService, settingsService));
                                     }
                                 }
                             }
-
+                            
                             if (existingVMs.Count == 0 && type == WatchEventType.Added)
                             {
                                 // Fresh add
@@ -277,7 +281,11 @@ public partial class ServiceListViewModel(
                                 {
                                     foreach (var port in item.Spec.Ports.Where(p => p.Protocol == "TCP"))
                                     {
-                                        _allServices.Add(new ServiceViewModel(item, port, portForwardService, settingsService));
+                                        var newId = $"{item.Metadata.NamespaceProperty}/{item.Metadata.Name}:{port.Port}";
+                                        if (!_allServices.Any(s => s.Id == newId))
+                                        {
+                                            _allServices.Add(new ServiceViewModel(item, port, portForwardService, settingsService));
+                                        }
                                     }
                                 }
                             }
