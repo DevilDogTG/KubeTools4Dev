@@ -1,0 +1,37 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:KubeTools4Dev.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="500"
+        x:Class="KubeTools4Dev.Views.AboutWindow"
+        x:DataType="vm:AboutViewModel"
+        Icon="avares://KubeTools4Dev/Assets/app-icon.png"
+        Title="About KubeTools4Dev"
+        Width="400" Height="500"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+    <Design.DataContext>
+        <vm:AboutViewModel/>
+    </Design.DataContext>
+
+    <Border Padding="20">
+        <StackPanel Spacing="15" HorizontalAlignment="Center" VerticalAlignment="Center">
+            
+            <!-- Author Image -->
+            <Image Source="/Assets/author.png" Width="150" Height="150" HorizontalAlignment="Center"/>
+
+            <TextBlock Text="{Binding ApplicationName}" Classes="H3" FontWeight="Bold" HorizontalAlignment="Center"/>
+            
+            <TextBlock Text="{Binding Version, StringFormat='Version {0}'}" HorizontalAlignment="Center" Opacity="0.7"/>
+            
+            <TextBlock Text="{Binding Description}" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" MaxWidth="350"/>
+            
+            <Button Command="{Binding OpenUrlCommand}" Content="View on GitHub" Classes="Primary" HorizontalAlignment="Center"/>
+            
+            <TextBlock Text="Copyright © 2025 DevilDogTG" FontSize="11" HorizontalAlignment="Center" Opacity="0.5" Margin="0,20,0,0"/>
+
+        </StackPanel>
+    </Border>
+</Window>

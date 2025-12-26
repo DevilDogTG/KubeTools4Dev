@@ -63,6 +63,7 @@
 
         <!-- Buttons -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,10,0,0">
+            <Button Content="About" Command="{Binding OpenAboutCommand}"/>
             <Button Content="Save" Command="{Binding SaveCommand}" Classes="Primary"/>
         </StackPanel>
     </Grid>

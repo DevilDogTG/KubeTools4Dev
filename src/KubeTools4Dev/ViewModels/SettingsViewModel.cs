@@ -114,6 +114,23 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Opens the about dialog.
+    /// </summary>
+    [RelayCommand]
+    private static void OpenAbout()
+    {
+        var aboutWindow = new Views.AboutWindow();
+        if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            aboutWindow.ShowDialog(desktop.MainWindow);
+        }
+        else
+        {
+            aboutWindow.Show();
+        }
+    }
+
+    /// <summary>
     /// Loads the settings.
     /// </summary>
     private void LoadSettings()
