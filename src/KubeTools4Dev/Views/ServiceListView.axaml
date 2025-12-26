@@ -50,6 +50,12 @@
             <Button Content="Stop All"
                     Command="{Binding StopAllCommand}"
                     Classes="Danger"/>
+            
+            <TextBox Watermark="Filter services..."
+                     Text="{Binding FilterText}"
+                     Width="200" 
+                     Margin="10,0,0,0"/>
+
             <ProgressBar IsIndeterminate="True"
                          IsVisible="{Binding IsLoading}" />
         </StackPanel>

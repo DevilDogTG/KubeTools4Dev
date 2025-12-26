@@ -173,12 +173,35 @@ public partial class ServiceListViewModel(
     }
 
     /// <summary>
+    /// The filter text
+    /// </summary>
+    [ObservableProperty]
+    private string _filterText = string.Empty;
+
+    /// <summary>
+    /// Called when [filter text changed].
+    /// </summary>
+    /// <param name="value">The value.</param>
+    partial void OnFilterTextChanged(string value)
+    {
+        UpdateFilteredList();
+    }
+
+    /// <summary>
     /// Updates the filtered list.
     /// </summary>
     private void UpdateFilteredList()
     {
-        // Simple list update, assume no filtering for now or add if needed later
-        var sorted = _allServices
+        var query = _allServices.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(FilterText))
+        {
+            query = query.Where(s => 
+                (s.Name?.Contains(FilterText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (s.Namespace?.Contains(FilterText, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+
+        var sorted = query
             .OrderBy(s => s.Namespace)
             .ThenBy(s => s.Name)
             .ToList();
