@@ -1,8 +1,10 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using KubeTools4Dev.Core.Services.Interfaces;
+using KubeTools4Dev.Models;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -11,9 +13,9 @@ using System.Linq;
 namespace KubeTools4Dev.ViewModels;
 
 /// <summary>
-/// Setting view model.
+/// Settings view model.
 /// </summary>
-/// <seealso cref="KubeTools4Dev.ViewModels.ViewModelBase" />
+/// <seealso cref="ViewModelBase" />
 public partial class SettingsViewModel : ViewModelBase
 {
     /// <summary>
@@ -25,16 +27,6 @@ public partial class SettingsViewModel : ViewModelBase
     /// The settings service
     /// </summary>
     private readonly ISettingsService _settingsService;
-    /// <summary>
-    /// The excluded services
-    /// </summary>
-    public ObservableCollection<ExclusionItem> ExcludedServices { get; } = [];
-
-    /// <summary>
-    /// The new excluded service
-    /// </summary>
-    [ObservableProperty]
-    private string _newExcludedService = string.Empty;
 
     /// <summary>
     /// The hidden service names text
@@ -48,7 +40,6 @@ public partial class SettingsViewModel : ViewModelBase
     /// </summary>
     [ObservableProperty]
     private string _hiddenServiceTypesText = string.Empty;
-
     /// <summary>
     /// The log level
     /// </summary>
@@ -63,12 +54,10 @@ public partial class SettingsViewModel : ViewModelBase
     private string _logPath = string.Empty;
 
     /// <summary>
-    /// Gets the current effective log path.
+    /// The new excluded service
     /// </summary>
-    public string CurrentLogPath => !string.IsNullOrWhiteSpace(LogPath)
-        ? LogPath
-        : _settingsService.GetDefaultLogPath();
-
+    [ObservableProperty]
+    private string _newExcludedService = string.Empty;
     /// <summary>
     /// The refresh interval seconds
     /// </summary>
@@ -94,6 +83,17 @@ public partial class SettingsViewModel : ViewModelBase
         _settingsService.SettingsChanged += OnSettingsChanged;
     }
 
+    /// <summary>
+    /// Gets the current effective log path.
+    /// </summary>
+    public string CurrentLogPath => !string.IsNullOrWhiteSpace(LogPath)
+        ? LogPath
+        : _settingsService.GetDefaultLogPath();
+
+    /// <summary>
+    /// The excluded services
+    /// </summary>
+    public ObservableCollection<ExclusionItem> ExcludedServices { get; } = [];
     /// <summary>
     /// Gets the log levels.
     /// </summary>
@@ -127,6 +127,31 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Parses the list.
+    /// </summary>
+    /// <param name="input">The input.</param>
+    /// <returns></returns>
+    private static List<string> ParseList(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return [];
+        }
+
+        var items = input.Split([',', '\r', '\n'], System.StringSplitOptions.RemoveEmptyEntries);
+        var list = new List<string>();
+        foreach (var item in items)
+        {
+            var trimmed = item.Trim();
+            if (!string.IsNullOrEmpty(trimmed))
+            {
+                list.Add(trimmed);
+            }
+        }
+        return list;
+    }
+
+    /// <summary>
     /// Adds the excluded service.
     /// </summary>
     [RelayCommand]
@@ -153,21 +178,6 @@ public partial class SettingsViewModel : ViewModelBase
                 SyncToSettingsService();
                 _settingsService.Save();
             }
-        }
-    }
-
-    /// <summary>
-    /// Removes the excluded service.
-    /// </summary>
-    /// <param name="item">The item.</param>
-    [RelayCommand]
-    private void RemoveExcludedService(ExclusionItem item)
-    {
-        if (item != null)
-        {
-            ExcludedServices.Remove(item);
-            SyncToSettingsService();
-            _settingsService.Save();
         }
     }
 
@@ -212,36 +222,22 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>
     /// Called when [settings changed].
     /// </summary>
-    private void OnSettingsChanged()
-    {
-        Avalonia.Threading.Dispatcher.UIThread.Invoke(LoadSettings);
-    }
+    private void OnSettingsChanged() => Dispatcher.UIThread.Invoke(LoadSettings);
 
     /// <summary>
-    /// Parses the list.
+    /// Removes the excluded service.
     /// </summary>
-    /// <param name="input">The input.</param>
-    /// <returns></returns>
-    private static List<string> ParseList(string input)
+    /// <param name="item">The item.</param>
+    [RelayCommand]
+    private void RemoveExcludedService(ExclusionItem item)
     {
-        if (string.IsNullOrWhiteSpace(input))
+        if (item != null)
         {
-            return [];
+            ExcludedServices.Remove(item);
+            SyncToSettingsService();
+            _settingsService.Save();
         }
-
-        var items = input.Split([',', '\r', '\n'], System.StringSplitOptions.RemoveEmptyEntries);
-        var list = new List<string>();
-        foreach (var item in items)
-        {
-            var trimmed = item.Trim();
-            if (!string.IsNullOrEmpty(trimmed))
-            {
-                list.Add(trimmed);
-            }
-        }
-        return list;
     }
-
     /// <summary>
     /// Saves this instance.
     /// </summary>
@@ -279,11 +275,3 @@ public partial class SettingsViewModel : ViewModelBase
     }
 }
 
-/// <summary>
-/// Exclusion item wrapper.
-/// </summary>
-public partial class ExclusionItem(string value) : ObservableObject
-{
-    [ObservableProperty]
-    private string _value = value;
-}

@@ -21,7 +21,7 @@ public partial class PodListViewModel : ViewModelBase
     /// <summary>
     /// All pods
     /// </summary>
-    private readonly List<PodViewModel> _allPods = new();
+    private readonly List<PodViewModel> _allPods = [];
 
     /// <summary>
     /// The kube service
@@ -67,7 +67,7 @@ public partial class PodListViewModel : ViewModelBase
     /// The pods
     /// </summary>
     [ObservableProperty]
-    private ObservableCollection<PodViewModel> _pods = new();
+    private ObservableCollection<PodViewModel> _pods = [];
 
     /// <summary>
     /// The refresh interval seconds
@@ -98,7 +98,7 @@ public partial class PodListViewModel : ViewModelBase
         };
 
         _refreshTimer.Tick += (s, e) => TriggerRefresh();
-        
+
         _settingsService.SettingsChanged += OnSettingsChanged;
     }
 

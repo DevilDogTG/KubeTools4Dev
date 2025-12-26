@@ -120,14 +120,13 @@ public class SettingsService : ISettingsService
             }
 
             // Extract default log path
-            // Extract default log path
             // 1. Check Settings:General:LogPath first (Preferred source of truth)
             var generalLogPath = _settings.General?.LogPath;
-            if (!string.IsNullOrEmpty(generalLogPath)) 
+            if (!string.IsNullOrEmpty(generalLogPath))
             {
-               _defaultLogPath = generalLogPath;
+                _defaultLogPath = generalLogPath;
             }
-            else 
+            else
             {
                 // 2. Fallback to Serilog config
                 var writeTo = config.GetSection("Serilog:WriteTo").GetChildren();

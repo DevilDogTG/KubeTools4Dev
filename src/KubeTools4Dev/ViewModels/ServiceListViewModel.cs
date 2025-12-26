@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,7 +17,7 @@ namespace KubeTools4Dev.ViewModels;
 /// <summary>
 /// View model for the list of services.
 /// </summary>
-/// <seealso cref="KubeTools4Dev.ViewModels.ViewModelBase" />
+/// <seealso cref="ViewModelBase" />
 public partial class ServiceListViewModel : ViewModelBase
 {
     /// <summary>
@@ -49,9 +50,9 @@ public partial class ServiceListViewModel : ViewModelBase
     /// </summary>
     private readonly ISettingsService _settingsService;
     /// <summary>
-    /// The CTS
+    /// The cancellation token source
     /// </summary>
-    private CancellationTokenSource? _cts;
+    private CancellationTokenSource? _cancellationTokenSource;
     /// <summary>
     /// The filter text
     /// </summary>
@@ -104,8 +105,8 @@ public partial class ServiceListViewModel : ViewModelBase
     public void Cleanup()
     {
         _settingsService.SettingsChanged -= OnSettingsChanged;
-        _cts?.Cancel();
-        _cts?.Dispose();
+        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource?.Dispose();
         _portForwardService.StopAll();
     }
 
@@ -122,10 +123,12 @@ public partial class ServiceListViewModel : ViewModelBase
             var services = await _kubeService.GetServicesAsync();
 
             // Filter out internal kubernetes service or headless
-            var relevantServices = services.Where(s => s.Metadata.Name != "kubernetes" && s.Spec.Type != "ExternalName");
+            var relevantServices = services.Where(s =>
+                s.Metadata.Name != "kubernetes"
+                && s.Spec.Type != "ExternalName");
 
             // Stop existing watch if any
-            _cts?.Cancel();
+            _cancellationTokenSource?.Cancel();
             if (_watchTask != null)
             {
                 try
@@ -138,8 +141,8 @@ public partial class ServiceListViewModel : ViewModelBase
                     _logger.LogError(ex, "Error while waiting for previous watch task to complete");
                 }
             }
-            _cts?.Dispose();
-            _cts = new CancellationTokenSource();
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = new CancellationTokenSource();
 
             _allServices.Clear();
             foreach (var svc in relevantServices)
@@ -148,15 +151,20 @@ public partial class ServiceListViewModel : ViewModelBase
 
                 foreach (var port in svc.Spec.Ports.Where(p => p.Protocol == "TCP"))
                 {
-                    var vm = new ServiceViewModel(_loggerFactory.CreateLogger<ServiceViewModel>(), svc, port, _portForwardService, _settingsService);
-                    vm.PropertyChanged += OnServicePropertyChanged;
-                    _allServices.Add(vm);
+                    var viewModel = new ServiceViewModel(
+                        _loggerFactory.CreateLogger<ServiceViewModel>(),
+                        svc,
+                        port,
+                        _portForwardService,
+                        _settingsService);
+                    viewModel.PropertyChanged += OnServicePropertyChanged;
+                    _allServices.Add(viewModel);
                 }
             }
             UpdateFilteredList();
 
             // Start Watch
-            _watchTask = WatchServicesAsync(_cts.Token);
+            _watchTask = WatchServicesAsync(_cancellationTokenSource.Token);
         }
         catch (Exception ex)
         {
@@ -204,8 +212,10 @@ public partial class ServiceListViewModel : ViewModelBase
     /// Called when [service property changed].
     /// </summary>
     /// <param name="sender">The sender.</param>
-    /// <param name="e">The <see cref="System.ComponentModel.PropertyChangedEventArgs"/> instance containing the event data.</param>
-    private void OnServicePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    /// <param name="e">The <see cref="PropertyChangedEventArgs"/> instance containing the event data.</param>
+    private void OnServicePropertyChanged(
+        object? sender,
+        PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ServiceViewModel.IsForwarding))
         {
@@ -251,14 +261,14 @@ public partial class ServiceListViewModel : ViewModelBase
                         !currentKeys.Contains($"{viewModel.Namespace}/{viewModel.Name}"))
                     .ToList();
 
-                foreach (var vm in staleViewModels)
+                foreach (var viewModel in staleViewModels)
                 {
-                    if (vm.IsForwarding)
+                    if (viewModel.IsForwarding)
                     {
-                        vm.IsForwarding = false;
+                        viewModel.IsForwarding = false;
                     }
-                    vm.PropertyChanged -= OnServicePropertyChanged;
-                    _allServices.Remove(vm);
+                    viewModel.PropertyChanged -= OnServicePropertyChanged;
+                    _allServices.Remove(viewModel);
                 }
 
                 if (staleViewModels.Count != 0)
@@ -390,7 +400,11 @@ public partial class ServiceListViewModel : ViewModelBase
                     {
                         if (item.Metadata.Name == "kubernetes" || item.Spec.Type == "ExternalName") return;
 
-                        var existingViewModels = _allServices.Where(s => s.Name == item.Metadata.Name && s.Namespace == item.Metadata.NamespaceProperty).ToList();
+                        var existingViewModels = _allServices
+                            .Where(service =>
+                                service.Name == item.Metadata.Name
+                                && service.Namespace == item.Metadata.NamespaceProperty)
+                            .ToList();
 
                         if (type == WatchEventType.Deleted)
                         {
@@ -404,7 +418,9 @@ public partial class ServiceListViewModel : ViewModelBase
                         {
                             if (item.Spec.Ports != null)
                             {
-                                var newPorts = item.Spec.Ports.Where(p => p.Protocol == "TCP").ToList();
+                                var newPorts = item.Spec.Ports
+                                    .Where(p => p.Protocol == "TCP")
+                                    .ToList();
 
                                 foreach (var viewModel in existingViewModels.ToList())
                                 {
