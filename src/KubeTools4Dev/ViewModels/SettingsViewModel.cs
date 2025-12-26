@@ -2,8 +2,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace KubeTools4Dev.ViewModels;
@@ -24,10 +26,15 @@ public partial class SettingsViewModel : ViewModelBase
     /// </summary>
     private readonly ISettingsService _settingsService;
     /// <summary>
-    /// The excluded services text
+    /// The excluded services
+    /// </summary>
+    public ObservableCollection<ExclusionItem> ExcludedServices { get; } = [];
+
+    /// <summary>
+    /// The new excluded service
     /// </summary>
     [ObservableProperty]
-    private string _excludedServicesText = string.Empty;
+    private string _newExcludedService = string.Empty;
 
     /// <summary>
     /// The hidden service names text
@@ -131,6 +138,51 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Adds the excluded service.
+    /// </summary>
+    [RelayCommand]
+    private void AddExcludedService()
+    {
+        if (!string.IsNullOrWhiteSpace(NewExcludedService))
+        {
+            // Avoid duplicates
+            var trimmed = NewExcludedService.Trim();
+            bool exists = false;
+            foreach (var item in ExcludedServices)
+            {
+                if (item.Value.Equals(trimmed, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    exists = true;
+                    break;
+                }
+            }
+
+                if (!exists)
+            {
+                ExcludedServices.Add(new ExclusionItem(trimmed));
+                NewExcludedService = string.Empty;
+                SyncToSettingsService();
+                _settingsService.Save();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Removes the excluded service.
+    /// </summary>
+    /// <param name="item">The item.</param>
+    [RelayCommand]
+    private void RemoveExcludedService(ExclusionItem item)
+    {
+        if (item != null)
+        {
+            ExcludedServices.Remove(item);
+            SyncToSettingsService();
+            _settingsService.Save();
+        }
+    }
+
+    /// <summary>
     /// Loads the settings.
     /// </summary>
     private void LoadSettings()
@@ -144,7 +196,26 @@ public partial class SettingsViewModel : ViewModelBase
         WatchRetryDelayMilliseconds = _settingsService.Pods.WatchRetryDelayMilliseconds;
 
         // Services
-        ExcludedServicesText = string.Join(", ", _settingsService.Services.ExcludedServices);
+        var sourceList = _settingsService.Services.ExcludedServices ?? [];
+        
+        // Remove items not in source
+        for (int i = ExcludedServices.Count - 1; i >= 0; i--)
+        {
+            if (!sourceList.Contains(ExcludedServices[i].Value))
+            {
+                ExcludedServices.RemoveAt(i);
+            }
+        }
+
+        // Add items not in current list
+        foreach (var s in sourceList)
+        {
+            if (!ExcludedServices.Any(x => x.Value == s))
+            {
+                ExcludedServices.Add(new ExclusionItem(s));
+            }
+        }
+        
         HiddenServiceNamesText = string.Join(", ", _settingsService.Services.HiddenServiceNames);
         HiddenServiceTypesText = string.Join(", ", _settingsService.Services.HiddenServiceTypes);
     }
@@ -188,6 +259,16 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private void Save()
     {
+        SyncToSettingsService();
+        _settingsService.Save();
+        // Feedback?
+    }
+
+    /// <summary>
+    /// Synchronizes the view model state to the settings service.
+    /// </summary>
+    private void SyncToSettingsService()
+    {
         // General
         _settingsService.General.LogLevel = LogLevel;
         _settingsService.General.LogPath = string.IsNullOrWhiteSpace(LogPath) ? null : LogPath;
@@ -197,11 +278,23 @@ public partial class SettingsViewModel : ViewModelBase
         _settingsService.Pods.WatchRetryDelayMilliseconds = WatchRetryDelayMilliseconds;
 
         // Services
-        _settingsService.Services.ExcludedServices = ParseList(ExcludedServicesText);
+        var excludedList = new List<string>();
+        foreach(var item in ExcludedServices)
+        {
+            excludedList.Add(item.Value);
+        }
+        _settingsService.Services.ExcludedServices = excludedList;
+
         _settingsService.Services.HiddenServiceNames = ParseList(HiddenServiceNamesText);
         _settingsService.Services.HiddenServiceTypes = ParseList(HiddenServiceTypesText);
-
-        _settingsService.Save();
-        // Feedback?
     }
+}
+
+/// <summary>
+/// Exclusion item wrapper.
+/// </summary>
+public partial class ExclusionItem(string value) : ObservableObject
+{
+    [ObservableProperty]
+    private string _value = value;
 }

@@ -1,9 +1,7 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DMNSN.Core;
 using k8s;
-using k8s.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using System;
@@ -18,30 +16,72 @@ namespace KubeTools4Dev.ViewModels;
 /// <summary>
 /// View model for the list of services.
 /// </summary>
+/// <seealso cref="KubeTools4Dev.ViewModels.ViewModelBase" />
 public partial class ServiceListViewModel : ViewModelBase
 {
-    private readonly IKubernetesService _kubeService;
-    private readonly IPortForwardService _portForwardService;
-    private readonly ISettingsService _settingsService;
-    private readonly ILogger<ServiceListViewModel> _logger;
-    private readonly ILoggerFactory _loggerFactory;
-
     /// <summary>
     /// All services (ViewModels)
     /// </summary>
     private readonly List<ServiceViewModel> _allServices = [];
-    private CancellationTokenSource? _cts;
-    private Task? _watchTask;
 
+    /// <summary>
+    /// The kube service
+    /// </summary>
+    private readonly IKubernetesService _kubeService;
+
+    /// <summary>
+    /// The logger
+    /// </summary>
+    private readonly ILogger<ServiceListViewModel> _logger;
+
+    /// <summary>
+    /// The logger factory
+    /// </summary>
+    private readonly ILoggerFactory _loggerFactory;
+
+    /// <summary>
+    /// The port forward service
+    /// </summary>
+    private readonly IPortForwardService _portForwardService;
+
+    /// <summary>
+    /// The settings service
+    /// </summary>
+    private readonly ISettingsService _settingsService;
+    /// <summary>
+    /// The CTS
+    /// </summary>
+    private CancellationTokenSource? _cts;
+    /// <summary>
+    /// The filter text
+    /// </summary>
     [ObservableProperty]
     private string _filterText = string.Empty;
 
+    /// <summary>
+    /// The is loading
+    /// </summary>
     [ObservableProperty]
     private bool _isLoading;
 
+    /// <summary>
+    /// The services
+    /// </summary>
     [ObservableProperty]
     private ObservableCollection<ServiceViewModel> _services = [];
 
+    /// <summary>
+    /// The watch task
+    /// </summary>
+    private Task? _watchTask;
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ServiceListViewModel"/> class.
+    /// </summary>
+    /// <param name="kubeService">The kube service.</param>
+    /// <param name="portForwardService">The port forward service.</param>
+    /// <param name="settingsService">The settings service.</param>
+    /// <param name="logger">The logger.</param>
+    /// <param name="loggerFactory">The logger factory.</param>
     public ServiceListViewModel(
         IKubernetesService kubeService,
         IPortForwardService portForwardService,
@@ -58,6 +98,9 @@ public partial class ServiceListViewModel : ViewModelBase
         _settingsService.SettingsChanged += OnSettingsChanged;
     }
 
+    /// <summary>
+    /// Cleanups this instance.
+    /// </summary>
     public void Cleanup()
     {
         _settingsService.SettingsChanged -= OnSettingsChanged;
@@ -66,6 +109,9 @@ public partial class ServiceListViewModel : ViewModelBase
         _portForwardService.StopAll();
     }
 
+    /// <summary>
+    /// Initializes the asynchronous.
+    /// </summary>
     public async Task InitializeAsync()
     {
         IsLoading = true;
@@ -122,38 +168,17 @@ public partial class ServiceListViewModel : ViewModelBase
         }
     }
 
-    private void OnSettingsChanged()
-    {
-        Dispatcher.UIThread.Invoke(() =>
-        {
-            UpdateFilteredList();
-            foreach (var svc in Services)
-            {
-                // Create key to check
-                var key = $"{svc.Namespace}/{svc.Name}:{svc.TargetPortDisplay}";
-                bool shouldBeExcluded = _settingsService.Services.ExcludedServices.Contains(key);
-                if (svc.IsExcluded != shouldBeExcluded)
-                {
-                    svc.IsExcluded = shouldBeExcluded; 
-                }
-            }
-        });
-    }
-
+    /// <summary>
+    /// Determines whether this instance [can stop all].
+    /// </summary>
+    /// <returns>
+    ///   <c>true</c> if this instance [can stop all]; otherwise, <c>false</c>.
+    /// </returns>
     private bool CanStopAll() => _allServices.Any(s => s.IsForwarding);
 
-    [RelayCommand(CanExecute = nameof(CanStopAll))]
-    private async Task StopAll()
-    {
-        foreach (var svc in Services)
-        {
-            if (svc.IsForwarding)
-            {
-                svc.IsForwarding = false;
-            }
-        }
-    }
-
+    /// <summary>
+    /// Forwards all.
+    /// </summary>
     [RelayCommand]
     private async Task ForwardAll()
     {
@@ -166,11 +191,20 @@ public partial class ServiceListViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Called when [filter text changed].
+    /// </summary>
+    /// <param name="value">The value.</param>
     partial void OnFilterTextChanged(string value)
     {
         UpdateFilteredList();
     }
 
+    /// <summary>
+    /// Called when [service property changed].
+    /// </summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">The <see cref="System.ComponentModel.PropertyChangedEventArgs"/> instance containing the event data.</param>
     private void OnServicePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ServiceViewModel.IsForwarding))
@@ -179,6 +213,29 @@ public partial class ServiceListViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Called when [settings changed].
+    /// </summary>
+    private void OnSettingsChanged()
+    {
+        Dispatcher.UIThread.Invoke(() =>
+        {
+            UpdateFilteredList();
+            foreach (var svc in Services)
+            {
+                // Create key to check
+                var key = $"{svc.Namespace}/{svc.Name}:{svc.TargetPortDisplay}";
+                bool shouldBeExcluded = _settingsService.Services.ExcludedServices.Contains(key);
+                if (svc.IsExcluded != shouldBeExcluded)
+                {
+                    svc.IsExcluded = shouldBeExcluded;
+                }
+            }
+        });
+    }
+    /// <summary>
+    /// Reconciles the stale services.
+    /// </summary>
     private async Task ReconcileStaleServices()
     {
         try
@@ -216,6 +273,23 @@ public partial class ServiceListViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Stops all.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanStopAll))]
+    private async Task StopAll()
+    {
+        foreach (var svc in Services)
+        {
+            if (svc.IsForwarding)
+            {
+                svc.IsForwarding = false;
+            }
+        }
+    }
+    /// <summary>
+    /// Updates the filtered list.
+    /// </summary>
     private void UpdateFilteredList()
     {
         var query = _allServices.AsEnumerable();
@@ -243,7 +317,7 @@ public partial class ServiceListViewModel : ViewModelBase
             .ToList();
 
         // Sync local collection 
-        
+
         // 1. Remove items not in sorted
         for (int i = Services.Count - 1; i >= 0; i--)
         {
@@ -277,6 +351,10 @@ public partial class ServiceListViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Watches the services asynchronous.
+    /// </summary>
+    /// <param name="token">The token.</param>
     private async Task WatchServicesAsync(CancellationToken token)
     {
         var reconcileFailureCount = 0;

@@ -7,11 +7,24 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <Version>1.1.0</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Title>KubeTools4Dev</Title>
+    <Authors>DevilDogTG</Authors>
+    <Company>DevDogs</Company>
+    <Description>A developer tool for Kubernetes.</Description>
+    <Copyright>Copyright © 2025 DevDogs</Copyright>
+    <PackageProjectUrl>https://devildogtg.dmnsn.com</PackageProjectUrl>
+    <PackageIcon>app-icon.png</PackageIcon>
+    <RepositoryUrl>https://github.com/DevilDogTG/KubeTools4Dev</RepositoryUrl>
+    <PackageTags>dev;k8s;</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\app-icon.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
     </None>
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
