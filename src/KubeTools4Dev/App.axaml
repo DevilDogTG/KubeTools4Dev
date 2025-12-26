@@ -23,7 +23,7 @@
              <Setter Property="Foreground" Value="White"/>
         </Style>
         <Style Selector="Button.Danger:disabled /template/ ContentPresenter">
-             <Setter Property="Background" Value="#1F000000"/> <!-- Faded black/gray -->
+            <Setter Property="Background" Value="#1F000000"/> <!-- Faded black/gray -->
         </Style>
     </Application.Styles>
 </Application>

@@ -236,6 +236,8 @@ public partial class ServiceViewModel : ObservableObject
     private async void StartForwarding()
     {
         Status = "Starting";
+        _pfCancellationTokenSource?.Cancel();
+        _pfCancellationTokenSource?.Dispose();
         _pfCancellationTokenSource = new CancellationTokenSource();
         try
         {
@@ -279,6 +281,8 @@ public partial class ServiceViewModel : ObservableObject
     private void StopForwarding()
     {
         _pfCancellationTokenSource?.Cancel();
+        _pfCancellationTokenSource?.Dispose();
+        _pfCancellationTokenSource = null;
         Status = "Stopped";
         StopTimer();
     }

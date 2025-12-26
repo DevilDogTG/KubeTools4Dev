@@ -60,11 +60,16 @@ public partial class ServiceListViewModel(
     private ObservableCollection<ServiceViewModel> _services = [];
 
     /// <summary>
+    /// The watch task
+    /// </summary>
+    private Task? _watchTask;
+    /// <summary>
     /// Cleanups this instance.
     /// </summary>
     public void Cleanup()
     {
         _cts?.Cancel();
+        _cts?.Dispose();
         portForwardService.StopAll();
     }
 
@@ -85,6 +90,15 @@ public partial class ServiceListViewModel(
 
             // Stop existing watch if any
             _cts?.Cancel();
+            if (_watchTask != null)
+            {
+                try
+                {
+                    await _watchTask;
+                }
+                catch (Exception) { }
+            }
+            _cts?.Dispose();
             _cts = new CancellationTokenSource();
 
             _allServices.Clear();
@@ -102,7 +116,7 @@ public partial class ServiceListViewModel(
             UpdateFilteredList();
 
             // Start Watch
-            _ = WatchServicesAsync(_cts.Token);
+            _watchTask = WatchServicesAsync(_cts.Token);
         }
         catch (Exception ex)
         {
@@ -113,6 +127,14 @@ public partial class ServiceListViewModel(
             IsLoading = false;
         }
     }
+
+    /// <summary>
+    /// Determines whether this instance can stop all.
+    /// </summary>
+    /// <returns>
+    ///   <c>true</c> if this instance can stop all; otherwise, <c>false</c>.
+    /// </returns>
+    private bool CanStopAll() => _allServices.Any(s => s.IsForwarding);
 
     /// <summary>
     /// Forwards all.
@@ -136,6 +158,19 @@ public partial class ServiceListViewModel(
     partial void OnFilterTextChanged(string value)
     {
         UpdateFilteredList();
+    }
+
+    /// <summary>
+    /// Handles the service property changed.
+    /// </summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">The <see cref="System.ComponentModel.PropertyChangedEventArgs"/> instance containing the event data.</param>
+    private void OnServicePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ServiceViewModel.IsForwarding))
+        {
+            StopAllCommand.NotifyCanExecuteChanged();
+        }
     }
 
     /// <summary>
@@ -189,31 +224,6 @@ public partial class ServiceListViewModel(
             }
         }
     }
-
-    /// <summary>
-    /// Determines whether this instance can stop all.
-    /// </summary>
-    /// <returns>
-    ///   <c>true</c> if this instance can stop all; otherwise, <c>false</c>.
-    /// </returns>
-    private bool CanStopAll()
-    {
-        return _allServices.Any(s => s.IsForwarding);
-    }
-
-    /// <summary>
-    /// Handles the service property changed.
-    /// </summary>
-    /// <param name="sender">The sender.</param>
-    /// <param name="e">The <see cref="System.ComponentModel.PropertyChangedEventArgs"/> instance containing the event data.</param>
-    private void OnServicePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(ServiceViewModel.IsForwarding))
-        {
-            StopAllCommand.NotifyCanExecuteChanged();
-        }
-    }
-
     /// <summary>
     /// Updates the filtered list.
     /// </summary>
@@ -348,27 +358,7 @@ public partial class ServiceListViewModel(
                                 }
                             }
 
-                            if (existingViewModels.Count == 0 && type == WatchEventType.Added)
-                            {
-                                // Fresh add
-                                if (item.Spec.Ports != null)
-                                {
-                                    foreach (var port in item.Spec.Ports.Where(p => p.Protocol == "TCP"))
-                                    {
-                                        var newId = $"{item.Metadata.NamespaceProperty}/{item.Metadata.Name}:{port.Port}";
-                                        if (!_allServices.Any(s => s.Id == newId))
-                                        {
-                                            var newVm = new ServiceViewModel(
-                                                item,
-                                                port,
-                                                portForwardService,
-                                                settingsService);
-                                            newVm.PropertyChanged += OnServicePropertyChanged;
-                                            _allServices.Add(newVm);
-                                        }
-                                    }
-                                }
-                            }
+
                         }
                         UpdateFilteredList();
                     });
