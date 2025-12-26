@@ -10,7 +10,7 @@
     <Title>KubeTools4Dev</Title>
     <Authors>DevilDogTG</Authors>
     <Company>DevDogs</Company>
-    <Description>A developer tool for Kubernetes.</Description>
+    <Description>Kubernetes tools for developer.</Description>
     <Copyright>Copyright © 2025 DevDogs</Copyright>
     <PackageProjectUrl>https://devildogtg.dmnsn.com</PackageProjectUrl>
     <PackageIcon>app-icon.png</PackageIcon>

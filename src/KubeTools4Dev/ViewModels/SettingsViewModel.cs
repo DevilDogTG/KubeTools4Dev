@@ -1,8 +1,9 @@
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
-using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -127,7 +128,8 @@ public partial class SettingsViewModel : ViewModelBase
     private static void OpenAbout()
     {
         var aboutWindow = new Views.AboutWindow();
-        if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+            && desktop.MainWindow is not null)
         {
             aboutWindow.ShowDialog(desktop.MainWindow);
         }
@@ -157,7 +159,7 @@ public partial class SettingsViewModel : ViewModelBase
                 }
             }
 
-                if (!exists)
+            if (!exists)
             {
                 ExcludedServices.Add(new ExclusionItem(trimmed));
                 NewExcludedService = string.Empty;
@@ -197,7 +199,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         // Services
         var sourceList = _settingsService.Services.ExcludedServices ?? [];
-        
+
         // Remove items not in source
         for (int i = ExcludedServices.Count - 1; i >= 0; i--)
         {
@@ -215,7 +217,7 @@ public partial class SettingsViewModel : ViewModelBase
                 ExcludedServices.Add(new ExclusionItem(s));
             }
         }
-        
+
         HiddenServiceNamesText = string.Join(", ", _settingsService.Services.HiddenServiceNames);
         HiddenServiceTypesText = string.Join(", ", _settingsService.Services.HiddenServiceTypes);
     }
@@ -279,7 +281,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         // Services
         var excludedList = new List<string>();
-        foreach(var item in ExcludedServices)
+        foreach (var item in ExcludedServices)
         {
             excludedList.Add(item.Value);
         }

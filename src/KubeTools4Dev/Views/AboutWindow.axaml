@@ -30,7 +30,7 @@
             
             <Button Command="{Binding OpenUrlCommand}" Content="View on GitHub" Classes="Primary" HorizontalAlignment="Center"/>
             
-            <TextBlock Text="Copyright © 2025 DevilDogTG" FontSize="11" HorizontalAlignment="Center" Opacity="0.5" Margin="0,20,0,0"/>
+            <TextBlock Text="{Binding Copyright}" FontSize="11" HorizontalAlignment="Center" Opacity="0.5" Margin="0,20,0,0"/>
 
         </StackPanel>
     </Border>
