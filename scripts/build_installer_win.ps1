@@ -54,4 +54,8 @@ if (Test-Path $PortableFile) {
     Write-Host "Created: ${ProjectName}-Portable-${Version}.zip"
 }
 
+# Remove nupkg files as requested
+Get-ChildItem "$ReleaseDir/*.nupkg" | Remove-Item -Force
+Write-Host "Removed intermediate .nupkg files."
+
 Write-Host "Done! Installer is in $ReleaseDir"
