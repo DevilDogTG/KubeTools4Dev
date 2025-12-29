@@ -21,6 +21,10 @@ class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Velopack: It's important to Run() the VelopackApp as early as possible in the app startup.
+        Velopack.VelopackApp.Build()
+            .Run();
+
         // 1. Load Base Configuration
         var baseConfig = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
