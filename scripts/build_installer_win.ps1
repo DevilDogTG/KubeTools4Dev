@@ -30,7 +30,7 @@ else {
 $CsprojContent = [xml](Get-Content "$ProjectDir/$ProjectName.csproj")
 $Version = $CsprojContent.Project.PropertyGroup.Version
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    throw "Failed to extract application version from '$ProjectName.csproj'. Ensure a <Version> element is defined in the project file."
+    throw "Failed to extract application version from '$ProjectName.csproj'. Ensure the <Version> element exists and contains a valid version string."
 }
 Write-Host "Building Version: $Version"
 
@@ -67,7 +67,14 @@ if (Test-Path $PortableFile) {
 }
 
 # Remove nupkg files as requested
-Get-ChildItem "$ReleaseDir/*.nupkg" | Remove-Item -Force
-Write-Host "Removed intermediate .nupkg files."
+$nupkgFiles = Get-ChildItem -Path $ReleaseDir -Filter *.nupkg -ErrorAction SilentlyContinue
+if ($nupkgFiles) {
+    $removedCount = $nupkgFiles.Count
+    $nupkgFiles | Remove-Item -Force
+    Write-Host "Removed $removedCount intermediate .nupkg file(s)."
+}
+else {
+    Write-Host "No intermediate .nupkg files found to remove."
+}
 
 Write-Host "Done! Installer is in $ReleaseDir"

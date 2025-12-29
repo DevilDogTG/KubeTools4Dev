@@ -1,4 +1,6 @@
+using DMNSN.Core;
 using KubeTools4Dev.Core.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using Velopack;
 using Velopack.Sources;
 
@@ -8,7 +10,8 @@ namespace KubeTools4Dev.Core.Services;
 /// Update service powered by Velopack.
 /// </summary>
 /// <seealso cref="IUpdateService" />
-public class UpdateService : IUpdateService
+public class UpdateService(
+    ILogger<UpdateService> logger) : IUpdateService
 {
     /// <summary>
     /// The update manager
@@ -40,7 +43,8 @@ public class UpdateService : IUpdateService
         }
         catch (Exception)
         {
-            // Log or ignore
+
+            logger.Warning("Failed to check for updates.");
             return null;
         }
     }
