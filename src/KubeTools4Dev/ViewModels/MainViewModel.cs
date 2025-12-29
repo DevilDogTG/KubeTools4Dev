@@ -46,6 +46,11 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     [ObservableProperty]
     private ServiceListViewModel _serviceList;
+    /// <summary>
+    /// The settings view model
+    /// </summary>
+    [ObservableProperty]
+    private SettingsViewModel _settings;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MainViewModel" /> class.
@@ -53,11 +58,13 @@ public partial class MainViewModel : ViewModelBase
     /// <param name="kubeService">The kube service.</param>
     /// <param name="podListViewModel">The pod list view model.</param>
     /// <param name="serviceListViewModel">The service list view model.</param>
+    /// <param name="settingsViewModel">The settings view model.</param>
     /// <param name="logger">The logger.</param>
     public MainViewModel(
         IKubernetesService kubeService,
         PodListViewModel podListViewModel,
         ServiceListViewModel serviceListViewModel,
+        SettingsViewModel settingsViewModel,
         ILogger<MainViewModel> logger)
     {
         _kubeService = kubeService;
@@ -65,6 +72,7 @@ public partial class MainViewModel : ViewModelBase
 
         PodList = podListViewModel;
         ServiceList = serviceListViewModel;
+        Settings = settingsViewModel;
 
         // Auto-connect on start
         _ = ConnectCommand.ExecuteAsync(null);

@@ -1,0 +1,191 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:KubeTools4Dev.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="KubeTools4Dev.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel"
+             x:Name="Root">
+
+    <UserControl.Styles>
+        <Style Selector="DataGridColumnHeadersPresenter">
+            <Setter Property="MinHeight" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+        </Style>
+        <Style Selector="DataGridColumnHeader">
+            <Setter Property="Padding" Value="5,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="DataGridRow">
+            <Setter Property="MinHeight" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+        </Style>
+        <Style Selector="DataGridCell">
+            <Setter Property="MinHeight" Value="22"/>
+            <Setter Property="Margin" Value="3,2,3,0"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="*, Auto" Margin="10">
+
+        <ScrollViewer Grid.Row="0">
+            <StackPanel Spacing="10">
+                <!-- General Section -->
+                <Border Classes="Card"
+                        Theme="{StaticResource CardBorder}"
+                        Padding="10">
+                     <StackPanel Spacing="5">
+                        <TextBlock Text="General"
+                                   Classes="H4"
+                                   FontWeight="Bold" />
+                        <TextBlock Text="Logging Configuration"
+                                   FontWeight="SemiBold" />
+                        
+                        <Grid ColumnDefinitions="Auto, *"
+                              RowDefinitions="Auto, Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                       Text="Log Level:"
+                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1"
+                                      ItemsSource="{Binding LogLevels}"
+                                      SelectedItem="{Binding LogLevel}"
+                                      HorizontalAlignment="Stretch"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                       Text="Log Path:"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,10,0"/>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,5,0,0" Spacing="2">
+                                <TextBox Text="{Binding LogPath}"
+                                         Watermark="Default Path"/>
+                                <SelectableTextBlock Text="{Binding CurrentLogPath, StringFormat='Active: {0}'}"
+                                                     FontSize="11"
+                                                     Foreground="Gray"
+                                                     TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                     </StackPanel>
+                </Border>
+
+                <!-- Pods Section -->
+                <Border Classes="Card"
+                        Theme="{StaticResource CardBorder}"
+                        Padding="10">
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="Pods"
+                                   Classes="H4"
+                                   FontWeight="Bold"/>
+                        <TextBlock Text="Refresh Settings"
+                                   FontWeight="SemiBold" />
+                        
+                        <Grid ColumnDefinitions="Auto, *"
+                              RowDefinitions="Auto, Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                       Text="Refresh Interval (Seconds):"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,10,0"/>
+                            <NumericUpDown Grid.Row="0" Grid.Column="1"
+                                           Value="{Binding RefreshIntervalSeconds}"
+                                           Minimum="1"
+                                           Increment="1"
+                                           Maximum="60" />
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                       Text="Watch Retry Delay (ms):"
+                                       VerticalAlignment="Center"
+                                       Margin="0,5,10,0"/>
+                            <NumericUpDown Grid.Row="1" Grid.Column="1"
+                                           Value="{Binding WatchRetryDelayMilliseconds}"
+                                           Minimum="1000"
+                                           Maximum="60000"
+                                           Margin="0,5,0,0"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Services Section -->
+                <Border Classes="Card" Theme="{StaticResource CardBorder}" Padding="10">
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="Services"
+                                   Classes="H4"
+                                   FontWeight="Bold"/>
+                        <TextBlock Text="Filtering &amp; Exclusion Rules (Comma/Newline Separated)"
+                                   FontWeight="SemiBold" />
+
+                        <TextBlock Text="Hidden Service Names:" />
+                        <TextBox Text="{Binding HiddenServiceNamesText}"
+                                 AcceptsReturn="True"
+                                 Height="50"
+                                 Watermark="e.g. kubernetes, kube-dns"/>
+
+                        <TextBlock Text="Hidden Service Types:" />
+                        <TextBox Text="{Binding HiddenServiceTypesText}"
+                                 AcceptsReturn="True"
+                                 Height="50"
+                                 Watermark="e.g. ExternalName, ClusterIP"/>
+
+                        <TextBlock Text="Excluded Services (Auto-Port-Forward):" />
+                        <Grid ColumnDefinitions="*, Auto"
+                              Margin="0,0,0,5">
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding NewExcludedService}"
+                                     Watermark="Add service (e.g. namespace/service:port)"
+                                     Height="20"
+                                     Margin="0,0,5,0"/>
+                            <Button Grid.Column="1"
+                                    Content="Add"
+                                    Height="20"
+                                    Padding="10,0"
+                                    VerticalContentAlignment="Center"
+                                    Command="{Binding AddExcludedServiceCommand}"/>
+                        </Grid>
+                        <DataGrid ItemsSource="{Binding ExcludedServices}"
+                                  AutoGenerateColumns="False"
+                                  MinHeight="100"
+                                  CanUserResizeColumns="True"
+                                  CanUserSortColumns="True"
+                                  FontSize="12"
+                                  GridLinesVisibility="Horizontal"
+                                  RowHeight="20"
+                                  VerticalScrollBarVisibility="Visible">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Service"
+                                                    Binding="{Binding Value}"
+                                                    Width="*"
+                                                    IsReadOnly="False"/>
+                                <DataGridTemplateColumn Header="Action"
+                                                        Width="Auto">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:CompileBindings="False">
+                                            <Button Content="Remove"
+                                                    Command="{Binding #Root.DataContext.RemoveExcludedServiceCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Classes="Danger"
+                                                    Padding="5,0"
+                                                    FontSize="10"
+                                                    MinHeight="18"
+                                                    VerticalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Spacing="10"
+                    Margin="0,10,0,0">
+            <Button Content="About"
+                    Command="{Binding OpenAboutCommand}"/>
+            <Button Content="Save"
+                    Command="{Binding SaveCommand}" Classes="Primary"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

@@ -6,11 +6,25 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <Version>1.1.0</Version>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Title>KubeTools4Dev</Title>
+    <Authors>DevilDogTG</Authors>
+    <Company>DevDogs</Company>
+    <Description>Kubernetes tools for developer.</Description>
+    <Copyright>Copyright © 2025 DevDogs</Copyright>
+    <PackageProjectUrl>https://devildogtg.dmnsn.com</PackageProjectUrl>
+    <PackageIcon>app-icon.png</PackageIcon>
+    <RepositoryUrl>https://github.com/DevilDogTG/KubeTools4Dev</RepositoryUrl>
+    <PackageTags>dev;k8s;</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\app-icon.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
     </None>
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
@@ -22,7 +36,6 @@
     <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.8" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.10" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.10" />
-    <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
     <PackageReference Include="Avalonia.Diagnostics" Version="11.3.10">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>

@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,31 +18,42 @@ namespace KubeTools4Dev.ViewModels;
 /// <summary>
 /// View model for the list of services.
 /// </summary>
-/// <remarks>
-/// Initializes a new instance of the <see cref="ServiceListViewModel" /> class.
-/// </remarks>
 /// <seealso cref="ViewModelBase" />
-/// <param name="kubeService">The kube service.</param>
-/// <param name="portForwardService">The port forward service.</param>
-/// <param name="settingsService">The settings service.</param>
-/// <param name="logger">The logger.</param>
-public partial class ServiceListViewModel(
-    IKubernetesService kubeService,
-    IPortForwardService portForwardService,
-    ISettingsService settingsService,
-    ILogger<ServiceListViewModel> logger,
-    ILoggerFactory loggerFactory
-) : ViewModelBase
+public partial class ServiceListViewModel : ViewModelBase
 {
     /// <summary>
-    /// All services
+    /// All services (ViewModels)
     /// </summary>
     private readonly List<ServiceViewModel> _allServices = [];
-    /// <summary>
-    /// The cancellation token source used to manage cancellation of the service watcher.
-    /// </summary>
-    private CancellationTokenSource? _cts;
 
+    /// <summary>
+    /// The kube service
+    /// </summary>
+    private readonly IKubernetesService _kubeService;
+
+    /// <summary>
+    /// The logger
+    /// </summary>
+    private readonly ILogger<ServiceListViewModel> _logger;
+
+    /// <summary>
+    /// The logger factory
+    /// </summary>
+    private readonly ILoggerFactory _loggerFactory;
+
+    /// <summary>
+    /// The port forward service
+    /// </summary>
+    private readonly IPortForwardService _portForwardService;
+
+    /// <summary>
+    /// The settings service
+    /// </summary>
+    private readonly ISettingsService _settingsService;
+    /// <summary>
+    /// The cancellation token source
+    /// </summary>
+    private CancellationTokenSource? _cancellationTokenSource;
     /// <summary>
     /// The filter text
     /// </summary>
@@ -65,13 +77,38 @@ public partial class ServiceListViewModel(
     /// </summary>
     private Task? _watchTask;
     /// <summary>
+    /// Initializes a new instance of the <see cref="ServiceListViewModel"/> class.
+    /// </summary>
+    /// <param name="kubeService">The kube service.</param>
+    /// <param name="portForwardService">The port forward service.</param>
+    /// <param name="settingsService">The settings service.</param>
+    /// <param name="logger">The logger.</param>
+    /// <param name="loggerFactory">The logger factory.</param>
+    public ServiceListViewModel(
+        IKubernetesService kubeService,
+        IPortForwardService portForwardService,
+        ISettingsService settingsService,
+        ILogger<ServiceListViewModel> logger,
+        ILoggerFactory loggerFactory)
+    {
+        _kubeService = kubeService;
+        _portForwardService = portForwardService;
+        _settingsService = settingsService;
+        _logger = logger;
+        _loggerFactory = loggerFactory;
+
+        _settingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    /// <summary>
     /// Cleanups this instance.
     /// </summary>
     public void Cleanup()
     {
-        _cts?.Cancel();
-        _cts?.Dispose();
-        portForwardService.StopAll();
+        _settingsService.SettingsChanged -= OnSettingsChanged;
+        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource?.Dispose();
+        _portForwardService.StopAll();
     }
 
     /// <summary>
@@ -82,15 +119,17 @@ public partial class ServiceListViewModel(
         IsLoading = true;
         try
         {
-            if (!kubeService.IsConnected) return;
+            if (!_kubeService.IsConnected) return;
 
-            var services = await kubeService.GetServicesAsync();
+            var services = await _kubeService.GetServicesAsync();
 
             // Filter out internal kubernetes service or headless
-            var relevantServices = services.Where(s => s.Metadata.Name != "kubernetes" && s.Spec.Type != "ExternalName");
+            var relevantServices = services.Where(s =>
+                s.Metadata.Name != "kubernetes"
+                && s.Spec.Type != "ExternalName");
 
             // Stop existing watch if any
-            _cts?.Cancel();
+            _cancellationTokenSource?.Cancel();
             if (_watchTask != null)
             {
                 try
@@ -99,15 +138,15 @@ public partial class ServiceListViewModel(
                 }
                 catch (OperationCanceledException)
                 {
-                    logger.Information("The watch task is cancelled");
+                    _logger.Debug("Previous watch task was canceled.");
                 }
                 catch (Exception ex)
                 {
-                    logger.Error(ex, "Error while waiting for previous watch task to complete");
+                    _logger.Error(ex, "Error while waiting for previous watch task to complete");
                 }
             }
-            _cts?.Dispose();
-            _cts = new CancellationTokenSource();
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = new CancellationTokenSource();
 
             _allServices.Clear();
             foreach (var svc in relevantServices)
@@ -116,19 +155,24 @@ public partial class ServiceListViewModel(
 
                 foreach (var port in svc.Spec.Ports.Where(p => p.Protocol == "TCP"))
                 {
-                    var vm = new ServiceViewModel(loggerFactory.CreateLogger<ServiceViewModel>(), svc, port, portForwardService, settingsService);
-                    vm.PropertyChanged += OnServicePropertyChanged;
-                    _allServices.Add(vm);
+                    var viewModel = new ServiceViewModel(
+                        _loggerFactory.CreateLogger<ServiceViewModel>(),
+                        svc,
+                        port,
+                        _portForwardService,
+                        _settingsService);
+                    viewModel.PropertyChanged += OnServicePropertyChanged;
+                    _allServices.Add(viewModel);
                 }
             }
             UpdateFilteredList();
 
             // Start Watch
-            _watchTask = WatchServicesAsync(_cts.Token);
+            _watchTask = WatchServicesAsync(_cancellationTokenSource.Token);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to initialize service list");
+            _logger.LogError(ex, "Failed to initialize service list");
         }
         finally
         {
@@ -137,10 +181,10 @@ public partial class ServiceListViewModel(
     }
 
     /// <summary>
-    /// Determines whether this instance can stop all.
+    /// Determines whether this instance [can stop all].
     /// </summary>
     /// <returns>
-    ///   <c>true</c> if this instance can stop all; otherwise, <c>false</c>.
+    ///   <c>true</c> if this instance [can stop all]; otherwise, <c>false</c>.
     /// </returns>
     private bool CanStopAll() => _allServices.Any(s => s.IsForwarding);
 
@@ -154,7 +198,7 @@ public partial class ServiceListViewModel(
         {
             if (!svc.IsForwarding && !svc.IsExcluded)
             {
-                svc.IsForwarding = true; // Triggers the command in setter
+                svc.IsForwarding = true;
             }
         }
     }
@@ -169,11 +213,13 @@ public partial class ServiceListViewModel(
     }
 
     /// <summary>
-    /// Handles the service property changed.
+    /// Called when [service property changed].
     /// </summary>
     /// <param name="sender">The sender.</param>
-    /// <param name="e">The <see cref="System.ComponentModel.PropertyChangedEventArgs"/> instance containing the event data.</param>
-    private void OnServicePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    /// <param name="e">The <see cref="PropertyChangedEventArgs"/> instance containing the event data.</param>
+    private void OnServicePropertyChanged(
+        object? sender,
+        PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ServiceViewModel.IsForwarding))
         {
@@ -182,13 +228,33 @@ public partial class ServiceListViewModel(
     }
 
     /// <summary>
+    /// Called when [settings changed].
+    /// </summary>
+    private void OnSettingsChanged()
+    {
+        Dispatcher.UIThread.Invoke(() =>
+        {
+            UpdateFilteredList();
+            foreach (var svc in Services)
+            {
+                // Create key to check
+                var key = $"{svc.Namespace}/{svc.Name}:{svc.TargetPortDisplay}";
+                bool shouldBeExcluded = _settingsService.Services.ExcludedServices.Contains(key);
+                if (svc.IsExcluded != shouldBeExcluded)
+                {
+                    svc.IsExcluded = shouldBeExcluded;
+                }
+            }
+        });
+    }
+    /// <summary>
     /// Reconciles the stale services.
     /// </summary>
     private async Task ReconcileStaleServices()
     {
         try
         {
-            var currentServices = await kubeService.GetServicesAsync();
+            var currentServices = await _kubeService.GetServicesAsync();
             var currentKeys = new HashSet<string>(currentServices.Select(s => $"{s.Metadata.NamespaceProperty}/{s.Metadata.Name}"));
 
             await Dispatcher.UIThread.InvokeAsync(() =>
@@ -199,14 +265,14 @@ public partial class ServiceListViewModel(
                         !currentKeys.Contains($"{viewModel.Namespace}/{viewModel.Name}"))
                     .ToList();
 
-                foreach (var vm in staleViewModels)
+                foreach (var viewModel in staleViewModels)
                 {
-                    if (vm.IsForwarding)
+                    if (viewModel.IsForwarding)
                     {
-                        vm.IsForwarding = false; // Ensure background task stops while VM is still active
+                        viewModel.IsForwarding = false;
                     }
-                    vm.PropertyChanged -= OnServicePropertyChanged;
-                    _allServices.Remove(vm);
+                    viewModel.PropertyChanged -= OnServicePropertyChanged;
+                    _allServices.Remove(viewModel);
                 }
 
                 if (staleViewModels.Count != 0)
@@ -217,7 +283,7 @@ public partial class ServiceListViewModel(
         }
         catch (Exception)
         {
-            logger.Warning("Failed to reconcile stale services");
+            _logger.LogWarning("Failed to reconcile stale services");
         }
     }
 
@@ -253,12 +319,18 @@ public partial class ServiceListViewModel(
                     StringComparison.OrdinalIgnoreCase) ?? false));
         }
 
+        // Apply Settings Filter (Hidden Services)
+        if (_settingsService.Services?.HiddenServiceNames != null)
+        {
+            query = query.Where(s => !_settingsService.Services.HiddenServiceNames.Contains(s.Name));
+        }
+
         var sorted = query
             .OrderBy(s => s.Namespace)
             .ThenBy(s => s.Name)
             .ToList();
 
-        // Sync local collection with sorted list to minimize UI updates
+        // Sync local collection 
 
         // 1. Remove items not in sorted
         for (int i = Services.Count - 1; i >= 0; i--)
@@ -274,24 +346,19 @@ public partial class ServiceListViewModel(
         {
             var item = sorted[i];
 
-            // If we are at the end of the existing list, just add remaining
             if (i >= Services.Count)
             {
                 Services.Add(item);
             }
-            // If the item at current position is different
             else if (Services[i] != item)
             {
-                // Check if the item exists later in the list
                 int oldIndex = Services.IndexOf(item);
                 if (oldIndex >= 0)
                 {
-                    // Move it to the current position
                     Services.Move(oldIndex, i);
                 }
                 else
                 {
-                    // It's a new item, insert it
                     Services.Insert(i, item);
                 }
             }
@@ -310,8 +377,6 @@ public partial class ServiceListViewModel(
         {
             try
             {
-                // Prune stale services before starting/restarting watch
-                // This handles cases where we missed DELETED events (e.g. disconnect)
                 try
                 {
                     await ReconcileStaleServices();
@@ -319,37 +384,32 @@ public partial class ServiceListViewModel(
                 }
                 catch (OperationCanceledException)
                 {
-                    // Preserve cancellation semantics
                     throw;
                 }
                 catch (Exception)
                 {
                     reconcileFailureCount++;
-                    LogReconcileStaleServicesFailed(
-                        reconcileFailureCount,
-                        MaxReconcileFailures);
                     if (reconcileFailureCount >= MaxReconcileFailures)
                     {
-                        logger.Error("Stopping service watch after repeated reconciliation failures.");
+                        _logger.LogError("Stopping service watch after repeated reconciliation failures.");
                         break;
                     }
-                    // Wait briefly before retrying reconciliation
                     await Task.Delay(5000, token);
                     continue;
                 }
 
-                await foreach (var (type, item) in kubeService.WatchServicesAsync("", cancellationToken: token))
+                await foreach (var (type, item) in _kubeService.WatchServicesAsync("", cancellationToken: token))
                 {
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         if (item.Metadata.Name == "kubernetes" || item.Spec.Type == "ExternalName") return;
 
-                        // Identify existing items for this service
-                        // A Service might spawn multiple ViewModels (one per Port)
-                        // We need to match by Name/Namespace
-                        var existingViewModels = _allServices.Where(s => s.Name == item.Metadata.Name && s.Namespace == item.Metadata.NamespaceProperty).ToList();
+                        var existingViewModels = _allServices
+                            .Where(service =>
+                                service.Name == item.Metadata.Name
+                                && service.Namespace == item.Metadata.NamespaceProperty)
+                            .ToList();
 
-                        // Deleted
                         if (type == WatchEventType.Deleted)
                         {
                             foreach (var vm in existingViewModels)
@@ -358,19 +418,16 @@ public partial class ServiceListViewModel(
                                 _allServices.Remove(vm);
                             }
                         }
-                        // Added or Modified.
                         else
                         {
-                            // Find ports in new item.
                             if (item.Spec.Ports != null)
                             {
-                                var newPorts = item.Spec.Ports.Where(p => p.Protocol == "TCP").ToList();
+                                var newPorts = item.Spec.Ports
+                                    .Where(p => p.Protocol == "TCP")
+                                    .ToList();
 
-                                // Remove ViewModels for ports that no longer exist
                                 foreach (var viewModel in existingViewModels.ToList())
                                 {
-                                    // Check if the service port represented by viewModel.TargetPort still exists in newPorts
-                                    // viewModel.TargetPort stores the Service port (port.Port) as an int boxed as object, not the pod's targetPort
                                     if (!newPorts.Any(p => p.Port == (int)viewModel.TargetPort))
                                     {
                                         viewModel.PropertyChanged -= OnServicePropertyChanged;
@@ -378,25 +435,22 @@ public partial class ServiceListViewModel(
                                     }
                                 }
 
-                                // Add ViewModels for new ports
                                 foreach (var port in newPorts)
                                 {
                                     var newId = $"{item.Metadata.NamespaceProperty}/{item.Metadata.Name}:{port.Port}";
                                     if (!_allServices.Any(s => s.Id == newId))
                                     {
                                         var newVm = new ServiceViewModel(
-                                            loggerFactory.CreateLogger<ServiceViewModel>(),
+                                            _loggerFactory.CreateLogger<ServiceViewModel>(),
                                             item,
                                             port,
-                                            portForwardService,
-                                            settingsService);
+                                            _portForwardService,
+                                            _settingsService);
                                         newVm.PropertyChanged += OnServicePropertyChanged;
                                         _allServices.Add(newVm);
                                     }
                                 }
                             }
-
-
                         }
                         UpdateFilteredList();
                     });
@@ -405,12 +459,12 @@ public partial class ServiceListViewModel(
             }
             catch (OperationCanceledException)
             {
-                logger.Warning("Service watch cancelled.");
+                _logger.LogWarning("Service watch cancelled.");
                 break;
             }
             catch (Exception ex)
             {
-                logger.Error(ex, "Watch Service Error");
+                _logger.LogError(ex, "Watch Service Error");
                 await Task.Delay(5000, token);
             }
         }

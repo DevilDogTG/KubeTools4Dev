@@ -149,7 +149,7 @@ public partial class ServiceViewModel : ObservableObject
         // Display 
         TargetPortDisplay = port.Port.ToString();
 
-        _isExcluded = _settingsService.ExcludedServices.Contains(_settingsKey);
+        _isExcluded = _settingsService.Services.ExcludedServices.Contains(_settingsKey);
 
         _durationTimer = new DispatcherTimer
         {
@@ -187,15 +187,15 @@ public partial class ServiceViewModel : ObservableObject
             {
                 if (value)
                 {
-                    if (!_settingsService.ExcludedServices.Contains(_settingsKey))
+                    if (!_settingsService.Services.ExcludedServices.Contains(_settingsKey))
                     {
-                        _settingsService.ExcludedServices.Add(_settingsKey);
+                        _settingsService.Services.ExcludedServices.Add(_settingsKey);
                         _settingsService.Save();
                     }
                 }
                 else
                 {
-                    _settingsService.ExcludedServices.Remove(_settingsKey);
+                    _settingsService.Services.ExcludedServices.Remove(_settingsKey);
                     _settingsService.Save();
                 }
             }
