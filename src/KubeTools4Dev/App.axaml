@@ -1,0 +1,28 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:themes="clr-namespace:Material.Styles.Themes;assembly=Material.Styles"
+             x:Class="KubeTools4Dev.App"
+             RequestedThemeVariant="Dark">
+             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+
+    <Application.Styles>
+        <themes:MaterialTheme BaseTheme="Dark" PrimaryColor="Blue" SecondaryColor="Lime" />
+        <StyleInclude Source="avares://Material.Avalonia.DataGrid/DataGrid.xaml" />
+        
+        <Style Selector="Button.Primary">
+            <Setter Property="Background" Value="{DynamicResource PrimaryHueMidBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryHueMidForegroundBrush}"/>
+        </Style>
+        
+        <Style Selector="Button.Danger">
+            <Setter Property="Background" Value="#FFD32F2F"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.Danger:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#FFB71C1C"/>
+        </Style>
+        <Style Selector="Button.Danger:disabled /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1F000000"/> <!-- Faded black/gray -->
+        </Style>
+    </Application.Styles>
+</Application>
