@@ -21,7 +21,8 @@ fi
 # parsing .csproj using sed
 VERSION=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' "$PROJECT_DIR/$PROJECT_NAME.csproj" | head -n 1)
 if [ -z "$VERSION" ]; then
-    VERSION="1.0.0"
+    echo "Error: Could not extract <Version> from $PROJECT_DIR/$PROJECT_NAME.csproj" >&2
+    exit 1
 fi
 echo "Building Version: $VERSION"
 

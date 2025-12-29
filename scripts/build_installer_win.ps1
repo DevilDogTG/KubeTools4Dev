@@ -8,17 +8,29 @@ $ReleaseDir = "$PSScriptRoot/../dist/Releases"
 
 # Ensure vpk is installed
 Write-Host "Checking for vpk (Velopack CLI)..."
-dotnet tool update -g vpk
-if ($LASTEXITCODE -ne 0) {
-    Write-Warning "Failed to update vpk globally. Trying to install..."
+$vpkListOutput = dotnet tool list -g 2>$null
+$vpkInstalled = $LASTEXITCODE -eq 0 -and ($vpkListOutput -match '\bvpk\b')
+
+if ($vpkInstalled) {
+    Write-Host "vpk is already installed. Attempting to update..."
+    dotnet tool update -g vpk
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Failed to update vpk globally. Please verify your .NET tool configuration."
+    }
+}
+else {
+    Write-Host "vpk not found. Attempting to install..."
     dotnet tool install -g vpk
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Failed to install vpk globally. Please verify your .NET tool configuration."
+    }
 }
 
 # Get Version
 $CsprojContent = [xml](Get-Content "$ProjectDir/$ProjectName.csproj")
 $Version = $CsprojContent.Project.PropertyGroup.Version
-if ([string]::IsNullOrEmpty($Version)) {
-    $Version = "1.0.0" # Fallback
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    throw "Failed to extract application version from '$ProjectName.csproj'. Ensure a <Version> element is defined in the project file."
 }
 Write-Host "Building Version: $Version"
 
