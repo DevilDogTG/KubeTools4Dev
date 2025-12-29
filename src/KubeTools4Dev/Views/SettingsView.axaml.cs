@@ -3,7 +3,7 @@ using Avalonia.Controls;
 namespace KubeTools4Dev.Views;
 
 /// <summary>
-/// Setting view.
+/// Settings view.
 /// </summary>
 /// <seealso cref="Avalonia.Controls.UserControl" />
 public partial class SettingsView : UserControl
