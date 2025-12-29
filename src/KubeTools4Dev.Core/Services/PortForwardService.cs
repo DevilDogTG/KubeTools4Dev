@@ -93,14 +93,20 @@ public partial class PortForwardService(
                     LogPortForwardStarting(serviceName, podName, localPort, remotePort);
 
                     // Create socket listener
+                    // Use IPv6Any with DualMode to support both IPv4 and IPv6 connections.
+                    // This resolves "Connection Refused" when clients prefer ::1 over 127.0.0.1
                     var ipEndPoint = new IPEndPoint(
-                        address: IPAddress.Any,
+                        address: IPAddress.IPv6Any,
                         port: localPort);
 
                     listener = new Socket(
-                        AddressFamily.InterNetwork,
+                        AddressFamily.InterNetworkV6,
                         SocketType.Stream,
                         ProtocolType.Tcp);
+                    
+                    listener.DualMode = true;
+                    listener.NoDelay = true; // Disable Nagle's algorithm for lower latency
+                    
                     listener.Bind(ipEndPoint);
                     listener.Listen(100);
 

@@ -91,7 +91,7 @@ public partial class AboutViewModel : ViewModelBase
             .GetCustomAttributes(typeof(AssemblyCopyrightAttribute), false)
             .Cast<AssemblyCopyrightAttribute>()
             .FirstOrDefault()?.Copyright
-                ?? "Copyright © 2025 DevilDogTG";
+                ?? "Copyright © 2025-2026 DevilDogTG";
     }
 
     /// <summary>
