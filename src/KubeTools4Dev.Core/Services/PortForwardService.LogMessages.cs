@@ -100,7 +100,7 @@ public partial class PortForwardService
     /// Logs when traffic data starts flowing.
     /// </summary>
     [LoggerMessage(
-        Level = LogLevel.Information,
+        Level = LogLevel.Trace,
         Message = "Traffic started for {PodName} ({Direction})")]
     private partial void LogTrafficStart(string podName, string direction);
 
@@ -108,7 +108,7 @@ public partial class PortForwardService
     /// Logs when traffic data ends.
     /// </summary>
     [LoggerMessage(
-        Level = LogLevel.Information,
+        Level = LogLevel.Debug,
         Message = "Traffic ended for {PodName} ({Direction}). Total bytes: {TotalBytes}")]
     private partial void LogTrafficEnd(string podName, string direction, long totalBytes);
 
