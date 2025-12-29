@@ -24,15 +24,7 @@ public class UpdateService : IUpdateService
         // For now, simpler to just use the static logic or wrap it.
         // But purely static usage of VelopackApp doesn't fit well with this service if we want to mock it.
         // Velopack's UpdateManager is the way to go.
-        try
-        {
-            _updateManager = new UpdateManager(new GithubSource("https://github.com/DevilDogTG/KubeTools4Dev", null, false));
-        }
-        catch
-        {
-            // Likely running in dev mode or not installed
-            _updateManager = null;
-        }
+        _updateManager = new UpdateManager(new GithubSource("https://github.com/DevilDogTG/KubeTools4Dev", null, false));
     }
 
     /// <summary>
