@@ -261,7 +261,7 @@ public partial class ServiceViewModel : ObservableObject
             }
             catch (Exception)
             {
-                _logger.Information("Waitting old task, prevent race condition.");
+                _logger.Information("Waiting old task, prevent race condition.");
             }
         }
         _pfCancellationTokenSource?.Dispose();
@@ -308,9 +308,6 @@ public partial class ServiceViewModel : ObservableObject
     /// <summary>
     /// Stops the forwarding.
     /// </summary>
-    /// <summary>
-    /// Stops the forwarding.
-    /// </summary>
     private void StopForwarding()
     {
         _pfCancellationTokenSource?.Cancel();
@@ -341,6 +338,7 @@ public partial class ServiceViewModel : ObservableObject
         Status = "Stopped";
         StopTimer();
     }
+
     /// <summary>
     /// Stops the timer.
     /// </summary>

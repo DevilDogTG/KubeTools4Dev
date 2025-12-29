@@ -3,7 +3,7 @@ using Avalonia.Controls;
 namespace KubeTools4Dev.Views;
 
 /// <summary>
-/// Main application windows
+/// Main application window
 /// </summary>
 /// <seealso cref="Window" />
 public partial class MainWindow : Window
