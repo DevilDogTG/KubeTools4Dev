@@ -3,7 +3,7 @@
 namespace KubeTools4Dev.Core.Services.Interfaces;
 
 /// <summary>
-/// 
+/// Defines operations for checking, downloading, and applying application updates.
 /// </summary>
 public interface IUpdateService
 {
@@ -22,7 +22,7 @@ public interface IUpdateService
     Task<UpdateInfo?> CheckForUpdatesAsync();
 
     /// <summary>
-    /// Downloads the and update asynchronous.
+    /// Downloads and applies the update asynchronously.
     /// </summary>
     /// <param name="updateInfo">The update information.</param>
     /// <returns></returns>

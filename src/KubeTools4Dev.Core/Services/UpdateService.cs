@@ -46,7 +46,7 @@ public class UpdateService : IUpdateService
     }
 
     /// <summary>
-    /// Downloads the and update asynchronous.
+    /// Downloads and applies the update asynchronously.
     /// </summary>
     /// <param name="updateInfo">The update information.</param>
     public async Task DownloadAndUpdateAsync(UpdateInfo updateInfo)
