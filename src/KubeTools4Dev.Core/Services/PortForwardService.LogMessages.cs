@@ -95,4 +95,36 @@ public partial class PortForwardService
         Level = LogLevel.Warning,
         Message = "WebSocket error for pod {PodName}: {ErrorMessage}")]
     private partial void LogWebSocketError(string podName, string errorMessage);
+
+    /// <summary>
+    /// Logs when traffic data starts flowing.
+    /// </summary>
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Traffic started for {PodName} ({Direction})")]
+    private partial void LogTrafficStart(string podName, string direction);
+
+    /// <summary>
+    /// Logs when traffic data ends.
+    /// </summary>
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Traffic ended for {PodName} ({Direction}). Total bytes: {TotalBytes}")]
+    private partial void LogTrafficEnd(string podName, string direction, long totalBytes);
+
+    /// <summary>
+    /// Logs error output from the pod.
+    /// </summary>
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Pod error output for {PodName}: {Output}")]
+    private partial void LogPodErrorOutput(string podName, string output);
+
+    /// <summary>
+    /// Logs port resolution details.
+    /// </summary>
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Resolved Service Port {ServicePort} to Target Port {TargetPort} for pod {PodName}")]
+    private partial void LogPortResolution(int servicePort, int targetPort, string podName);
 }

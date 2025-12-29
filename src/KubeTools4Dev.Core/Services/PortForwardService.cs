@@ -71,54 +71,89 @@ public partial class PortForwardService(
 
         try
         {
-            while (!linkedCancellationToken.Token.IsCancellationRequested)
+            // Start two listeners: one for IPv4 (Loopback) and one for IPv6 (IPv6Loopback)
+            var ipv4Task = RunListenerAsync(
+                IPAddress.Loopback,
+                localPort,
+                serviceName,
+                namespaceName,
+                remotePort,
+                linkedCancellationToken.Token);
+
+            var ipv6Task = RunListenerAsync(
+                IPAddress.IPv6Loopback,
+                localPort,
+                serviceName,
+                namespaceName,
+                remotePort,
+                linkedCancellationToken.Token);
+
+            await Task.WhenAll(ipv4Task, ipv6Task);
+        }
+        finally
+        {
+            _activeForwards.TryRemove(key, out _);
+        }
+    }
+
+    private async Task RunListenerAsync(
+        IPAddress address,
+        int localPort,
+        string serviceName,
+        string namespaceName,
+        int servicePort,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
             {
                 Socket? listener = null;
 
                 try
                 {
-                    // Resolve pod from service
-                    var podName = await ResolvePodFromServiceAsync(
+                    // Resolve pod and target port from service
+                    var resolutionResult = await ResolvePodAndPortAsync(
                         serviceName,
                         namespaceName,
-                        linkedCancellationToken.Token);
+                        servicePort,
+                        cancellationToken);
 
-                    if (string.IsNullOrEmpty(podName))
+                    if (resolutionResult == null)
                     {
                         LogNoPodFound(serviceName, namespaceName);
-                        await Task.Delay(RetryDelay, linkedCancellationToken.Token);
+                        await Task.Delay(RetryDelay, cancellationToken);
                         continue;
                     }
 
-                    LogPortForwardStarting(serviceName, podName, localPort, remotePort);
+                    var (podName, targetPort) = resolutionResult.Value;
+
+                    LogPortForwardStarting(serviceName, podName, localPort, targetPort);
+                    LogPortResolution(servicePort, targetPort, podName);
 
                     // Create socket listener
-                    // Use IPv6Any with DualMode to support both IPv4 and IPv6 connections.
-                    // This resolves "Connection Refused" when clients prefer ::1 over 127.0.0.1
-                    var ipEndPoint = new IPEndPoint(
-                        address: IPAddress.IPv6Any,
-                        port: localPort);
+                    var ipEndPoint = new IPEndPoint(address, localPort);
 
                     listener = new Socket(
-                        AddressFamily.InterNetworkV6,
+                        address.AddressFamily,
                         SocketType.Stream,
-                        ProtocolType.Tcp);
-                    
-                    listener.DualMode = true;
-                    listener.NoDelay = true; // Disable Nagle's algorithm for lower latency
-                    
+                        ProtocolType.Tcp)
+                    {
+                        NoDelay = true
+                    };
+
                     listener.Bind(ipEndPoint);
                     listener.Listen(100);
 
-                    LogPortForwardListening(localPort, podName, remotePort);
+                    LogPortForwardListening(localPort, podName, targetPort);
 
-                    // Accept connections and forward them - each connection gets its own WebSocket
+                    // Accept connections and forward them
                     await AcceptAndForwardConnectionsAsync(
                         listener,
                         podName,
                         namespaceName,
-                        remotePort,
-                        linkedCancellationToken.Token);
+                        targetPort,
+                        cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -132,9 +167,9 @@ public partial class PortForwardService(
                 catch (Exception ex)
                 {
                     LogPortForwardError(serviceName, ex.Message);
-                    if (!linkedCancellationToken.Token.IsCancellationRequested)
+                    if (!cancellationToken.IsCancellationRequested)
                     {
-                        await Task.Delay(RetryDelay, linkedCancellationToken.Token);
+                        await Task.Delay(RetryDelay, cancellationToken);
                     }
                 }
                 finally
@@ -143,9 +178,9 @@ public partial class PortForwardService(
                 }
             }
         }
-        finally
+        catch (OperationCanceledException)
         {
-            _activeForwards.TryRemove(key, out _);
+            // Ignore
         }
     }
 
@@ -229,6 +264,9 @@ public partial class PortForwardService(
     {
         const string Direction = "local->pod";
         var buffer = new byte[4096];
+        long totalBytes = 0;
+        bool hasLoggedStart = false;
+
         try
         {
             while (!cancellationToken.IsCancellationRequested && socket.Connected)
@@ -238,8 +276,16 @@ public partial class PortForwardService(
                 {
                     break; // Connection closed
                 }
+
+                if (!hasLoggedStart)
+                {
+                    LogTrafficStart(podName, Direction);
+                    hasLoggedStart = true;
+                }
+
                 stream.Write(buffer, 0, bytesReceived);
                 stream.Flush();
+                totalBytes += bytesReceived;
             }
         }
         catch (SocketException ex)
@@ -254,6 +300,13 @@ public partial class PortForwardService(
         {
             // Socket or stream disposed - normal during shutdown
             LogStreamClosed(podName, Direction, ex.Message);
+        }
+        finally
+        {
+            if (hasLoggedStart)
+            {
+                LogTrafficEnd(podName, Direction, totalBytes);
+            }
         }
     }
 
@@ -268,6 +321,9 @@ public partial class PortForwardService(
     {
         const string Direction = "pod->local";
         var buffer = new byte[4096];
+        long totalBytes = 0;
+        bool hasLoggedStart = false;
+
         try
         {
             while (!cancellationToken.IsCancellationRequested && socket.Connected)
@@ -277,7 +333,15 @@ public partial class PortForwardService(
                 {
                     break; // Stream closed
                 }
+
+                if (!hasLoggedStart)
+                {
+                    LogTrafficStart(podName, Direction);
+                    hasLoggedStart = true;
+                }
+
                 socket.Send(buffer, bytesRead, SocketFlags.None);
+                totalBytes += bytesRead;
             }
         }
         catch (SocketException ex)
@@ -292,6 +356,13 @@ public partial class PortForwardService(
         {
             // Socket or stream disposed - normal during shutdown
             LogStreamClosed(podName, Direction, ex.Message);
+        }
+        finally
+        {
+             if (hasLoggedStart)
+             {
+                 LogTrafficEnd(podName, Direction, totalBytes);
+             }
         }
     }
 
@@ -334,8 +405,33 @@ public partial class PortForwardService(
                 StreamType.PortForward);
             demuxer.Start();
 
-            // Get the stream for the port
+            // Get the stream for the port (Channel 0)
             var podStream = demuxer.GetStream((byte?)0, (byte?)0);
+
+            // Get the error stream (Channel 1)
+            var errorStream = demuxer.GetStream((byte?)1, (byte?)1);
+
+            // Read error stream in background
+            var errorTask = Task.Run(async () =>
+            {
+                try
+                {
+                    using var reader = new StreamReader(errorStream);
+                    while (!cancellationToken.IsCancellationRequested)
+                    {
+                        var line = await reader.ReadLineAsync(cancellationToken);
+                        if (line != null)
+                        {
+                            LogPodErrorOutput(podName, line);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
+                catch { /* Ignore error stream errors */ }
+            }, cancellationToken);
 
             // Create tasks for bidirectional copy (like the official example)
             var socketToPod = Task.Run(() =>
@@ -373,46 +469,80 @@ public partial class PortForwardService(
     }
 
     /// <summary>
-    /// Resolves a pod name from a service by looking up pods matching the service's selector.
+    /// Resolves a pod and the actual target port from a service.
+    /// Handles mapping Service Port -> Target Port (Int or String).
     /// </summary>
-    /// <param name="serviceName">Name of the service.</param>
-    /// <param name="namespaceName">Name of the namespace.</param>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>The name of a running pod matching the service selector, or null if none found.</returns>
-    private async Task<string?> ResolvePodFromServiceAsync(
+    private async Task<(string PodName, int TargetPort)?> ResolvePodAndPortAsync(
         string serviceName,
         string namespaceName,
+        int servicePort,
         CancellationToken cancellationToken)
     {
         var client = kubernetesService.Client;
 
-        // Get the service to find its selector
+        // 1. Get Service to find Selector and TargetPort mapping
         var service = await client.CoreV1.ReadNamespacedServiceAsync(
             name: serviceName,
             namespaceParameter: namespaceName,
             cancellationToken: cancellationToken);
-        var selector = service?.Spec.Selector;
 
-        if (selector == null || selector.Count == 0)
+        if (service?.Spec?.Selector == null || service.Spec.Selector.Count == 0)
         {
             return null;
         }
 
-        // Build label selector string
-        var labelSelector = string.Join(",", selector.Select(kv => $"{kv.Key}={kv.Value}"));
+        // 2. Find the ServicePort entry matching our input port
+        var servicePortEntry = service.Spec.Ports?.FirstOrDefault(p => p.Port == servicePort);
+        var targetPortVal = servicePortEntry?.TargetPort;
 
-        // List pods matching the selector
+        // 3. Find a Pod matching the selector
+        var labelSelector = string.Join(",", service.Spec.Selector.Select(kv => $"{kv.Key}={kv.Value}"));
         var pods = await client.CoreV1.ListNamespacedPodAsync(
             namespaceParameter: namespaceName,
             labelSelector: labelSelector,
             cancellationToken: cancellationToken);
 
-        // Return the first running pod
         var runningPod = pods.Items
             .FirstOrDefault(p =>
                 p.Status.Phase == "Running"
                 && p.Status.ContainerStatuses?.All(c => c.Ready == true) == true);
 
-        return runningPod?.Metadata.Name;
+        if (runningPod == null)
+        {
+            return null;
+        }
+
+        int resolvedPort = servicePort; // Default fallback
+
+        // 4. Resolve TargetPort
+        if (targetPortVal != null)
+        {
+            // Case A: TargetPort is an Integer (e.g., 8080)
+            if (targetPortVal.Value != null && int.TryParse(targetPortVal.Value, out int parsedPort)) 
+            {
+                resolvedPort = parsedPort;
+            }
+            // Case B: TargetPort is a String/Name (e.g., "http") or value was not an int
+            else 
+            {
+                string portName = targetPortVal.Value; // e.g. "http"
+                
+                // Look up container port by name in the Pod Spec
+                var containerPort = runningPod.Spec.Containers
+                    .SelectMany(c => c.Ports ?? [])
+                    .FirstOrDefault(p => p.Name == portName);
+
+                if (containerPort != null)
+                {
+                    resolvedPort = containerPort.ContainerPort;
+                }
+                else
+                {
+                   // Fallback logic matches original implementation
+                }
+            }
+        }
+
+        return (runningPod.Metadata.Name, resolvedPort);
     }
 }
