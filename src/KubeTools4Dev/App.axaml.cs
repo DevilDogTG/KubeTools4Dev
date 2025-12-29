@@ -66,6 +66,7 @@ public partial class App : Application
         services.AddSingleton<IKubernetesService, KubernetesService>();
         services.AddSingleton<IPortForwardService, PortForwardService>();
         services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<IUpdateService, UpdateService>();
 
         // ViewModels
         // MainViewModel as Singleton (usually shared for the main window)
