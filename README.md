@@ -10,7 +10,10 @@
 
 ### 📦 Pod Monitoring
 - **Real-time Updates**: View a live list of pods across all namespaces.
-- **Comprehensive Details**: See essential pod information including Name, Namespace, Status, Age, and Restart counts.
+- **Comprehensive Details**: See essential pod information including Name, Namespace, Status, Age, and Restart counts. Statuses are dynamically parsed with color coding for quick issue spotting (e.g., `CrashLoopBackOff` appears in red).
+- **Resource Metrics**: View real-time CPU and RAM usage directly in the datagrid (requires Kubernetes Metrics Server installed on your cluster).
+- **Live Logs Streaming**: Instantly open a resizable side-panel to stream real-time raw pod logs with smart auto-scrolling.
+- **Describe & Events**: Quickly inspect a pod's YAML configuration along with its real-time Kubernetes events in the side-panel.
 - **Filtering**: Quickly find pods by filtering on Name or Namespace.
 - **Auto-Refresh**: Configurable refresh interval to keep data up-to-date.
 
