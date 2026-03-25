@@ -19,6 +19,18 @@ public partial class PodViewModel : ObservableObject
     private string _age = string.Empty;
 
     /// <summary>
+    /// The cpu usage
+    /// </summary>
+    [ObservableProperty]
+    private string _cpuUsage = string.Empty;
+
+    /// <summary>
+    /// The ram usage
+    /// </summary>
+    [ObservableProperty]
+    private string _ramUsage = string.Empty;
+
+    /// <summary>
     /// The last restart
     /// </summary>
     [ObservableProperty]
@@ -88,15 +100,7 @@ public partial class PodViewModel : ObservableObject
         Name = pod.Metadata.Name;
         Namespace = pod.Metadata.NamespaceProperty;
 
-        // Check for Terminating state (DeletionTimestamp is set)
-        if (pod.Metadata.DeletionTimestamp.HasValue)
-        {
-            Status = "Terminating";
-        }
-        else
-        {
-            Status = pod.Status.Phase;
-        }
+        Status = GetPodStatus(pod);
 
         // Age
         Age = pod.Metadata.CreationTimestamp.HasValue
@@ -130,15 +134,7 @@ public partial class PodViewModel : ObservableObject
         }
 
         // Color
-        StatusColor = Status switch
-        {
-            "Running" => Brushes.SpringGreen,
-            "Succeeded" => Brushes.LightBlue,
-            "Pending" => Brushes.Orange,
-            "Failed" => Brushes.Red,
-            "Terminating" => Brushes.DarkOrange, // Distinct color for terminating
-            _ => Brushes.Gray
-        };
+        StatusColor = GetStatusColor(Status);
     }
 
     /// <summary>
@@ -155,5 +151,189 @@ public partial class PodViewModel : ObservableObject
         if (age.TotalHours >= 1) return $"{(int)age.TotalHours}h{(int)age.Minutes}m";
         if (age.TotalMinutes >= 1) return $"{(int)age.TotalMinutes}m";
         return $"{(int)age.TotalSeconds}s";
+    }
+
+    private IBrush GetStatusColor(string status)
+    {
+        if (status is "Running" or "Completed" or "Succeeded")
+        {
+            return status == "Running" ? Brushes.SpringGreen : Brushes.LightBlue;
+        }
+
+        if (status is "Terminating")
+        {
+            return Brushes.DarkOrange;
+        }
+
+        if (status is "Pending" or "ContainerCreating" or "PodInitializing")
+        {
+            return Brushes.Orange;
+        }
+
+        if (status.Contains("BackOff") || status.Contains("Err") || status.Contains("Crash") || status.Contains("Failed") || status.Contains("OOMKilled") || status.Contains("Invalid"))
+        {
+            return Brushes.Red;
+        }
+
+        if (status.StartsWith("Init:"))
+        {
+            return Brushes.Orange;
+        }
+
+        return Brushes.Gray;
+    }
+
+    private string GetPodStatus(V1Pod pod)
+    {
+        var reason = pod.Status?.Phase ?? "Unknown";
+
+        if (pod.Status?.Reason != null)
+        {
+            reason = pod.Status.Reason;
+        }
+
+        var initializing = false;
+
+        if (pod.Status?.InitContainerStatuses != null)
+        {
+            for (var i = 0; i < pod.Status.InitContainerStatuses.Count; i++)
+            {
+                var container = pod.Status.InitContainerStatuses[i];
+
+                if (container.State?.Terminated != null && container.State.Terminated.ExitCode == 0)
+                {
+                    continue;
+                }
+
+                if (container.State?.Terminated != null)
+                {
+                    if (string.IsNullOrEmpty(container.State.Terminated.Reason))
+                    {
+                        if (container.State.Terminated.Signal != 0)
+                        {
+                            reason = $"Init:Signal:{container.State.Terminated.Signal}";
+                        }
+                        else
+                        {
+                            reason = $"Init:ExitCode:{container.State.Terminated.ExitCode}";
+                        }
+                    }
+                    else
+                    {
+                        reason = $"Init:{container.State.Terminated.Reason}";
+                    }
+
+                    initializing = true;
+                }
+                else if (container.State?.Waiting != null && !string.IsNullOrEmpty(container.State.Waiting.Reason) && container.State.Waiting.Reason != "PodInitializing")
+                {
+                    reason = $"Init:{container.State.Waiting.Reason}";
+                    initializing = true;
+                }
+                else
+                {
+                    reason = $"Init:{i}/{pod.Spec?.InitContainers?.Count ?? 0}";
+                    initializing = true;
+                }
+
+                break;
+            }
+        }
+
+        if (!initializing)
+        {
+            var hasRunning = false;
+
+            if (pod.Status?.ContainerStatuses != null)
+            {
+                for (var i = pod.Status.ContainerStatuses.Count - 1; i >= 0; i--)
+                {
+                    var container = pod.Status.ContainerStatuses[i];
+
+                    if (container.State?.Waiting != null && !string.IsNullOrEmpty(container.State.Waiting.Reason))
+                    {
+                        reason = container.State.Waiting.Reason;
+                    }
+                    else if (container.State?.Terminated != null && !string.IsNullOrEmpty(container.State.Terminated.Reason))
+                    {
+                        reason = container.State.Terminated.Reason;
+                    }
+                    else if (container.State?.Terminated != null && string.IsNullOrEmpty(container.State.Terminated.Reason))
+                    {
+                        if (container.State.Terminated.Signal != 0)
+                        {
+                            reason = $"Signal:{container.State.Terminated.Signal}";
+                        }
+                        else
+                        {
+                            reason = $"ExitCode:{container.State.Terminated.ExitCode}";
+                        }
+                    }
+                    else if (container.Ready && container.State?.Running != null)
+                    {
+                        hasRunning = true;
+                    }
+                }
+            }
+
+            if (reason == "Completed" && hasRunning)
+            {
+                var hasReadyCondition = pod.Status?.Conditions?.Any(c => c.Type == "Ready" && c.Status == "True") == true;
+
+                if (hasReadyCondition)
+                {
+                    reason = "Running";
+                }
+                else
+                {
+                    reason = "NotReady";
+                }
+            }
+        }
+
+        if (pod.Metadata?.DeletionTimestamp != null && pod.Status?.Reason == "NodeLost")
+        {
+            reason = "Unknown";
+        }
+        else if (pod.Metadata?.DeletionTimestamp != null)
+        {
+            reason = "Terminating";
+        }
+
+        return reason;
+    }
+    /// <summary>
+    /// Updates the metrics.
+    /// </summary>
+    /// <param name="metrics">The metrics.</param>
+    public void UpdateMetrics(PodMetrics metrics)
+    {
+        if (metrics?.Containers == null)
+        {
+            CpuUsage = string.Empty;
+            RamUsage = string.Empty;
+            return;
+        }
+
+        var totalCpu = 0m;
+        var totalMemory = 0m;
+
+        foreach (var container in metrics.Containers)
+        {
+            if (container.Usage.TryGetValue("cpu", out var cpu))
+            {
+                totalCpu += cpu.ToDecimal();
+            }
+            if (container.Usage.TryGetValue("memory", out var memory))
+            {
+                totalMemory += memory.ToDecimal();
+            }
+        }
+
+        var cpuMCores = (int)(totalCpu * 1000m);
+        CpuUsage = cpuMCores == 0 && totalCpu > 0 ? "<1m" : $"{cpuMCores}m";
+
+        var memoryMiB = (int)(totalMemory / 1048576m);
+        RamUsage = memoryMiB == 0 && totalMemory > 0 ? "<1Mi" : $"{memoryMiB}Mi";
     }
 }

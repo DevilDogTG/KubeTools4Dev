@@ -58,6 +58,44 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool _isLoading;
 
+    [ObservableProperty]
+    private bool _isPanelOpen;
+
+    private Avalonia.Controls.GridLength _savedPanelWidth = new Avalonia.Controls.GridLength(600);
+
+    [ObservableProperty]
+    private Avalonia.Controls.GridLength _panelWidth = new Avalonia.Controls.GridLength(0);
+
+    partial void OnIsPanelOpenChanged(bool value)
+    {
+        if (value)
+        {
+            PanelWidth = _savedPanelWidth;
+        }
+        else
+        {
+            if (PanelWidth.Value > 10)
+            {
+                _savedPanelWidth = PanelWidth;
+            }
+            PanelWidth = new Avalonia.Controls.GridLength(0);
+        }
+    }
+
+    [ObservableProperty]
+    private PodViewModel? _selectedPodDetail;
+
+    [ObservableProperty]
+    private ObservableCollection<string> _podLogsList = [];
+
+    [ObservableProperty]
+    private string _podDescribeText = string.Empty;
+
+    [ObservableProperty]
+    private int _selectedTabIndex;
+
+    private CancellationTokenSource? _logStreamCts;
+
     /// <summary>
     /// The last refresh time
     /// </summary>
@@ -136,6 +174,8 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
             _cancellationTokenSource = new CancellationTokenSource();
             _ = WatchPodsAsync(_cancellationTokenSource.Token);
 
+            _ = FetchAndUpdateMetricsAsync();
+
             _refreshTimer.Start();
         }
         catch (Exception ex)
@@ -161,6 +201,8 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
             _refreshTimer.Tick -= OnRefreshTimerTick;
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource?.Dispose();
+            _logStreamCts?.Cancel();
+            _logStreamCts?.Dispose();
         }
     }
 
@@ -210,7 +252,7 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     /// </summary>
     /// <param name="sender">The sender.</param>
     /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-    private void OnRefreshTimerTick(object? sender, EventArgs e) => TriggerRefresh();
+    private async void OnRefreshTimerTick(object? sender, EventArgs e) => await TriggerRefreshAsync();
 
     /// <summary>
     /// Called when [settings changed].
@@ -228,19 +270,46 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Triggers the refresh.
     /// </summary>
-    private void TriggerRefresh()
+    private async Task TriggerRefreshAsync()
     {
-        // For now, just update the timestamp if we are "watching"
-        // If the watch is stuck, this won't help unless we re-fetch.
-        // User asked for "config interval to refresh". This usually implies re-fetching or ensuring liveliness.
-        // Let's re-fetch if the user wants. But usually Watch is better.
-        // Let's just update the "Age" of pods and "Last Updated" if needed.
-        // Actually, "Last Updated" should reflect data change.
-        // Let's update the AGE of pods periodically.
         UpdateRefreshTime();
         foreach (var pod in Pods)
         {
             pod.RefreshAge();
+        }
+
+        await FetchAndUpdateMetricsAsync();
+    }
+
+    private async Task FetchAndUpdateMetricsAsync()
+    {
+        try
+        {
+            if (!_kubeService.IsConnected) return;
+
+            var metrics = await _kubeService.GetPodMetricsAsync("");
+            if (metrics?.Items == null) return;
+
+            var metricsDict = metrics.Items.ToDictionary(m => (m.Metadata.NamespaceProperty, m.Metadata.Name));
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                foreach (var pod in _allPods)
+                {
+                    if (metricsDict.TryGetValue((pod.Namespace, pod.Name), out var podMetrics))
+                    {
+                        pod.UpdateMetrics(podMetrics);
+                    }
+                    else
+                    {
+                        pod.UpdateMetrics(null!);
+                    }
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to update pod metrics.");
         }
     }
 
@@ -329,6 +398,78 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
             {
                 _logger.LogError(ex, "Watch Error");
             }
+        }
+    }
+
+    [RelayCommand]
+    private void ShowLogs(PodViewModel pod)
+    {
+        SelectedPodDetail = pod;
+        SelectedTabIndex = 0;
+        IsPanelOpen = true;
+
+        _ = StartLogStreamAsync(pod);
+    }
+
+    [RelayCommand]
+    private async Task ShowDescribeAsync(PodViewModel pod)
+    {
+        SelectedPodDetail = pod;
+        SelectedTabIndex = 1;
+        IsPanelOpen = true;
+
+        _logStreamCts?.Cancel();
+        PodLogsList.Clear();
+        
+        PodDescribeText = "Loading describe output...";
+        PodDescribeText = await _kubeService.GetPodDescribeAsync(pod.Namespace, pod.Name);
+    }
+
+    [RelayCommand]
+    private void ClosePanel()
+    {
+        IsPanelOpen = false;
+        SelectedPodDetail = null;
+        _logStreamCts?.Cancel();
+        PodLogsList.Clear();
+        PodDescribeText = string.Empty;
+    }
+
+    private async Task StartLogStreamAsync(PodViewModel pod)
+    {
+        _logStreamCts?.Cancel();
+        _logStreamCts = new CancellationTokenSource();
+        var token = _logStreamCts.Token;
+
+        PodLogsList.Clear();
+        PodLogsList.Add($"Connecting to log stream for {pod.Name}...");
+
+        try
+        {
+            await foreach (var line in _kubeService.StreamPodLogsAsync(pod.Namespace, pod.Name, token))
+            {
+                if (token.IsCancellationRequested) break;
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (PodLogsList.Count > 1000)
+                    {
+                        PodLogsList.RemoveAt(0);
+                    }
+                    PodLogsList.Add(line);
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+        catch (Exception ex)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                PodLogsList.Add($"Error streaming logs: {ex.Message}");
+            });
         }
     }
 }

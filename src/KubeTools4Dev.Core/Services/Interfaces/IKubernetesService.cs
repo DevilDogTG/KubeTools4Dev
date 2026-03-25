@@ -1,4 +1,4 @@
-﻿using k8s;
+using k8s;
 using k8s.Models;
 
 namespace KubeTools4Dev.Core.Services.Interfaces;
@@ -37,6 +37,30 @@ public interface IKubernetesService
     /// <param name="namespaceName">Name of the namespace.</param>
     /// <returns>A list of pods in the specified namespace.</returns>
     Task<IEnumerable<V1Pod>> GetPodsAsync(string namespaceName = "default");
+
+    /// <summary>
+    /// Gets the pod metrics asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <returns>A list of pod metrics in the specified namespace.</returns>
+    Task<PodMetricsList?> GetPodMetricsAsync(string namespaceName = "default");
+
+    /// <summary>
+    /// Streams the pod logs asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="podName">Name of the pod.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>An async enumerable of log lines.</returns>
+    IAsyncEnumerable<string> StreamPodLogsAsync(string namespaceName, string podName, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the pod describe asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="podName">Name of the pod.</param>
+    /// <returns>A string representing the describe output.</returns>
+    Task<string> GetPodDescribeAsync(string namespaceName, string podName);
 
     /// <summary>
     /// Gets the services asynchronous.
