@@ -104,6 +104,71 @@ public class KubernetesService(
     }
 
     /// <summary>
+    /// Streams the pod logs asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="podName">Name of the pod.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>An async enumerable of log lines.</returns>
+    public async IAsyncEnumerable<string> StreamPodLogsAsync(
+        string namespaceName, 
+        string podName, 
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        using var stream = await Client.CoreV1.ReadNamespacedPodLogAsync(
+            name: podName,
+            namespaceParameter: namespaceName,
+            follow: true,
+            tailLines: 1000,
+            cancellationToken: cancellationToken);
+
+        using var reader = new System.IO.StreamReader(stream);
+        
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync();
+            if (line == null) break;
+            
+            yield return line;
+        }
+    }
+
+    /// <summary>
+    /// Gets the pod describe asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="podName">Name of the pod.</param>
+    /// <returns>A string representing the describe output.</returns>
+    public async Task<string> GetPodDescribeAsync(string namespaceName, string podName)
+    {
+        try
+        {
+            var pod = await Client.CoreV1.ReadNamespacedPodAsync(podName, namespaceName);
+            var events = await Client.CoreV1.ListNamespacedEventAsync(namespaceName, fieldSelector: $"involvedObject.name={podName}");
+            
+            var yaml = k8s.KubernetesYaml.Serialize(pod);
+            
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("--- POD YAML ---");
+            sb.AppendLine(yaml);
+            sb.AppendLine();
+            sb.AppendLine("--- EVENTS ---");
+            
+            foreach (var evt in events.Items)
+            {
+                sb.AppendLine($"[{evt.Type}] {evt.Reason} - {evt.Message} ({evt.LastTimestamp})");
+            }
+            
+            return sb.ToString();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to get pod describe");
+            return $"Error: {ex.Message}";
+        }
+    }
+
+    /// <summary>
     /// Gets the services asynchronous.
     /// </summary>
     /// <param name="namespaceName">Name of the namespace.</param>

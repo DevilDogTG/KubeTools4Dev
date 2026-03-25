@@ -58,6 +58,44 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool _isLoading;
 
+    [ObservableProperty]
+    private bool _isPanelOpen;
+
+    private Avalonia.Controls.GridLength _savedPanelWidth = new Avalonia.Controls.GridLength(600);
+
+    [ObservableProperty]
+    private Avalonia.Controls.GridLength _panelWidth = new Avalonia.Controls.GridLength(0);
+
+    partial void OnIsPanelOpenChanged(bool value)
+    {
+        if (value)
+        {
+            PanelWidth = _savedPanelWidth;
+        }
+        else
+        {
+            if (PanelWidth.Value > 10)
+            {
+                _savedPanelWidth = PanelWidth;
+            }
+            PanelWidth = new Avalonia.Controls.GridLength(0);
+        }
+    }
+
+    [ObservableProperty]
+    private PodViewModel? _selectedPodDetail;
+
+    [ObservableProperty]
+    private ObservableCollection<string> _podLogsList = [];
+
+    [ObservableProperty]
+    private string _podDescribeText = string.Empty;
+
+    [ObservableProperty]
+    private int _selectedTabIndex;
+
+    private CancellationTokenSource? _logStreamCts;
+
     /// <summary>
     /// The last refresh time
     /// </summary>
@@ -163,6 +201,8 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
             _refreshTimer.Tick -= OnRefreshTimerTick;
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource?.Dispose();
+            _logStreamCts?.Cancel();
+            _logStreamCts?.Dispose();
         }
     }
 
@@ -358,6 +398,78 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
             {
                 _logger.LogError(ex, "Watch Error");
             }
+        }
+    }
+
+    [RelayCommand]
+    private void ShowLogs(PodViewModel pod)
+    {
+        SelectedPodDetail = pod;
+        SelectedTabIndex = 0;
+        IsPanelOpen = true;
+
+        _ = StartLogStreamAsync(pod);
+    }
+
+    [RelayCommand]
+    private async Task ShowDescribeAsync(PodViewModel pod)
+    {
+        SelectedPodDetail = pod;
+        SelectedTabIndex = 1;
+        IsPanelOpen = true;
+
+        _logStreamCts?.Cancel();
+        PodLogsList.Clear();
+        
+        PodDescribeText = "Loading describe output...";
+        PodDescribeText = await _kubeService.GetPodDescribeAsync(pod.Namespace, pod.Name);
+    }
+
+    [RelayCommand]
+    private void ClosePanel()
+    {
+        IsPanelOpen = false;
+        SelectedPodDetail = null;
+        _logStreamCts?.Cancel();
+        PodLogsList.Clear();
+        PodDescribeText = string.Empty;
+    }
+
+    private async Task StartLogStreamAsync(PodViewModel pod)
+    {
+        _logStreamCts?.Cancel();
+        _logStreamCts = new CancellationTokenSource();
+        var token = _logStreamCts.Token;
+
+        PodLogsList.Clear();
+        PodLogsList.Add($"Connecting to log stream for {pod.Name}...");
+
+        try
+        {
+            await foreach (var line in _kubeService.StreamPodLogsAsync(pod.Namespace, pod.Name, token))
+            {
+                if (token.IsCancellationRequested) break;
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (PodLogsList.Count > 1000)
+                    {
+                        PodLogsList.RemoveAt(0);
+                    }
+                    PodLogsList.Add(line);
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+        catch (Exception ex)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                PodLogsList.Add($"Error streaming logs: {ex.Message}");
+            });
         }
     }
 }
