@@ -136,6 +136,8 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
             _cancellationTokenSource = new CancellationTokenSource();
             _ = WatchPodsAsync(_cancellationTokenSource.Token);
 
+            _ = FetchAndUpdateMetricsAsync();
+
             _refreshTimer.Start();
         }
         catch (Exception ex)
@@ -210,7 +212,7 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     /// </summary>
     /// <param name="sender">The sender.</param>
     /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-    private void OnRefreshTimerTick(object? sender, EventArgs e) => TriggerRefresh();
+    private async void OnRefreshTimerTick(object? sender, EventArgs e) => await TriggerRefreshAsync();
 
     /// <summary>
     /// Called when [settings changed].
@@ -228,19 +230,46 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Triggers the refresh.
     /// </summary>
-    private void TriggerRefresh()
+    private async Task TriggerRefreshAsync()
     {
-        // For now, just update the timestamp if we are "watching"
-        // If the watch is stuck, this won't help unless we re-fetch.
-        // User asked for "config interval to refresh". This usually implies re-fetching or ensuring liveliness.
-        // Let's re-fetch if the user wants. But usually Watch is better.
-        // Let's just update the "Age" of pods and "Last Updated" if needed.
-        // Actually, "Last Updated" should reflect data change.
-        // Let's update the AGE of pods periodically.
         UpdateRefreshTime();
         foreach (var pod in Pods)
         {
             pod.RefreshAge();
+        }
+
+        await FetchAndUpdateMetricsAsync();
+    }
+
+    private async Task FetchAndUpdateMetricsAsync()
+    {
+        try
+        {
+            if (!_kubeService.IsConnected) return;
+
+            var metrics = await _kubeService.GetPodMetricsAsync("");
+            if (metrics?.Items == null) return;
+
+            var metricsDict = metrics.Items.ToDictionary(m => (m.Metadata.NamespaceProperty, m.Metadata.Name));
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                foreach (var pod in _allPods)
+                {
+                    if (metricsDict.TryGetValue((pod.Namespace, pod.Name), out var podMetrics))
+                    {
+                        pod.UpdateMetrics(podMetrics);
+                    }
+                    else
+                    {
+                        pod.UpdateMetrics(null!);
+                    }
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to update pod metrics.");
         }
     }
 

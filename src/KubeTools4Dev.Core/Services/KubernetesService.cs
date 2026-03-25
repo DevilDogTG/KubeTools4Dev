@@ -84,6 +84,26 @@ public class KubernetesService(
     }
 
     /// <summary>
+    /// Gets the pod metrics asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <returns>A list of pod metrics in the specified namespace.</returns>
+    public async Task<PodMetricsList?> GetPodMetricsAsync(string namespaceName = "default")
+    {
+        try
+        {
+            return IsAllNamespaces(namespaceName)
+                ? await Client.GetKubernetesPodsMetricsAsync()
+                : await Client.GetKubernetesPodsMetricsByNamespaceAsync(namespaceName);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to get pod metrics. Metrics server might not be installed.");
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Gets the services asynchronous.
     /// </summary>
     /// <param name="namespaceName">Name of the namespace.</param>

@@ -19,6 +19,18 @@ public partial class PodViewModel : ObservableObject
     private string _age = string.Empty;
 
     /// <summary>
+    /// The cpu usage
+    /// </summary>
+    [ObservableProperty]
+    private string _cpuUsage = string.Empty;
+
+    /// <summary>
+    /// The ram usage
+    /// </summary>
+    [ObservableProperty]
+    private string _ramUsage = string.Empty;
+
+    /// <summary>
     /// The last restart
     /// </summary>
     [ObservableProperty]
@@ -289,5 +301,39 @@ public partial class PodViewModel : ObservableObject
         }
 
         return reason;
+    }
+    /// <summary>
+    /// Updates the metrics.
+    /// </summary>
+    /// <param name="metrics">The metrics.</param>
+    public void UpdateMetrics(PodMetrics metrics)
+    {
+        if (metrics?.Containers == null)
+        {
+            CpuUsage = string.Empty;
+            RamUsage = string.Empty;
+            return;
+        }
+
+        var totalCpu = 0m;
+        var totalMemory = 0m;
+
+        foreach (var container in metrics.Containers)
+        {
+            if (container.Usage.TryGetValue("cpu", out var cpu))
+            {
+                totalCpu += cpu.ToDecimal();
+            }
+            if (container.Usage.TryGetValue("memory", out var memory))
+            {
+                totalMemory += memory.ToDecimal();
+            }
+        }
+
+        var cpuMCores = (int)(totalCpu * 1000m);
+        CpuUsage = cpuMCores == 0 && totalCpu > 0 ? "<1m" : $"{cpuMCores}m";
+
+        var memoryMiB = (int)(totalMemory / 1048576m);
+        RamUsage = memoryMiB == 0 && totalMemory > 0 ? "<1Mi" : $"{memoryMiB}Mi";
     }
 }

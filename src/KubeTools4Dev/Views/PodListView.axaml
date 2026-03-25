@@ -101,6 +101,12 @@
 					</DataGridTemplateColumn.CellTemplate>
 				</DataGridTemplateColumn>
 
+				<DataGridTextColumn Binding="{Binding CpuUsage}"
+									Header="CPU"
+									Width="80"/>
+				<DataGridTextColumn Binding="{Binding RamUsage}"
+									Header="RAM"
+									Width="80"/>
 				<DataGridTextColumn Binding="{Binding Restarts}"
 									Header="Restarts"
 									Width="60"/>

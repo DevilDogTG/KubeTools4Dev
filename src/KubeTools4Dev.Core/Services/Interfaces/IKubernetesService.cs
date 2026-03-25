@@ -1,4 +1,4 @@
-﻿using k8s;
+using k8s;
 using k8s.Models;
 
 namespace KubeTools4Dev.Core.Services.Interfaces;
@@ -37,6 +37,13 @@ public interface IKubernetesService
     /// <param name="namespaceName">Name of the namespace.</param>
     /// <returns>A list of pods in the specified namespace.</returns>
     Task<IEnumerable<V1Pod>> GetPodsAsync(string namespaceName = "default");
+
+    /// <summary>
+    /// Gets the pod metrics asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <returns>A list of pod metrics in the specified namespace.</returns>
+    Task<PodMetricsList?> GetPodMetricsAsync(string namespaceName = "default");
 
     /// <summary>
     /// Gets the services asynchronous.
