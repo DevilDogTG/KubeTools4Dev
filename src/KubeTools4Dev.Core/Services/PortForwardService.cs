@@ -295,13 +295,23 @@ public partial class PortForwardService(
             demuxer.Start();
 
             // Get the stream for the port (channel 0 is data)
-            using var podStream = demuxer.GetStream((byte?)0, (byte?)0);
-            using var localStream = new NetworkStream(handler, ownsSocket: false);
+            var podStream = demuxer.GetStream((byte?)0, (byte?)0);
 
-            // Bidirectional copy using modern async streams
-            // We use a relatively small buffer and frequent flushes to ensure low latency for interactive protocols
-            var socketToPod = CopyStreamWithFlushAsync(localStream, podStream, podName, "local->pod", cancellationToken);
-            var podToSocket = CopyStreamWithFlushAsync(podStream, localStream, podName, "pod->local", cancellationToken);
+            // Create tasks for bidirectional copy (like the official example)
+            var socketToPod = Task.Run(() =>
+                CopySocketToStream(
+                    socket: handler,
+                    stream: podStream,
+                    podName: podName,
+                    cancellationToken: cancellationToken),
+                cancellationToken);
+            var podToSocket = Task.Run(() =>
+                CopyStreamToSocket(
+                    stream: podStream,
+                    socket: handler,
+                    podName: podName,
+                    cancellationToken: cancellationToken),
+                cancellationToken);
 
             // Wait for either direction to complete (connection closed)
             await Task.WhenAny(socketToPod, podToSocket);
@@ -323,29 +333,79 @@ public partial class PortForwardService(
     }
 
     /// <summary>
-    /// Copies data from one stream to another with periodic flushing and error logging.
+    /// Copies data from socket to stream (local -> pod).
     /// </summary>
-    private async Task CopyStreamWithFlushAsync(
-        Stream source,
-        Stream destination,
+    private void CopySocketToStream(
+        Socket socket,
+        Stream stream,
         string podName,
-        string direction,
         CancellationToken cancellationToken)
     {
+        const string Direction = "local->pod";
         var buffer = new byte[4096];
         try
         {
-            int bytesRead;
-            while ((bytesRead = await source.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false)) > 0)
+            while (!cancellationToken.IsCancellationRequested && socket.Connected)
             {
-                await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
-                await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
+                int bytesReceived = socket.Receive(buffer);
+                if (bytesReceived == 0)
+                {
+                    break; // Connection closed
+                }
+                stream.Write(buffer, 0, bytesReceived);
+                stream.Flush();
             }
         }
-        catch (OperationCanceledException) { }
-        catch (Exception ex)
+        catch (SocketException ex)
         {
-            LogStreamClosed(podName, direction, ex.Message);
+            LogStreamClosed(podName, Direction, ex.Message);
+        }
+        catch (IOException ex)
+        {
+            LogStreamClosed(podName, Direction, ex.Message);
+        }
+        catch (ObjectDisposedException ex)
+        {
+            // Socket or stream disposed - normal during shutdown
+            LogStreamClosed(podName, Direction, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Copies data from stream to socket (pod -> local).
+    /// </summary>
+    private void CopyStreamToSocket(
+        Stream stream,
+        Socket socket,
+        string podName,
+        CancellationToken cancellationToken)
+    {
+        const string Direction = "pod->local";
+        var buffer = new byte[4096];
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested && socket.Connected)
+            {
+                int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                if (bytesRead == 0)
+                {
+                    break; // Stream closed
+                }
+                socket.Send(buffer, bytesRead, SocketFlags.None);
+            }
+        }
+        catch (SocketException ex)
+        {
+            LogStreamClosed(podName, Direction, ex.Message);
+        }
+        catch (IOException ex)
+        {
+            LogStreamClosed(podName, Direction, ex.Message);
+        }
+        catch (ObjectDisposedException ex)
+        {
+            // Socket or stream disposed - normal during shutdown
+            LogStreamClosed(podName, Direction, ex.Message);
         }
     }
 

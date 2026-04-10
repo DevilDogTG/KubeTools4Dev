@@ -51,19 +51,6 @@ public class KubernetesService(
                 ? KubernetesClientConfiguration.BuildDefaultConfig()
                 : KubernetesClientConfiguration.BuildConfigFromConfigFile(kubeConfigPath);
 
-            // Use SocketsHttpHandler with Keep-Alive to maintain connections during idle periods
-            // This prevents intermediate load balancers/firewalls from dropping the connection.
-            config.FirstMessageHandlerSetup = (handler) =>
-            {
-                if (handler is SocketsHttpHandler socketsHandler)
-                {
-                    socketsHandler.PooledConnectionIdleTimeout = TimeSpan.FromMinutes(10);
-                    socketsHandler.KeepAlivePingDelay = TimeSpan.FromSeconds(30);
-                    socketsHandler.KeepAlivePingTimeout = TimeSpan.FromSeconds(10);
-                    socketsHandler.EnableMultipleHttp2Connections = true;
-                }
-            };
-
             _client = new Kubernetes(config);
 
             // Verify connection by listing nodes or just checking api versions
