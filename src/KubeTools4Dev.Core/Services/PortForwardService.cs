@@ -30,9 +30,19 @@ public partial class PortForwardService(
     private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(3);
 
     /// <summary>
+    /// Cache duration for pod name resolution.
+    /// </summary>
+    private static readonly TimeSpan PodNameCacheDuration = TimeSpan.FromSeconds(10);
+
+    /// <summary>
     /// The active forwards with their cancellation token sources.
     /// </summary>
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeForwards = new();
+
+    /// <summary>
+    /// Cache for resolved pod names from services.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, (string PodName, DateTime Expiration)> _podNameCache = new();
 
     /// <summary>
     /// Starts the service port forward asynchronous.
@@ -113,9 +123,11 @@ public partial class PortForwardService(
                     LogPortForwardListening(localPort, podName, remotePort);
 
                     // Accept connections and forward them - each connection gets its own WebSocket
+                    // We pass serviceName instead of a fixed podName to allow for dynamic resolution
+                    // if the pod changes (e.g. during re-deployment).
                     await AcceptAndForwardConnectionsAsync(
                         listener,
-                        podName,
+                        serviceName,
                         namespaceName,
                         remotePort,
                         linkedCancellationToken.Token);
@@ -178,7 +190,7 @@ public partial class PortForwardService(
     /// </summary>
     private async Task AcceptAndForwardConnectionsAsync(
         Socket listener,
-        string podName,
+        string serviceName,
         string namespaceName,
         int remotePort,
         CancellationToken cancellationToken)
@@ -189,14 +201,16 @@ public partial class PortForwardService(
             {
                 // Accept connection
                 var handler = await listener.AcceptAsync(cancellationToken);
-                LogConnectionAccepted(podName, remotePort);
+                
+                // Set keep-alive on the local socket to prevent it from being dropped during idle debugging sessions
+                handler.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
 
-                // Handle each connection in a separate task with its own WebSocket
+                // Handle each connection in a separate task
                 _ = Task.Run(async () =>
                 {
                     await HandleSingleConnectionAsync(
                         handler,
-                        podName,
+                        serviceName,
                         namespaceName,
                         remotePort,
                         cancellationToken);
@@ -215,6 +229,106 @@ public partial class PortForwardService(
             {
                 break;
             }
+        }
+    }
+
+    /// <summary>
+    /// Handles a single connection with its own WebSocket tunnel to the pod.
+    /// </summary>
+    private async Task HandleSingleConnectionAsync(
+        Socket handler,
+        string serviceName,
+        string namespaceName,
+        int remotePort,
+        CancellationToken cancellationToken)
+    {
+        WebSocket? webSocket = null;
+        StreamDemuxer? demuxer = null;
+        string? podName = null;
+
+        try
+        {
+            // Resolve current pod name for this connection
+            podName = await GetPodNameAsync(serviceName, namespaceName, cancellationToken);
+            if (string.IsNullOrEmpty(podName))
+            {
+                LogNoPodFound(serviceName, namespaceName);
+                return;
+            }
+
+            LogConnectionAccepted(podName, remotePort);
+
+            // Create WebSocket connection for this specific connection
+            using var timeoutCts = new CancellationTokenSource(ConnectionTimeout);
+            using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(
+                token1: cancellationToken,
+                token2: timeoutCts.Token);
+
+            try
+            {
+                webSocket = await kubernetesService.Client
+                    .WebSocketNamespacedPodPortForwardAsync(
+                        name: podName,
+                        @namespace: namespaceName,
+                        ports: [remotePort],
+                        webSocketSubProtocol: "v4.channel.k8s.io",
+                        cancellationToken: connectCts.Token)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
+            {
+                LogConnectionTimeout(podName, remotePort);
+                return;
+            }
+            catch (Exception ex)
+            {
+                // If we fail to connect to the pod, invalidate the cache to force a re-resolve next time
+                InvalidatePodCache(serviceName, namespaceName);
+                LogConnectionError(podName, ex.Message);
+                return;
+            }
+
+            // Create stream demuxer for port forwarding
+            demuxer = new StreamDemuxer(
+                webSocket,
+                StreamType.PortForward);
+            demuxer.Start();
+
+            // Get the stream for the port (channel 0 is data)
+            var podStream = demuxer.GetStream((byte?)0, (byte?)0);
+
+            // Create tasks for bidirectional copy (like the official example)
+            var socketToPod = Task.Run(() =>
+                CopySocketToStream(
+                    socket: handler,
+                    stream: podStream,
+                    podName: podName,
+                    cancellationToken: cancellationToken),
+                cancellationToken);
+            var podToSocket = Task.Run(() =>
+                CopyStreamToSocket(
+                    stream: podStream,
+                    socket: handler,
+                    podName: podName,
+                    cancellationToken: cancellationToken),
+                cancellationToken);
+
+            // Wait for either direction to complete (connection closed)
+            await Task.WhenAny(socketToPod, podToSocket);
+        }
+        catch (WebSocketException ex)
+        {
+            LogWebSocketError(podName ?? serviceName, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            LogConnectionError(podName ?? serviceName, ex.Message);
+        }
+        finally
+        {
+            try { handler.Close(); } catch { }
+            try { demuxer?.Dispose(); } catch { }
+            try { webSocket?.Dispose(); } catch { }
         }
     }
 
@@ -296,80 +410,31 @@ public partial class PortForwardService(
     }
 
     /// <summary>
-    /// Handles a single connection with its own WebSocket tunnel to the pod.
+    /// Gets the pod name from cache or resolves it if needed.
     /// </summary>
-    private async Task HandleSingleConnectionAsync(Socket handler, string podName, string namespaceName, int remotePort, CancellationToken cancellationToken)
+    private async Task<string?> GetPodNameAsync(string serviceName, string namespaceName, CancellationToken cancellationToken)
     {
-        WebSocket? webSocket = null;
-        StreamDemuxer? demuxer = null;
-
-        try
+        var cacheKey = $"{namespaceName}/{serviceName}";
+        if (_podNameCache.TryGetValue(cacheKey, out var cached) && DateTime.UtcNow < cached.Expiration)
         {
-            // Create WebSocket connection for this specific connection
-            using var timeoutCts = new CancellationTokenSource(ConnectionTimeout);
-            using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(
-                token1: cancellationToken,
-                token2: timeoutCts.Token);
-
-            try
-            {
-                webSocket = await kubernetesService.Client
-                    .WebSocketNamespacedPodPortForwardAsync(
-                        name: podName,
-                        @namespace: namespaceName,
-                        ports: [remotePort],
-                        webSocketSubProtocol: "v4.channel.k8s.io",
-                        cancellationToken: connectCts.Token)
-                    .ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
-            {
-                LogConnectionTimeout(podName, remotePort);
-                return;
-            }
-
-            // Create stream demuxer for port forwarding
-            demuxer = new StreamDemuxer(
-                webSocket,
-                StreamType.PortForward);
-            demuxer.Start();
-
-            // Get the stream for the port
-            var podStream = demuxer.GetStream((byte?)0, (byte?)0);
-
-            // Create tasks for bidirectional copy (like the official example)
-            var socketToPod = Task.Run(() =>
-                CopySocketToStream(
-                    socket: handler,
-                    stream: podStream,
-                    podName: podName,
-                    cancellationToken: cancellationToken),
-                cancellationToken);
-            var podToSocket = Task.Run(() =>
-                CopyStreamToSocket(
-                    stream: podStream,
-                    socket: handler,
-                    podName: podName,
-                    cancellationToken: cancellationToken),
-                cancellationToken);
-
-            // Wait for either direction to complete (connection closed)
-            await Task.WhenAny(socketToPod, podToSocket);
+            return cached.PodName;
         }
-        catch (WebSocketException ex)
+
+        var podName = await ResolvePodFromServiceAsync(serviceName, namespaceName, cancellationToken);
+        if (!string.IsNullOrEmpty(podName))
         {
-            LogWebSocketError(podName, ex.Message);
+            _podNameCache[cacheKey] = (podName, DateTime.UtcNow.Add(PodNameCacheDuration));
         }
-        catch (Exception ex)
-        {
-            LogConnectionError(podName, ex.Message);
-        }
-        finally
-        {
-            try { handler.Close(); } catch { }
-            try { demuxer?.Dispose(); } catch { }
-            try { webSocket?.Dispose(); } catch { }
-        }
+
+        return podName;
+    }
+
+    /// <summary>
+    /// Invalidates the pod name cache for a service.
+    /// </summary>
+    private void InvalidatePodCache(string serviceName, string namespaceName)
+    {
+        _podNameCache.TryRemove($"{namespaceName}/{serviceName}", out _);
     }
 
     /// <summary>
