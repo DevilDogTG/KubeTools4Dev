@@ -96,7 +96,7 @@
 										Width="*"/>
 
 					<DataGridTemplateColumn Header="Status"
-											Width="100">
+											Width="130">
 						<DataGridTemplateColumn.CellTemplate>
 							<DataTemplate>
 								<TextBlock Text="{Binding Status}"
