@@ -35,7 +35,7 @@
     Override the PR title. Defaults to the current branch name.
 
 .PARAMETER Provider
-    AI provider to use for PR description generation. Defaults to Gemini.
+    AI provider to use for PR description generation. Defaults to Copilot.
 
 .PARAMETER Draft
     Open the PR as a draft (ignored when updating an existing PR).
@@ -51,7 +51,7 @@ param (
     [string]$Title,
     [Parameter()]
     [ValidateSet("Gemini", "Copilot")]
-    [string]$Provider = "Gemini",
+    [string]$Provider = "Copilot",
     [switch]$Draft,
     [switch]$SkipRebase,
     [switch]$SkipTests
