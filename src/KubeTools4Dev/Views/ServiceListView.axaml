@@ -46,7 +46,7 @@
                     Spacing="10"
                     Margin="10">
             
-            <TextBox Watermark="Filter services..."
+            <TextBox PlaceholderText="Filter services..."
                      Text="{Binding FilterText}"
                      Width="200" 
                      Height="20"

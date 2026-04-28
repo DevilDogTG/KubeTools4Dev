@@ -58,7 +58,7 @@
                                        Margin="0,0,10,0"/>
                             <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,5,0,0" Spacing="2">
                                 <TextBox Text="{Binding LogPath}"
-                                         Watermark="Default Path"/>
+                                         PlaceholderText="Default Path"/>
                                 <SelectableTextBlock Text="{Binding CurrentLogPath, StringFormat='Active: {0}'}"
                                                      FontSize="11"
                                                      Foreground="Gray"
@@ -117,20 +117,20 @@
                         <TextBox Text="{Binding HiddenServiceNamesText}"
                                  AcceptsReturn="True"
                                  Height="50"
-                                 Watermark="e.g. kubernetes, kube-dns"/>
+                                 PlaceholderText="e.g. kubernetes, kube-dns"/>
 
                         <TextBlock Text="Hidden Service Types:" />
                         <TextBox Text="{Binding HiddenServiceTypesText}"
                                  AcceptsReturn="True"
                                  Height="50"
-                                 Watermark="e.g. ExternalName, ClusterIP"/>
+                                 PlaceholderText="e.g. ExternalName, ClusterIP"/>
 
                         <TextBlock Text="Excluded Services (Auto-Port-Forward):" />
                         <Grid ColumnDefinitions="*, Auto"
                               Margin="0,0,0,5">
                             <TextBox Grid.Column="0"
                                      Text="{Binding NewExcludedService}"
-                                     Watermark="Add service (e.g. namespace/service:port)"
+                                     PlaceholderText="Add service (e.g. namespace/service:port)"
                                      Height="20"
                                      Margin="0,0,5,0"/>
                             <Button Grid.Column="1"
