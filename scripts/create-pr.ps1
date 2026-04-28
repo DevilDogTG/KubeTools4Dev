@@ -19,7 +19,7 @@ if (!(Get-Command gh -ErrorAction SilentlyContinue)) {
 # 2. Git Status Checks
 $CurrentBranch = (git branch --show-current)
 if ($CurrentBranch -eq "main" -or $CurrentBranch -eq "master") {
-    throw "You are on the '$CurrentBranch' branch. Please switch to a feature or hotfix branch to create a PR."
+    throw "You are on the '$CurrentBranch' branch. Please switch to a feature or hotfix branch to create/update a PR."
 }
 
 $gitStatus = git status --porcelain
@@ -27,16 +27,25 @@ if (![string]::IsNullOrWhiteSpace($gitStatus)) {
     Write-Warning "Working directory has uncommitted changes. These will not be included in the PR description."
 }
 
-Write-Host "Preparing PR for branch: $CurrentBranch"
+# 3. Check for Existing PR
+Write-Host "Checking for existing PR for branch: $CurrentBranch..."
+$ExistingPR = gh pr list --head $CurrentBranch --json number,state --jq ".[0]" | ConvertFrom-Json
+$IsUpdate = $null -ne $ExistingPR -and ![string]::IsNullOrWhiteSpace($ExistingPR.number)
 
-# 3. Extract Commits
+if ($IsUpdate) {
+    Write-Host "Found existing PR #$($ExistingPR.number) ($($ExistingPR.state)). Script will update this PR."
+} else {
+    Write-Host "No existing PR found. Script will create a new one."
+}
+
+# 4. Extract Commits
 Write-Host "Extracting commit log against main..."
 $Commits = git log main..HEAD --oneline
 if ([string]::IsNullOrWhiteSpace($Commits)) {
     throw "No commits found on this branch that are not in 'main'."
 }
 
-# 4. Generate PR Body via AI
+# 5. Generate PR Body via AI
 function Get-PRBody {
     param([string]$commits, [string]$preferred)
     
@@ -96,22 +105,12 @@ $commits
         return "## Changes`n`n" + ($commits -split "`n" | ForEach-Object { "- $_" } | Out-String)
     }
 
-    # Clean up the AI output:
-    # 1. Remove conversational preambles
-    # 2. Remove common CLI artifacts/encoding glitches (like the boxes/lines)
-    # 3. Trim whitespace
     Write-Host "Cleaning up AI-generated content..."
-    
     $cleaned = $rawResult
-    # Remove everything before the first "##" or "Summary" if it looks like a preamble
     if ($cleaned -match "(?s).*?(##.*|Summary.*)") {
         $cleaned = $Matches[1]
     }
-    
-    # Strip common garbage characters if they exist at the start
     $cleaned = $cleaned -replace "^[\s\S]*?(?=##|###|Summary|Changes)", ""
-    
-    # Remove any trailing "---" or "Suggested PR" labels
     $cleaned = $cleaned -replace "(?m)^---.*$", ""
     $cleaned = $cleaned -replace "Suggested PR description:", ""
 
@@ -120,20 +119,22 @@ $commits
 
 $PRBody = Get-PRBody -commits $Commits -preferred $Provider
 
-# 5. Create Pull Request
+# 6. Create or Update Pull Request
 $PRTitle = if ($Title) { $Title } else { $CurrentBranch }
-$ghArgs = @("pr", "create", "--title", $PRTitle, "--body", $PRBody)
 
-if ($Draft) {
-    $ghArgs += "--draft"
+if ($IsUpdate) {
+    Write-Host "Updating Pull Request #$($ExistingPR.number) on GitHub..."
+    gh pr edit $ExistingPR.number --title $PRTitle --body $PRBody
+} else {
+    Write-Host "Creating new Pull Request on GitHub..."
+    $ghArgs = @("pr", "create", "--title", $PRTitle, "--body", $PRBody)
+    if ($Draft) { $ghArgs += "--draft" }
+    & gh $ghArgs
 }
 
-Write-Host "Creating Pull Request on GitHub..."
-# Using UTF8 for the final GH command to ensure the description is readable on the web
-& gh $ghArgs
-
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "Pull Request created successfully!"
+    $action = if ($IsUpdate) { "updated" } else { "created" }
+    Write-Host "Pull Request $action successfully!"
 } else {
-    throw "Failed to create Pull Request via GitHub CLI."
+    throw "Failed to perform PR action via GitHub CLI."
 }
