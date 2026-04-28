@@ -34,9 +34,6 @@ You MUST NOT keep your plans in internal context only.
 - Never commit directly to `main`.
 
 ## Coding Standards
-- Target: `.NET 10`, `Nullable` enabled, `GenerateDocumentationFile=true`.
-- Primary constructors preferred (enforced via `.editorconfig`).
-- Public classes/members require XML doc comments (CS1591 enforced).
 - Build must have **0 warnings, 0 errors** (`-warnaserror`).
 - Use `[LoggerMessage]` source-generated methods for structured logging.
 
