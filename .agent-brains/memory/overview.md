@@ -1,14 +1,19 @@
 # Project Overview
 
-KubeTools4Dev is a cross-platform desktop application built with Avalonia UI and C# (.NET) for developers to interact with and manage Kubernetes resources.
+KubeTools4Dev is a cross-platform desktop application built with Avalonia UI and C# (.NET 10) for developers to interact with and manage Kubernetes resources.
 
 ## Project Structure
 - **KubeTools4Dev**: The primary Avalonia application, housing the ViewModels, Views, and UI logic.
-- **KubeTools4Dev.Core**: The core library containing models, configuration settings, and services for interacting with Kubernetes clusters (e.g., `KubernetesService`, `PortForwardService`).
+- **KubeTools4Dev.Core**: The core library containing models, configuration settings, and services (e.g., `KubernetesService`, `PortForwardService`, `SettingsService`).
+- **KubeTools4Dev.Core.Tests**: xUnit + NSubstitute test project (23 tests: `SettingsModelTests`, `SettingsServiceTests`, `PortForwardServiceTests`). Added `InternalsVisibleTo` in Core csproj.
 
 ## Developer Workflow (Modern Release Flow)
-The project has migrated from GitFlow to a Trunk-Based development flow using `main` as the primary branch.
-- **Branching**: Features and fixes use short-lived branches off `main`.
-- **Integration**: Merges are handled via Pull Requests with a Rebase or Squash strategy to maintain linear history.
-- **Automation**: `scripts/create-pr.ps1` automates PR creation/updates, utilizing Gemini or Copilot CLI for AI-generated descriptions.
-- **Release**: (Pending refactor) Release process is decoupled from daily integration.
+Trunk-based development off `main`.
+- **Feature script**: `scripts/finish-feature.ps1` — runs preflight checks (clean tree, rebase from main, `-warnaserror` build, `dotnet test`) then creates/updates the PR via `gh`.
+- **PR creation**: Generates AI title (conventional-commit style) + rich body (Overview / What's Changed / Files Changed / Testing) using full commit log + `git diff --stat` + truncated diff (6000 char cap).
+- **PR update (re-run)**: Posts a structured `<!-- finish-feature-update -->` comment with preflight results, new commits, AI summary, and `<!-- head-sha: SHA -->` marker. Does NOT overwrite the PR body.
+- **AI encoding**: All scripts set `chcp 65001` + `$OutputEncoding` + `[Console]::OutputEncoding` to UTF-8 to prevent emoji corruption on Thai Windows (CP874 OEM codepage).
+- **Release**: Phase 3 (automated release pipeline) is deferred.
+
+## Current Open PRs
+- PR #18 (`feature/test-coverage`) — test coverage + finish-feature script enhancements. Awaiting merge.
