@@ -7,6 +7,8 @@ param (
     [switch]$Draft
 )
 
+# Force UTF8 encoding for all output to prevent unreadable characters in PRs
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
 $ErrorActionPreference = "Stop"
 
 # 1. Environment Checks
@@ -39,10 +41,8 @@ function Get-PRBody {
     param([string]$commits, [string]$preferred)
     
     $prompt = @"
-Generate a professional GitHub Pull Request description in Markdown format based on the following commit messages. 
-The description should include:
-- A high-level summary.
-- A bulleted list of changes categorized by type (Features, Fixes, Refactoring, etc.).
+You are an expert developer assistant. Generate a clean, professional GitHub Pull Request description in Markdown format based on the following commit messages.
+IMPORTANT: Return ONLY the Markdown content. Do not include any conversational preamble (like 'Here is a suggested...'), do not include CLI progress indicators, and do not include the '---' separators at the start/end.
 
 Commits:
 $commits
@@ -50,6 +50,7 @@ $commits
 
     # Define tool order based on preference
     $tools = if ($preferred -eq "Copilot") { @("Copilot", "Gemini") } else { @("Gemini", "Copilot") }
+    $rawResult = ""
 
     foreach ($tool in $tools) {
         Write-Host "Checking availability of $tool..."
@@ -58,47 +59,63 @@ $commits
             if (Get-Command gemini -ErrorAction SilentlyContinue) {
                 try {
                     Write-Host "Generating description using Gemini..."
-                    $result = $prompt | gemini ask
-                    if (![string]::IsNullOrWhiteSpace($result)) { return $result }
+                    $rawResult = $prompt | gemini ask
+                    if (![string]::IsNullOrWhiteSpace($rawResult)) { break }
                 } catch {
-                    Write-Warning "Gemini failed to generate content."
+                    Write-Warning "Gemini failed."
                 }
-            } else {
-                Write-Host "Gemini CLI ('gemini') not found."
             }
         }
 
         if ($tool -eq "Copilot") {
-            # Check for gh copilot extension first
             $hasGhCopilot = (gh extension list | Select-String "copilot")
             $hasStandaloneCopilot = (Get-Command copilot -ErrorAction SilentlyContinue)
 
             if ($hasGhCopilot) {
                 try {
-                    Write-Host "Generating description using GitHub Copilot CLI (extension)..."
-                    # Using 'gh copilot explain' with redirected input
-                    $result = $prompt | gh copilot explain --file - 
-                    if (![string]::IsNullOrWhiteSpace($result)) { return $result }
+                    Write-Host "Generating description using GitHub Copilot extension..."
+                    $rawResult = $prompt | gh copilot explain --file - 
+                    if (![string]::IsNullOrWhiteSpace($rawResult)) { break }
                 } catch {
                     Write-Warning "GitHub Copilot extension failed."
                 }
             } elseif ($hasStandaloneCopilot) {
                 try {
                     Write-Host "Generating description using standalone Copilot CLI..."
-                    # Correcting syntax based on error: use -i for input in non-interactive mode
-                    $result = $prompt | copilot -i "suggest PR description"
-                    if (![string]::IsNullOrWhiteSpace($result)) { return $result }
+                    $rawResult = copilot --prompt $prompt
+                    if (![string]::IsNullOrWhiteSpace($rawResult)) { break }
                 } catch {
                     Write-Warning "Standalone Copilot CLI failed."
                 }
-            } else {
-                Write-Host "Copilot CLI (gh extension or standalone) not found."
             }
         }
     }
 
-    Write-Warning "All AI providers failed or are unavailable. Falling back to basic commit list."
-    return "## Changes`n`n" + ($commits -split "`n" | ForEach-Object { "- $_" } | Out-String)
+    if ([string]::IsNullOrWhiteSpace($rawResult)) {
+        Write-Warning "All AI providers failed. Using basic commit list."
+        return "## Changes`n`n" + ($commits -split "`n" | ForEach-Object { "- $_" } | Out-String)
+    }
+
+    # Clean up the AI output:
+    # 1. Remove conversational preambles
+    # 2. Remove common CLI artifacts/encoding glitches (like the boxes/lines)
+    # 3. Trim whitespace
+    Write-Host "Cleaning up AI-generated content..."
+    
+    $cleaned = $rawResult
+    # Remove everything before the first "##" or "Summary" if it looks like a preamble
+    if ($cleaned -match "(?s).*?(##.*|Summary.*)") {
+        $cleaned = $Matches[1]
+    }
+    
+    # Strip common garbage characters if they exist at the start
+    $cleaned = $cleaned -replace "^[\s\S]*?(?=##|###|Summary|Changes)", ""
+    
+    # Remove any trailing "---" or "Suggested PR" labels
+    $cleaned = $cleaned -replace "(?m)^---.*$", ""
+    $cleaned = $cleaned -replace "Suggested PR description:", ""
+
+    return $cleaned.Trim()
 }
 
 $PRBody = Get-PRBody -commits $Commits -preferred $Provider
@@ -112,6 +129,7 @@ if ($Draft) {
 }
 
 Write-Host "Creating Pull Request on GitHub..."
+# Using UTF8 for the final GH command to ensure the description is readable on the web
 & gh $ghArgs
 
 if ($LASTEXITCODE -eq 0) {
