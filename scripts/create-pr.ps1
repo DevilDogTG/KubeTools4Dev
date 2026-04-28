@@ -138,14 +138,25 @@ $PRBody = Get-PRBody -commits $Commits -preferred $Provider
 # 6. Create or Update Pull Request
 $PRTitle = if ($Title) { $Title } else { $CurrentBranch }
 
-if ($IsUpdate) {
-    Write-Host "Updating Pull Request #$($ExistingPR.number) on GitHub..."
-    gh pr edit $ExistingPR.number --title $PRTitle --body $PRBody
-} else {
-    Write-Host "Creating new Pull Request on GitHub..."
-    $ghArgs = @("pr", "create", "--title", $PRTitle, "--body", $PRBody)
-    if ($Draft) { $ghArgs += "--draft" }
-    & gh $ghArgs
+# Write the body to a UTF-8 temp file and use --body-file.
+# Passing multi-byte Unicode (emoji, special chars) as a --body argument is
+# unreliable across PowerShell versions and terminal encodings; a file avoids
+# all command-line argument encoding issues.
+$tempBodyFile = [System.IO.Path]::GetTempFileName()
+try {
+    [System.IO.File]::WriteAllText($tempBodyFile, $PRBody, [System.Text.Encoding]::UTF8)
+
+    if ($IsUpdate) {
+        Write-Host "Updating Pull Request #$($ExistingPR.number) on GitHub..."
+        gh pr edit $ExistingPR.number --title $PRTitle --body-file $tempBodyFile
+    } else {
+        Write-Host "Creating new Pull Request on GitHub..."
+        $ghArgs = @("pr", "create", "--title", $PRTitle, "--body-file", $tempBodyFile)
+        if ($Draft) { $ghArgs += "--draft" }
+        & gh $ghArgs
+    }
+} finally {
+    Remove-Item $tempBodyFile -ErrorAction SilentlyContinue
 }
 
 if ($LASTEXITCODE -eq 0) {
