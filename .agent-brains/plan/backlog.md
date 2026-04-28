@@ -5,7 +5,11 @@
 - [ ] Monitor bug reports and address UI/UX improvements.
 
 ## In Progress
-_(none)_
+- [ ] PR for `feature/pr-review-script` — `scripts/pr-review.ps1` AI code review script.
+
+## Atomic Plans
+- `modern-release-flow-status.md` — Phase 1 & 2 complete.
+- `pr-review-script.md` — AI code review script (✅ implemented, awaiting PR merge).
 
 ## Completed
 - [x] Initialized workspace via Centralized Agent Framework `project-initializer` skill.
