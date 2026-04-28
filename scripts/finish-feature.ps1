@@ -5,12 +5,31 @@
 .DESCRIPTION
     Preflights (all must pass before a PR is touched):
       1. Clean working tree  – no uncommitted changes
-      2. Rebase from main   – branch is up-to-date with origin/main
-      3. Build              – zero warnings, zero errors (-warnaserror)
-      4. Tests              – all xUnit tests pass
+      2. Commits ahead of main – branch must have at least one commit not in main
+      3. Rebase from main   – branch is up-to-date with origin/main
+      4. Build              – zero warnings, zero errors (-warnaserror)
+      5. Tests              – all xUnit tests pass
 
-    After all preflights pass the script generates an AI-assisted PR description
-    and creates (or updates) the GitHub PR.
+    First run (no PR yet):
+      Creates a new PR with an AI-generated full description.
+      Posts an initial marker comment containing the current HEAD SHA so future
+      runs can detect exactly which commits are "new".
+
+    Re-run (PR already exists):
+      Does NOT overwrite the PR body.
+      Instead, posts a structured update comment with:
+        - Preflight results (build/test status)
+        - List of commits added since the last finish-feature run
+        - AI-generated summary of those new commits
+        - Hidden machine-readable markers (<!-- finish-feature-update -->,
+          <!-- head-sha: SHA -->) for use by a future pr-review script.
+      If no new commits exist since the last update comment, exits cleanly
+      without posting a duplicate.
+
+    Future pr-review script contract (not implemented here):
+      Detects new PR creation or a new <!-- finish-feature-update --> comment.
+      Runs AI code-review on the diff since the SHA marker.
+      Posts findings as <!-- pr-review-findings --> comment for developer action.
 
 .PARAMETER Title
     Override the PR title. Defaults to the current branch name.
@@ -49,7 +68,7 @@ $OutputEncoding              = [System.Text.UTF8Encoding]::new($false)
 [Console]::InputEncoding    = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
 
-# ── Helper ────────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 function Write-Step([string]$msg) { Write-Host "`n▶ $msg" -ForegroundColor Cyan }
 function Write-Pass([string]$msg) { Write-Host "  ✅ $msg" -ForegroundColor Green }
 function Write-Fail([string]$msg) { Write-Host "  ❌ $msg" -ForegroundColor Red }
@@ -72,13 +91,22 @@ if (![string]::IsNullOrWhiteSpace($gitStatus)) {
 }
 Write-Pass "Working tree is clean"
 
-# ── 2. Rebase from main ───────────────────────────────────────────────────────
+# ── 2. Branch guard ───────────────────────────────────────────────────────────
 $CurrentBranch = (git branch --show-current)
 if ($CurrentBranch -eq "main" -or $CurrentBranch -eq "master") {
     Write-Fail "You are on '$CurrentBranch'. Switch to a feature or bugfix branch first."
     exit 1
 }
 
+Write-Step "Checking commits ahead of main..."
+$AllCommits = git log main..HEAD --oneline
+if ([string]::IsNullOrWhiteSpace($AllCommits)) {
+    Write-Fail "Nothing to PR — branch has no commits ahead of main."
+    exit 1
+}
+Write-Pass "Branch has commits ahead of main"
+
+# ── 3. Rebase from main ───────────────────────────────────────────────────────
 if ($SkipRebase) {
     Write-Host "`n⚠️  Rebase step skipped (-SkipRebase)" -ForegroundColor Yellow
 } else {
@@ -108,7 +136,7 @@ if ($SkipRebase) {
     }
 }
 
-# ── 3. Build (zero warnings, zero errors) ────────────────────────────────────
+# ── 4. Build (zero warnings, zero errors) ────────────────────────────────────
 Write-Step "Building solution (-warnaserror)..."
 $solutionFile = Get-ChildItem -Path (Split-Path $PSScriptRoot -Parent) -Filter "*.sln" -Recurse |
     Select-Object -First 1
@@ -130,7 +158,8 @@ if (-not $buildSuccess) {
 }
 Write-Pass ($buildSummary -join " | ")
 
-# ── 4. Tests ──────────────────────────────────────────────────────────────────
+# ── 5. Tests ──────────────────────────────────────────────────────────────────
+$testResultLine = "⏭️ skipped (-SkipTests)"
 if ($SkipTests) {
     Write-Host "`n⚠️  Test step skipped (-SkipTests)" -ForegroundColor Yellow
 } else {
@@ -146,10 +175,11 @@ if ($SkipTests) {
         Write-Host ($testSummary | Out-String)
         exit 1
     }
+    $testResultLine = "✅ " + ($testSummary | Out-String).Trim()
     Write-Pass ($testSummary | Out-String).Trim()
 }
 
-# ── 5. Check for existing PR ──────────────────────────────────────────────────
+# ── 6. Check for existing PR ──────────────────────────────────────────────────
 Write-Step "Checking for existing PR on branch: $CurrentBranch..."
 $ExistingPRJson = gh pr list --head $CurrentBranch --json number,state --jq ".[0]"
 $ExistingPR = if (![string]::IsNullOrWhiteSpace($ExistingPRJson) -and $ExistingPRJson -ne "null") {
@@ -158,31 +188,14 @@ $ExistingPR = if (![string]::IsNullOrWhiteSpace($ExistingPRJson) -and $ExistingP
 $IsUpdate = $null -ne $ExistingPR -and ![string]::IsNullOrWhiteSpace($ExistingPR.number)
 
 if ($IsUpdate) {
-    Write-Pass "Found existing PR #$($ExistingPR.number) ($($ExistingPR.state)) — will update"
+    Write-Pass "Found existing PR #$($ExistingPR.number) ($($ExistingPR.state)) — will post update comment"
 } else {
     Write-Pass "No existing PR — will create new"
 }
 
-# ── 6. Extract commits ────────────────────────────────────────────────────────
-Write-Step "Extracting commits against main..."
-$Commits = git log main..HEAD --oneline
-if ([string]::IsNullOrWhiteSpace($Commits)) {
-    Write-Fail "No commits found on this branch that are not in 'main'."
-    exit 1
-}
-Write-Host ($Commits | Out-String)
-
-# ── 7. Generate PR body via AI ────────────────────────────────────────────────
-function Get-PRBody {
-    param([string]$commits, [string]$preferred)
-
-    $prompt = @"
-You are an expert developer assistant. Generate a clean, professional GitHub Pull Request description in Markdown format based on the following commit messages.
-IMPORTANT: Return ONLY the Markdown content. Do not include any conversational preamble (like 'Here is a suggested...'), do not include CLI progress indicators, and do not include the '---' separators at the start/end.
-
-Commits:
-$commits
-"@
+# ── 7. AI text generation ─────────────────────────────────────────────────────
+function Invoke-AI {
+    param([string]$prompt, [string]$preferred)
 
     $tools = if ($preferred -eq "Copilot") { @("Copilot", "Gemini") } else { @("Gemini", "Copilot") }
     $rawResult = ""
@@ -193,12 +206,10 @@ $commits
         if ($tool -eq "Gemini") {
             if (Get-Command gemini -ErrorAction SilentlyContinue) {
                 try {
-                    Write-Host "  Generating description using Gemini..."
+                    Write-Host "  Generating using Gemini..."
                     $rawResult = ($prompt | gemini ask) -join "`n"
                     if (![string]::IsNullOrWhiteSpace($rawResult)) { break }
-                } catch {
-                    Write-Warning "Gemini failed."
-                }
+                } catch { Write-Warning "Gemini failed." }
             }
         }
 
@@ -208,72 +219,180 @@ $commits
 
             if ($hasGhCopilot) {
                 try {
-                    Write-Host "  Generating description using GitHub Copilot extension..."
+                    Write-Host "  Generating using GitHub Copilot extension..."
                     $rawResult = ($prompt | gh copilot explain --file -) -join "`n"
                     if (![string]::IsNullOrWhiteSpace($rawResult)) { break }
-                } catch {
-                    Write-Warning "GitHub Copilot extension failed."
-                }
+                } catch { Write-Warning "GitHub Copilot extension failed." }
             } elseif ($hasStandaloneCopilot) {
                 try {
-                    Write-Host "  Generating description using standalone Copilot CLI..."
+                    Write-Host "  Generating using standalone Copilot CLI..."
                     $rawResult = (copilot --prompt $prompt) -join "`n"
                     if (![string]::IsNullOrWhiteSpace($rawResult)) { break }
-                } catch {
-                    Write-Warning "Standalone Copilot CLI failed."
-                }
+                } catch { Write-Warning "Standalone Copilot CLI failed." }
             }
         }
     }
 
-    if ([string]::IsNullOrWhiteSpace($rawResult)) {
+    return $rawResult
+}
+
+function Clean-AIOutput([string]$raw, [string]$fallback) {
+    if ([string]::IsNullOrWhiteSpace($raw)) {
         Write-Warning "All AI providers failed. Using basic commit list."
-        return "## Changes`n`n" + ($commits -split "`n" | ForEach-Object { "- $_" } | Out-String)
+        return "## Changes`n`n" + ($fallback -split "`n" | ForEach-Object { "- $_" } | Out-String)
     }
 
-    Write-Host "  Cleaning up AI output..."
-    $cleaned = $rawResult
+    $cleaned = $raw
     $cleaned = $cleaned -replace "\r\n", "`n"
     $cleaned = $cleaned -replace "\r", "`n"
-    # Strip Copilot CLI agentic tool-use lines (box-drawing / bullet characters)
     $cleaned = $cleaned -replace "(?m)^[\u25CF\u2514\u251C\u2500\u2502\u252C\u2510\u250C\u2518\u2524\u253C]+.*$", ""
-    # Remove common CLI artefacts
     $cleaned = $cleaned -replace "(?m)^---\s*$", ""
     $cleaned = $cleaned -replace "(?m)^Suggested PR description:\s*$", ""
-    # Drop everything before the first Markdown heading
     $cleaned = $cleaned -replace "(?sm)^.*?(?=^#{1,6}\s|^Summary\b|^Changes\b)", ""
-    # Collapse 3+ consecutive blank lines
     $cleaned = $cleaned -replace "(?m)(\n\s*){3,}", "`n`n"
-
     return $cleaned.Trim()
 }
 
-Write-Step "Generating PR description..."
-$PRBody = Get-PRBody -commits $Commits -preferred $Provider
+# ── 8. Write body/comment to a temp file and submit ───────────────────────────
+function Submit-WithTempFile {
+    param([string]$content, [scriptblock]$action)
+    $tempFile = [System.IO.Path]::GetTempFileName()
+    try {
+        [System.IO.File]::WriteAllText($tempFile, $content, [System.Text.UTF8Encoding]::new($false))
+        & $action $tempFile
+    } finally {
+        Remove-Item $tempFile -ErrorAction SilentlyContinue
+    }
+}
 
-# ── 8. Create or update PR ────────────────────────────────────────────────────
-$PRTitle = if ($Title) { $Title } else { $CurrentBranch }
+$HeadSHA = (git rev-parse HEAD).Trim()
+$Timestamp = (Get-Date -Format "yyyy-MM-ddTHH:mm:sszzz")
+$BuildResultLine = "✅ " + ($buildSummary -join " | ")
 
-Write-Step "$(if ($IsUpdate) { 'Updating' } else { 'Creating' }) Pull Request..."
-$tempBodyFile = [System.IO.Path]::GetTempFileName()
-try {
-    [System.IO.File]::WriteAllText($tempBodyFile, $PRBody, [System.Text.UTF8Encoding]::new($false))
+if ($IsUpdate) {
+    # ── Update path: post a new comment ──────────────────────────────────────
 
-    if ($IsUpdate) {
-        gh pr edit $ExistingPR.number --title $PRTitle --body-file $tempBodyFile
+    Write-Step "Reading existing PR comments to detect last update SHA..."
+    $commentsJson = gh pr view $ExistingPR.number --json comments --jq ".comments[].body" 2>$null
+    $lastSHA = $null
+    if (![string]::IsNullOrWhiteSpace($commentsJson)) {
+        # Walk comments in reverse to find the most recent finish-feature-update marker
+        $allBodies = $commentsJson -split "(?=^)" | Where-Object { $_ -match "finish-feature-update" }
+        if ($allBodies) {
+            $lastComment = ($allBodies | Select-Object -Last 1)
+            if ($lastComment -match "<!--\s*head-sha:\s*([0-9a-f]{7,40})\s*-->") {
+                $lastSHA = $Matches[1]
+            }
+        }
+    }
+
+    # Determine "new" commits since last update (or all vs main if first update)
+    if ($lastSHA) {
+        Write-Host "  Last update SHA: $lastSHA"
+        $NewCommits = git log "${lastSHA}..HEAD" --oneline
     } else {
-        $ghArgs = @("pr", "create", "--title", $PRTitle, "--body-file", $tempBodyFile)
+        Write-Host "  No previous update comment found — using all commits vs main"
+        $NewCommits = $AllCommits
+    }
+
+    if ([string]::IsNullOrWhiteSpace($NewCommits)) {
+        Write-Pass "No new commits since last update comment — nothing to post."
+        exit 0
+    }
+
+    Write-Host "  New commits:`n$NewCommits"
+
+    Write-Step "Generating AI summary for new commits..."
+    $updatePrompt = @"
+You are an expert developer assistant. Write a concise GitHub PR update comment in Markdown summarising what changed based on these new commits.
+IMPORTANT: Return ONLY the Markdown content — no preamble, no '---' separators, no CLI artefacts.
+
+New commits:
+$NewCommits
+"@
+    $rawAI = Invoke-AI -prompt $updatePrompt -preferred $Provider
+    $aiSummary = Clean-AIOutput -raw $rawAI -fallback $NewCommits
+
+    # Build the formatted comment (machine markers go at the bottom)
+    $commitLines = ($NewCommits -split "`n" | Where-Object { $_ } | ForEach-Object { "- ``$_``" }) -join "`n"
+    $commentBody = @"
+## 🔄 Update — $Timestamp
+
+### Preflight Results
+- 🏗️ Build: $BuildResultLine
+- 🧪 Tests: $testResultLine
+
+### New Commits
+$commitLines
+
+### Summary
+$aiSummary
+
+<!-- finish-feature-update -->
+<!-- head-sha: $HeadSHA -->
+"@
+
+    Write-Step "Posting update comment on PR #$($ExistingPR.number)..."
+    Submit-WithTempFile -content $commentBody -action {
+        param($f)
+        gh pr comment $ExistingPR.number --body-file $f
+    }
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Pass "Update comment posted on PR #$($ExistingPR.number)"
+    } else {
+        Write-Fail "Failed to post PR comment."
+        exit 1
+    }
+
+} else {
+    # ── Create path: new PR with full AI description ──────────────────────────
+
+    Write-Step "Generating full PR description..."
+    $createPrompt = @"
+You are an expert developer assistant. Generate a clean, professional GitHub Pull Request description in Markdown format based on the following commit messages.
+IMPORTANT: Return ONLY the Markdown content. Do not include any conversational preamble (like 'Here is a suggested...'), do not include CLI progress indicators, and do not include the '---' separators at the start/end.
+
+Commits:
+$AllCommits
+"@
+    $rawAI = Invoke-AI -prompt $createPrompt -preferred $Provider
+    $PRBody = Clean-AIOutput -raw $rawAI -fallback $AllCommits
+
+    $PRTitle = if ($Title) { $Title } else { $CurrentBranch }
+
+    Write-Step "Creating Pull Request..."
+    Submit-WithTempFile -content $PRBody -action {
+        param($f)
+        $ghArgs = @("pr", "create", "--title", $PRTitle, "--body-file", $f)
         if ($Draft) { $ghArgs += "--draft" }
         & gh $ghArgs
     }
-} finally {
-    Remove-Item $tempBodyFile -ErrorAction SilentlyContinue
-}
 
-if ($LASTEXITCODE -eq 0) {
-    $action = if ($IsUpdate) { "updated" } else { "created" }
-    Write-Pass "Pull Request $action successfully!"
-} else {
-    Write-Fail "Failed to perform PR action via GitHub CLI."
-    exit 1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Failed to create PR via GitHub CLI."
+        exit 1
+    }
+    Write-Pass "Pull Request created successfully!"
+
+    # Post initial marker comment so the first re-run can diff correctly
+    Write-Step "Posting initial marker comment..."
+    $markerBody = @"
+<!-- finish-feature-update -->
+<!-- head-sha: $HeadSHA -->
+"@
+    $markerBody = $markerBody.Trim()
+    # Re-query to get the new PR number
+    $NewPRJson = gh pr list --head $CurrentBranch --json number --jq ".[0].number"
+    if (![string]::IsNullOrWhiteSpace($NewPRJson) -and $NewPRJson -ne "null") {
+        Submit-WithTempFile -content $markerBody -action {
+            param($f)
+            gh pr comment $NewPRJson --body-file $f
+        }
+        if ($LASTEXITCODE -eq 0) {
+            Write-Pass "Marker comment posted (HEAD: $HeadSHA)"
+        } else {
+            Write-Host "  ⚠️  Could not post marker comment — re-runs will fall back to all commits vs main." -ForegroundColor Yellow
+        }
+    }
 }
