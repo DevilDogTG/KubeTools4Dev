@@ -76,9 +76,7 @@ $commits
             if ($hasGhCopilot) {
                 try {
                     Write-Host "Generating description using GitHub Copilot CLI (extension)..."
-                    # Note: 'gh copilot explain' expects code or a concept. 
-                    # For general generation, we might need a specific command if 'explain' doesn't fit well.
-                    # Using a temporary file for the prompt can help with shell escaping.
+                    # Using 'gh copilot explain' with redirected input
                     $result = $prompt | gh copilot explain --file - 
                     if (![string]::IsNullOrWhiteSpace($result)) { return $result }
                 } catch {
@@ -87,7 +85,8 @@ $commits
             } elseif ($hasStandaloneCopilot) {
                 try {
                     Write-Host "Generating description using standalone Copilot CLI..."
-                    $result = $prompt | copilot suggest "PR description"
+                    # Correcting syntax based on error: use -i for input in non-interactive mode
+                    $result = $prompt | copilot -i "suggest PR description"
                     if (![string]::IsNullOrWhiteSpace($result)) { return $result }
                 } catch {
                     Write-Warning "Standalone Copilot CLI failed."
