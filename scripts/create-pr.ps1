@@ -7,8 +7,13 @@ param (
     [switch]$Draft
 )
 
-# Force UTF8 encoding for all output to prevent unreadable characters in PRs
-$OutputEncoding = [System.Text.UTF8Encoding]::new()
+# Force UTF-8 for all I/O with external processes:
+# - $OutputEncoding:          bytes written TO external commands (stdin pipe)
+# - [Console]::OutputEncoding: bytes read FROM external commands (stdout capture)
+# Without both, Windows PowerShell 5.x uses the OEM codepage (e.g. CP437) to
+# decode stdout, corrupting multi-byte Unicode (emoji, etc.) before any cleanup runs.
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
 
 # 1. Environment Checks
@@ -144,7 +149,7 @@ $PRTitle = if ($Title) { $Title } else { $CurrentBranch }
 # all command-line argument encoding issues.
 $tempBodyFile = [System.IO.Path]::GetTempFileName()
 try {
-    [System.IO.File]::WriteAllText($tempBodyFile, $PRBody, [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText($tempBodyFile, $PRBody, [System.Text.UTF8Encoding]::new($false))
 
     if ($IsUpdate) {
         Write-Host "Updating Pull Request #$($ExistingPR.number) on GitHub..."
