@@ -29,7 +29,8 @@ if (![string]::IsNullOrWhiteSpace($gitStatus)) {
 
 # 3. Check for Existing PR
 Write-Host "Checking for existing PR for branch: $CurrentBranch..."
-$ExistingPR = gh pr list --head $CurrentBranch --json number,state --jq ".[0]" | ConvertFrom-Json
+$ExistingPRJson = gh pr list --head $CurrentBranch --json number,state --jq ".[0]"
+$ExistingPR = if (![string]::IsNullOrWhiteSpace($ExistingPRJson) -and $ExistingPRJson -ne "null") { $ExistingPRJson | ConvertFrom-Json } else { $null }
 $IsUpdate = $null -ne $ExistingPR -and ![string]::IsNullOrWhiteSpace($ExistingPR.number)
 
 if ($IsUpdate) {
@@ -107,10 +108,12 @@ $commits
 
     Write-Host "Cleaning up AI-generated content..."
     $cleaned = $rawResult
-    if ($cleaned -match "(?s).*?(##.*|Summary.*)") {
-        $cleaned = $Matches[1]
-    }
-    $cleaned = $cleaned -replace "^[\s\S]*?(?=##|###|Summary|Changes)", ""
+    
+    # Robustly remove preambles using -replace instead of $Matches indexing
+    # This strips everything before the first line that starts with #, Summary, or Changes
+    $cleaned = $cleaned -replace "(?s)^.*?(?=^#|^Summary|^Changes)", ""
+    
+    # Remove common CLI status markers and separators
     $cleaned = $cleaned -replace "(?m)^---.*$", ""
     $cleaned = $cleaned -replace "Suggested PR description:", ""
 
