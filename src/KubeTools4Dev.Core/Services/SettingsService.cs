@@ -56,15 +56,33 @@ public class SettingsService : ISettingsService
     /// </summary>
     /// <param name="logger">The logger.</param>
     public SettingsService(ILogger<SettingsService> logger)
+        : this(logger, filePath: null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SettingsService" /> class with an explicit file path.
+    /// Intended for use in tests or scenarios where the default AppData path must be overridden.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    /// <param name="filePath">The full path to the settings file. When <c>null</c>, defaults to the standard AppData location.</param>
+    internal SettingsService(ILogger<SettingsService> logger, string? filePath)
     {
         _logger = logger;
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var folder = Path.Combine(appData, FolderName);
-        if (!Directory.Exists(folder))
+        if (filePath != null)
         {
-            Directory.CreateDirectory(folder);
+            _filePath = filePath;
         }
-        _filePath = Path.Combine(folder, FileName);
+        else
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var folder = Path.Combine(appData, FolderName);
+            if (!Directory.Exists(folder))
+            {
+                Directory.CreateDirectory(folder);
+            }
+            _filePath = Path.Combine(folder, FileName);
+        }
         Load();
     }
 
