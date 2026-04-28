@@ -69,7 +69,7 @@ $commits
             if (Get-Command gemini -ErrorAction SilentlyContinue) {
                 try {
                     Write-Host "Generating description using Gemini..."
-                    $rawResult = $prompt | gemini ask
+                    $rawResult = ($prompt | gemini ask) -join "`n"
                     if (![string]::IsNullOrWhiteSpace($rawResult)) { break }
                 } catch {
                     Write-Warning "Gemini failed."
@@ -84,7 +84,7 @@ $commits
             if ($hasGhCopilot) {
                 try {
                     Write-Host "Generating description using GitHub Copilot extension..."
-                    $rawResult = $prompt | gh copilot explain --file - 
+                    $rawResult = ($prompt | gh copilot explain --file -) -join "`n"
                     if (![string]::IsNullOrWhiteSpace($rawResult)) { break }
                 } catch {
                     Write-Warning "GitHub Copilot extension failed."
@@ -92,7 +92,7 @@ $commits
             } elseif ($hasStandaloneCopilot) {
                 try {
                     Write-Host "Generating description using standalone Copilot CLI..."
-                    $rawResult = copilot --prompt $prompt
+                    $rawResult = (copilot --prompt $prompt) -join "`n"
                     if (![string]::IsNullOrWhiteSpace($rawResult)) { break }
                 } catch {
                     Write-Warning "Standalone Copilot CLI failed."
@@ -108,14 +108,27 @@ $commits
 
     Write-Host "Cleaning up AI-generated content..."
     $cleaned = $rawResult
-    
-    # Robustly remove preambles using -replace instead of $Matches indexing
-    # This strips everything before the first line that starts with #, Summary, or Changes
-    $cleaned = $cleaned -replace "(?s)^.*?(?=^#|^Summary|^Changes)", ""
-    
+
+    # Normalize line endings to LF
+    $cleaned = $cleaned -replace "\r\n", "`n"
+    $cleaned = $cleaned -replace "\r", "`n"
+
+    # Remove Copilot CLI agentic tool-use lines.
+    # These are emitted as stdout and look like:
+    #   "● Tool description └ shell command... └ N lines..."
+    # The leading characters are Unicode box/bullet symbols (●=U+25CF, └=U+2514, ├=U+251C, etc.)
+    $cleaned = $cleaned -replace "(?m)^[\u25CF\u2514\u251C\u2500\u2502\u252C\u2510\u250C\u2518\u2524\u253C]+.*$", ""
+
     # Remove common CLI status markers and separators
-    $cleaned = $cleaned -replace "(?m)^---.*$", ""
-    $cleaned = $cleaned -replace "Suggested PR description:", ""
+    $cleaned = $cleaned -replace "(?m)^---\s*$", ""
+    $cleaned = $cleaned -replace "(?m)^Suggested PR description:\s*$", ""
+
+    # Strip everything before the first Markdown heading or known section header.
+    # (?sm): (?s) lets .* span newlines; (?m) makes ^ match at line starts.
+    $cleaned = $cleaned -replace "(?sm)^.*?(?=^#{1,6}\s|^Summary\b|^Changes\b)", ""
+
+    # Collapse 3+ consecutive blank lines down to one blank line
+    $cleaned = $cleaned -replace "(?m)(\n\s*){3,}", "`n`n"
 
     return $cleaned.Trim()
 }
