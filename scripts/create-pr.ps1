@@ -52,34 +52,48 @@ $commits
     $tools = if ($preferred -eq "Copilot") { @("Copilot", "Gemini") } else { @("Gemini", "Copilot") }
 
     foreach ($tool in $tools) {
+        Write-Host "Checking availability of $tool..."
+
         if ($tool -eq "Gemini") {
             if (Get-Command gemini -ErrorAction SilentlyContinue) {
                 try {
-                    Write-Host "Trying Gemini..."
+                    Write-Host "Generating description using Gemini..."
                     $result = $prompt | gemini ask
                     if (![string]::IsNullOrWhiteSpace($result)) { return $result }
                 } catch {
-                    Write-Warning "Gemini execution failed."
+                    Write-Warning "Gemini failed to generate content."
                 }
             } else {
-                Write-Verbose "Gemini CLI not found."
+                Write-Host "Gemini CLI ('gemini') not found."
             }
         }
 
         if ($tool -eq "Copilot") {
-            # Check for gh copilot extension
-            $hasCopilot = gh extension list | Select-String "github/gh-copilot"
-            if ($hasCopilot) {
+            # Check for gh copilot extension first
+            $hasGhCopilot = (gh extension list | Select-String "copilot")
+            $hasStandaloneCopilot = (Get-Command copilot -ErrorAction SilentlyContinue)
+
+            if ($hasGhCopilot) {
                 try {
-                    Write-Host "Trying Copilot (via gh copilot explain)..."
-                    # Using 'explain' as a general-purpose prompt handler for the CLI
-                    $result = gh copilot explain $prompt
+                    Write-Host "Generating description using GitHub Copilot CLI (extension)..."
+                    # Note: 'gh copilot explain' expects code or a concept. 
+                    # For general generation, we might need a specific command if 'explain' doesn't fit well.
+                    # Using a temporary file for the prompt can help with shell escaping.
+                    $result = $prompt | gh copilot explain --file - 
                     if (![string]::IsNullOrWhiteSpace($result)) { return $result }
                 } catch {
-                    Write-Warning "Copilot execution failed."
+                    Write-Warning "GitHub Copilot extension failed."
+                }
+            } elseif ($hasStandaloneCopilot) {
+                try {
+                    Write-Host "Generating description using standalone Copilot CLI..."
+                    $result = $prompt | copilot suggest "PR description"
+                    if (![string]::IsNullOrWhiteSpace($result)) { return $result }
+                } catch {
+                    Write-Warning "Standalone Copilot CLI failed."
                 }
             } else {
-                Write-Verbose "GitHub Copilot CLI extension not found."
+                Write-Host "Copilot CLI (gh extension or standalone) not found."
             }
         }
     }
