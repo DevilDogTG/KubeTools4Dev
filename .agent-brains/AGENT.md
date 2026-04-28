@@ -3,6 +3,7 @@ version: 1.0
 profiles:
   - base-developer
   - csharp-developer
+  - kubernetes-devops
 strict_override: false
 ---
 
