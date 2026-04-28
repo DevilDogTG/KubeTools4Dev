@@ -40,7 +40,7 @@
 						Spacing="10"
 						Margin="10">
 				<TextBox Text="{Binding FilterText}"
-						 Watermark="Filter pods..."
+						 PlaceholderText="Filter pods..."
 						 Width="200" Height="20"/>
 				<TextBlock Text="{Binding Pods.Count, StringFormat='Total: {0}'}"
 						   VerticalAlignment="Center"/>
