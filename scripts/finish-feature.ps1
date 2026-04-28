@@ -266,7 +266,7 @@ function Invoke-AI {
     return $rawResult
 }
 
-function Clean-AIOutput([string]$raw, [string]$fallback) {
+function Format-AIOutput([string]$raw, [string]$fallback) {
     if ([string]::IsNullOrWhiteSpace($raw)) {
         Write-Warning "All AI providers failed. Using basic commit list."
         return "## Changes`n`n" + ($fallback -split "`n" | ForEach-Object { "- $_" } | Out-String)
@@ -399,7 +399,7 @@ $($ctx.DiffStat)
 $($ctx.Diff)
 "@
     $rawAI = Invoke-AI -prompt $updatePrompt -preferred $Provider
-    $aiSummary = Clean-AIOutput -raw $rawAI -fallback $ctx.ShortLog
+    $aiSummary = Format-AIOutput -raw $rawAI -fallback $ctx.ShortLog
 
     $commitLines = ($ctx.ShortLog -split "`n" | Where-Object { $_ } | ForEach-Object { "- ``$_``" }) -join "`n"
     $commentBody = @"
@@ -488,7 +488,7 @@ $($ctx.DiffStat)
 $($ctx.Diff)
 "@
     $rawAI = Invoke-AI -prompt $createPrompt -preferred $Provider
-    $PRBody = Clean-AIOutput -raw $rawAI -fallback $ctx.ShortLog
+    $PRBody = Format-AIOutput -raw $rawAI -fallback $ctx.ShortLog
 
     Write-Step "Creating Pull Request..."
     Submit-WithTempFile -content $PRBody -action {
