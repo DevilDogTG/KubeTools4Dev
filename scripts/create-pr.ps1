@@ -7,13 +7,18 @@ param (
     [switch]$Draft
 )
 
-# Force UTF-8 for all I/O with external processes:
-# - $OutputEncoding:          bytes written TO external commands (stdin pipe)
-# - [Console]::OutputEncoding: bytes read FROM external commands (stdout capture)
-# Without both, Windows PowerShell 5.x uses the OEM codepage (e.g. CP437) to
-# decode stdout, corrupting multi-byte Unicode (emoji, etc.) before any cleanup runs.
+# Force the Windows console code page to UTF-8 (65001).
+# This is the key step that tells external programs (Gemini CLI, gh copilot, etc.)
+# to WRITE their stdout as UTF-8. Without it, they use the system OEM codepage
+# (e.g. CP874 on Thai Windows), corrupting emoji before PowerShell ever reads them.
+chcp 65001 | Out-Null
+
+# $OutputEncoding  = bytes PowerShell writes to child process stdin (pipe).
+# [Console]::OutputEncoding = bytes PowerShell reads from child process stdout.
+# Both must match the code page set above.
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::InputEncoding  = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
 
 # 1. Environment Checks
