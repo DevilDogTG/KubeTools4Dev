@@ -254,11 +254,15 @@ function Invoke-AI {
                     if (![string]::IsNullOrWhiteSpace($rawResult)) { break }
                 } catch { Write-Warning "GitHub Copilot extension failed." }
             } elseif ($hasStandaloneCopilot) {
+                # Write prompt to a temp file to avoid command-line length limits
+                $promptFile = [System.IO.Path]::GetTempFileName()
                 try {
+                    [System.IO.File]::WriteAllText($promptFile, $prompt, [System.Text.UTF8Encoding]::new($false))
                     Write-Host "  Generating using standalone Copilot CLI..."
-                    $rawResult = (copilot --prompt $prompt) -join "`n"
+                    $rawResult = (copilot explain --file $promptFile) -join "`n"
                     if (![string]::IsNullOrWhiteSpace($rawResult)) { break }
                 } catch { Write-Warning "Standalone Copilot CLI failed." }
+                finally { Remove-Item $promptFile -ErrorAction SilentlyContinue }
             }
         }
     }
