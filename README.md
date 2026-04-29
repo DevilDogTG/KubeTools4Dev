@@ -67,6 +67,15 @@ Before running KubeTools4Dev, ensure you have the following installed:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## Developer Scripts
+
+The `scripts/` directory contains PowerShell workflow scripts for contributors. Full documentation is available in [`scripts/documents/`](scripts/documents/).
+
+| Script | Description |
+|--------|-------------|
+| [`finish-feature.ps1`](scripts/finish-feature.ps1) | Runs preflights (clean tree, rebase, build, test) then creates or updates the GitHub PR with an AI-generated description. |
+| [`pr-review.ps1`](scripts/pr-review.ps1) | Reviews the PR diff with AI and posts structured findings (🔴 Critical / 🟡 Warning / 🔵 Info) as a GitHub comment. |
+
 ## Author
 
 **Supawat Tanmanee** (DevDogs)

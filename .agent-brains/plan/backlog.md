@@ -6,6 +6,7 @@
 
 ## In Progress
 - [ ] PR for `feature/pr-review-script` — `scripts/pr-review.ps1` AI code review script.
+- [ ] Write and commit script documentation under `scripts/documents/`.
 
 ## Atomic Plans
 - `modern-release-flow-status.md` — Phase 1 & 2 complete.
