@@ -1,0 +1,136 @@
+# Triggered when a vX.Y.Z tag is pushed to main (by tag.yml after a release PR merge).
+# Builds a self-contained Windows installer with Velopack and creates a GitHub Release.
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    name: Build & Publish Installer
+    runs-on: windows-2022
+    permissions:
+      contents: write
+
+    env:
+      SIGNING_CERT_BASE64: ${{ secrets.SIGNING_CERT_BASE64 }}
+      SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $v = (Get-Content version.json | ConvertFrom-Json).version
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+          echo "tag=v$v" >> $env:GITHUB_OUTPUT
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build & Test
+        run: |
+          dotnet build --no-restore --configuration Release -warnaserror
+          dotnet test  --no-build  --configuration Release
+
+      - name: Publish (self-contained win-x64)
+        run: >
+          dotnet publish src/KubeTools4Dev/KubeTools4Dev.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          --output publish/
+          /p:DebugType=embedded
+
+      - name: Install Velopack CLI
+        run: dotnet tool install --global vpk
+
+      - name: Pack installer
+        shell: pwsh
+        run: |
+          vpk pack `
+            --packId   KubeTools4Dev `
+            --packVersion "${{ steps.version.outputs.version }}" `
+            --packDir  publish/ `
+            --mainExe  KubeTools4Dev.exe `
+            --icon     src/KubeTools4Dev/Assets/app-icon.ico `
+            --outputDir installer/out/
+
+      - name: Sign main EXE
+        if: ${{ env.SIGNING_CERT_BASE64 != '' }}
+        shell: pwsh
+        run: |
+          $certPath = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+          [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:SIGNING_CERT_BASE64))
+
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter signtool.exe |
+                        Where-Object { $_.FullName -like '*x64*' } |
+                        Sort-Object FullName -Descending |
+                        Select-Object -First 1 -ExpandProperty FullName
+          if ($null -eq $signtool) { throw 'signtool.exe not found in Windows SDK. Ensure windows-2022 runner is used.' }
+
+          & $signtool sign /fd SHA256 /p $env:SIGNING_CERT_PASSWORD /f $certPath `
+            /t http://timestamp.digicert.com `
+            publish/KubeTools4Dev.exe
+
+          if ($LASTEXITCODE -ne 0) { throw "signtool failed for main EXE" }
+          Write-Host 'Signed: publish/KubeTools4Dev.exe' -ForegroundColor Green
+          Remove-Item $certPath -Force
+
+      - name: Sign installer EXE
+        if: ${{ env.SIGNING_CERT_BASE64 != '' }}
+        shell: pwsh
+        run: |
+          $certPath = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+          [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:SIGNING_CERT_BASE64))
+
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter signtool.exe |
+                        Where-Object { $_.FullName -like '*x64*' } |
+                        Sort-Object FullName -Descending |
+                        Select-Object -First 1 -ExpandProperty FullName
+          if ($null -eq $signtool) { throw 'signtool.exe not found in Windows SDK. Ensure windows-2022 runner is used.' }
+
+          $setup = Get-ChildItem 'installer/out/' -Filter '*Setup.exe' | Select-Object -First 1
+          if ($null -eq $setup) { throw 'No *-Setup.exe found in installer/out/ — vpk pack may have failed.' }
+          & $signtool sign /fd SHA256 /p $env:SIGNING_CERT_PASSWORD /f $certPath `
+            /t http://timestamp.digicert.com `
+            $setup.FullName
+
+          if ($LASTEXITCODE -ne 0) { throw "signtool failed for installer" }
+          Write-Host "Signed: $($setup.Name)" -ForegroundColor Green
+          Remove-Item $certPath -Force
+
+      - name: Rename artifacts
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem "installer/out/" -Filter "*Setup.exe" | Select-Object -First 1
+          if ($setup) {
+            Rename-Item -Path $setup.FullName -NewName "KubeTools4Dev-Setup-${{ steps.version.outputs.version }}.exe"
+          }
+          $portable = Get-ChildItem "installer/out/" -Filter "*Portable.zip" | Select-Object -First 1
+          if ($portable) {
+            Rename-Item -Path $portable.FullName -NewName "KubeTools4Dev-Portable-${{ steps.version.outputs.version }}.zip"
+          }
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: KubeTools4Dev ${{ steps.version.outputs.tag }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            installer/out/*.exe
+            installer/out/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
