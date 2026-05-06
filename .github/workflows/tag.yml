@@ -1,0 +1,50 @@
+# Auto-tags main after a release/vX.Y.Z PR is merged.
+#
+# Triggered by: a PR targeting main being merged where the head branch starts with release/.
+# Reads version.json from main, creates and pushes a vX.Y.Z git tag on the merge commit.
+name: Tag Release
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+jobs:
+  tag:
+    name: Create version tag
+    if: >
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'release/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(python3 -c "import json; print(json.load(open('version.json'))['version'])")
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Summary
+        run: |
+          echo "## Tag ${{ steps.version.outputs.tag }} created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Tag \`${{ steps.version.outputs.tag }}\` pushed to \`main\`." >> $GITHUB_STEP_SUMMARY
