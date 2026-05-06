@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options: [patch, minor, major]
+      release_notes:
+        description: 'Optional release notes (supports markdown)'
+        required: false
+        type: string
+
+jobs:
+  create-release-branch:
+    name: Bump version & create release branch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Compute new version
+        id: version
+        run: |
+          CURRENT=$(python3 -c "import json,sys; d=json.load(open('version.json')); print(d['version'])")
+          MAJOR=$(echo $CURRENT | cut -d. -f1)
+          MINOR=$(echo $CURRENT | cut -d. -f2)
+          PATCH=$(echo $CURRENT | cut -d. -f3)
+
+          case "${{ inputs.version_type }}" in
+            major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH+1)) ;;
+          esac
+
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          echo "current=${CURRENT}" >> $GITHUB_OUTPUT
+          echo "new=${NEW_VERSION}"  >> $GITHUB_OUTPUT
+          echo "branch=release/v${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${NEW_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Create release branch
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b ${{ steps.version.outputs.branch }}
+
+      - name: Bump version.json
+        run: |
+          python3 -c "
+          import json
+          with open('version.json', 'r') as f:
+              data = json.load(f)
+          data['version'] = '${{ steps.version.outputs.new }}'
+          with open('version.json', 'w') as f:
+              json.dump(data, f, indent=2)
+              f.write('\n')
+          "
+
+      - name: Bump KubeTools4Dev.csproj
+        run: |
+          python3 -c "
+          import re
+          path = 'src/KubeTools4Dev/KubeTools4Dev.csproj'
+          with open(path, 'r') as f:
+              content = f.read()
+          new_content = re.sub(r'<Version>.*?</Version>', f'<Version>${{ steps.version.outputs.new }}</Version>', content)
+          with open(path, 'w') as f:
+              f.write(new_content)
+          "
+
+      - name: Commit & Push
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          git add version.json src/KubeTools4Dev/KubeTools4Dev.csproj
+          git commit -m "chore: bump version to ${{ steps.version.outputs.new }}"
+          git push origin ${{ steps.version.outputs.branch }}
+
+      - name: Open PR → main
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          NOTES="${{ inputs.release_notes }}"
+          BODY="## Release ${{ steps.version.outputs.tag }}
+
+          **Version bump**: \`${{ steps.version.outputs.current }}\` → \`${{ steps.version.outputs.new }}\`
+          **Type**: ${{ inputs.version_type }}
+
+          ${NOTES:+### Release Notes
+          ${NOTES}}
+
+          ---
+          Merge this PR into \`main\` (rebase merge) to trigger tag creation."
+
+          gh pr create \
+            --base main \
+            --head "${{ steps.version.outputs.branch }}" \
+            --title "Release ${{ steps.version.outputs.tag }}" \
+            --body "$BODY"
+
+      - name: Summary
+        run: |
+          echo "## Release ${{ steps.version.outputs.tag }} prepared" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| | |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Previous version | \`${{ steps.version.outputs.current }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| New version | \`${{ steps.version.outputs.new }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Release branch | \`${{ steps.version.outputs.branch }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next step:**" >> $GITHUB_STEP_SUMMARY
+          echo "Merge the PR into \`main\` (rebase merge) to trigger tag creation." >> $GITHUB_STEP_SUMMARY
