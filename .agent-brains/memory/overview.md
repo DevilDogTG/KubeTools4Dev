@@ -9,7 +9,11 @@ KubeTools4Dev is a cross-platform desktop application built with Avalonia UI and
 
 ## Developer Workflow (Modern Release Flow)
 Trunk-based development off `main`.
-- **Feature script**: `scripts/finish-feature.ps1` — runs preflight checks (clean tree, rebase from main, `-warnaserror` build, `dotnet test`) then creates/updates the PR via `gh`.
+- **Release workflow**: `scripts/finish-feature.ps1` (or manual equivalent) — runs preflight checks (clean tree, rebase from main, `-warnaserror` build, `dotnet test`) then creates/updates the PR via `gh`.
+- **Version Management**: Uses a hybrid model where both `version.json` (at root) and `src/KubeTools4Dev/KubeTools4Dev.csproj` are maintained. 
+- **Automated Releases**:
+  - `release.yml`: Manual trigger for version bumping (patch/minor/major). Updates both version files and opens a release PR.
+  - `tag.yml`: Automatically tags the merge commit with `vX.Y.Z` when a release PR is merged into `main`.
 - **PR creation**: Generates AI title (conventional-commit style) + rich body (Overview / What's Changed / Files Changed / Testing) using full commit log + `git diff --stat` + truncated diff (6000 char cap).
 - **PR update (re-run)**: Posts a structured `<!-- finish-feature-update -->` comment with preflight results, new commits, AI summary, and `<!-- head-sha: SHA -->` marker. Does NOT overwrite the PR body.
 - **PR review script**: `scripts/pr-review.ps1` — reads `<!-- finish-feature-update -->` marker for base SHA, runs AI code review, posts `<!-- pr-review-findings -->` comment with 🔴/🟡/🔵 severity findings and `<!-- review-status: approved|needs-work -->` + `<!-- review-sha: SHA -->` markers. Detects developer replies for re-review loop.
@@ -18,4 +22,5 @@ Trunk-based development off `main`.
 
 ## Current Open PRs
 - PR #18 (`feature/test-coverage`) — test coverage + finish-feature script enhancements. Awaiting merge.
+- PR #22 (`feature/align-release-flow`) — aligned release flow and versioning with JoystickGremlinSharp.
 - `feature/pr-review-script` — new `scripts/pr-review.ps1` AI code review script. Awaiting PR.
