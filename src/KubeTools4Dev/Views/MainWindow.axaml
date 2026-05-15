@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="using:KubeTools4Dev.Views"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+        mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="700"
         x:Class="KubeTools4Dev.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="avares://KubeTools4Dev/Assets/app-icon.png"
@@ -29,17 +29,34 @@
              </Grid>
         </Border>
 
-        <!-- Main Content -->
-        <TabControl Grid.Row="1" Margin="3">
-            <TabItem Header="Pods">
-                <views:PodListView DataContext="{Binding PodList}"/>
-            </TabItem>
-            <TabItem Header="Services">
-                <views:ServiceListView DataContext="{Binding ServiceList}"/>
-            </TabItem>
-            <TabItem Header="Settings">
-                <views:SettingsView DataContext="{Binding Settings}"/>
-            </TabItem>
-        </TabControl>
+        <!-- Body: Sidebar + Content -->
+        <Grid Grid.Row="1" ColumnDefinitions="180, *" Margin="5">
+
+            <!-- LEFT SIDEBAR NAVIGATION -->
+            <Border Grid.Column="0" Classes="SidebarNav" CornerRadius="4" Margin="0,0,5,0">
+                <ListBox SelectedIndex="{Binding SelectedNavIndex, Mode=TwoWay}"
+                         Classes="SidebarNavList">
+                    <ListBoxItem Classes="SidebarNavItem" Content="Pods"/>
+                    <ListBoxItem Classes="SidebarNavItem" Content="Services"/>
+                    <ListBoxItem Classes="SidebarNavItem" Content="Settings"/>
+                </ListBox>
+            </Border>
+
+            <!-- MAIN CONTENT AREA -->
+            <Border Grid.Column="1" Background="{DynamicResource SemiColorBackground0}" CornerRadius="4">
+                <Panel>
+                    <Panel IsVisible="{Binding IsPodsVisible}">
+                        <views:PodListView DataContext="{Binding PodList}"/>
+                    </Panel>
+                    <Panel IsVisible="{Binding IsServicesVisible}">
+                        <views:ServiceListView DataContext="{Binding ServiceList}"/>
+                    </Panel>
+                    <Panel IsVisible="{Binding IsSettingsVisible}">
+                        <views:SettingsView DataContext="{Binding Settings}"/>
+                    </Panel>
+                </Panel>
+            </Border>
+
+        </Grid>
     </Grid>
 </Window>

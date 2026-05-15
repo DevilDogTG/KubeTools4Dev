@@ -24,5 +24,41 @@
         <Style Selector="Button.Danger:disabled /template/ ContentPresenter">
             <Setter Property="Background" Value="#1F000000"/> <!-- Faded black/gray -->
         </Style>
+
+        <!-- Left Sidebar Navigation -->
+        <Style Selector="Border.SidebarNav">
+            <Setter Property="Background" Value="{DynamicResource SemiColorBackground0}"/>
+        </Style>
+
+        <Style Selector="ListBox.SidebarNavList">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="6,8"/>
+        </Style>
+
+        <Style Selector="ListBoxItem.SidebarNavItem">
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style Selector="ListBoxItem.SidebarNavItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PrimaryHueLightBrush}"/>
+        </Style>
+
+        <Style Selector="ListBoxItem.SidebarNavItem:selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PrimaryHueMidBrush}"/>
+        </Style>
+        <Style Selector="ListBoxItem.SidebarNavItem:selected">
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryHueMidForegroundBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style Selector="ListBoxItem.SidebarNavItem:selected:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PrimaryHueDarkBrush}"/>
+        </Style>
     </Application.Styles>
 </Application>
