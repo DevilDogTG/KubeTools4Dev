@@ -36,6 +36,26 @@ public partial class MainViewModel : ViewModelBase
     private bool _isConnected;
 
     /// <summary>
+    /// The selected navigation index (0=Pods, 1=Services, 2=Settings).
+    /// </summary>
+    [ObservableProperty]
+    private int _selectedNavIndex = 0;
+
+    /// <summary>Gets a value indicating whether the Pods view is visible.</summary>
+    public bool IsPodsVisible => SelectedNavIndex == 0;
+    /// <summary>Gets a value indicating whether the Services view is visible.</summary>
+    public bool IsServicesVisible => SelectedNavIndex == 1;
+    /// <summary>Gets a value indicating whether the Settings view is visible.</summary>
+    public bool IsSettingsVisible => SelectedNavIndex == 2;
+
+    partial void OnSelectedNavIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsPodsVisible));
+        OnPropertyChanged(nameof(IsServicesVisible));
+        OnPropertyChanged(nameof(IsSettingsVisible));
+    }
+
+    /// <summary>
     /// The pod list
     /// </summary>
     [ObservableProperty]
