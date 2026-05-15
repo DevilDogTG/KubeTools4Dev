@@ -30,14 +30,25 @@
             <Setter Property="Background" Value="{DynamicResource SemiColorBackground0}"/>
         </Style>
 
+        <Style Selector="Button.SidebarToggle">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+        </Style>
+        <Style Selector="Button.SidebarToggle:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PrimaryHueLightBrush}"/>
+        </Style>
+
         <Style Selector="ListBox.SidebarNavList">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="6,8"/>
+            <Setter Property="Padding" Value="6,4"/>
         </Style>
 
         <Style Selector="ListBoxItem.SidebarNavItem">
-            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Padding" Value="10,10"/>
             <Setter Property="CornerRadius" Value="4"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="Medium"/>

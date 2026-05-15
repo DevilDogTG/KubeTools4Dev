@@ -36,6 +36,23 @@ public partial class MainViewModel : ViewModelBase
     private bool _isConnected;
 
     /// <summary>
+    /// Whether the left sidebar is in expanded (icon + text) or collapsed (icon only) state.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSidebarExpanded = true;
+
+    /// <summary>Gets the pixel width of the sidebar based on its expanded/collapsed state.</summary>
+    public double SidebarWidth => IsSidebarExpanded ? 180.0 : 52.0;
+
+    partial void OnIsSidebarExpandedChanged(bool value) => OnPropertyChanged(nameof(SidebarWidth));
+
+    /// <summary>
+    /// Toggles the sidebar between expanded and collapsed states.
+    /// </summary>
+    [RelayCommand]
+    private void ToggleSidebar() => IsSidebarExpanded = !IsSidebarExpanded;
+
+    /// <summary>
     /// The selected navigation index (0=Pods, 1=Services, 2=Settings).
     /// </summary>
     [ObservableProperty]
