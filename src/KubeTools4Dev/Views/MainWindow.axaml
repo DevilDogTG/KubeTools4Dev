@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="using:KubeTools4Dev.Views"
+        xmlns:material="using:Material.Icons.Avalonia"
         mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="700"
         x:Class="KubeTools4Dev.Views.MainWindow"
         x:DataType="vm:MainViewModel"
@@ -30,16 +31,58 @@
         </Border>
 
         <!-- Body: Sidebar + Content -->
-        <Grid Grid.Row="1" ColumnDefinitions="180, *" Margin="5">
+        <Grid Grid.Row="1" ColumnDefinitions="Auto, *" Margin="5">
 
             <!-- LEFT SIDEBAR NAVIGATION -->
-            <Border Grid.Column="0" Classes="SidebarNav" CornerRadius="4" Margin="0,0,5,0">
-                <ListBox SelectedIndex="{Binding SelectedNavIndex, Mode=TwoWay}"
-                         Classes="SidebarNavList">
-                    <ListBoxItem Classes="SidebarNavItem" Content="Pods"/>
-                    <ListBoxItem Classes="SidebarNavItem" Content="Services"/>
-                    <ListBoxItem Classes="SidebarNavItem" Content="Settings"/>
-                </ListBox>
+            <Border Grid.Column="0" Classes="SidebarNav" CornerRadius="4" Margin="0,0,5,0"
+                    Width="{Binding SidebarWidth}">
+                <Border.Transitions>
+                    <Transitions>
+                        <DoubleTransition Property="Width" Duration="0:0:0.2"/>
+                    </Transitions>
+                </Border.Transitions>
+                <DockPanel>
+
+                    <!-- Collapse / expand toggle -->
+                    <Button DockPanel.Dock="Top"
+                            Command="{Binding ToggleSidebarCommand}"
+                            Classes="SidebarToggle"
+                            HorizontalAlignment="Right"
+                            Margin="4,4,4,2">
+                        <Panel>
+                            <material:MaterialIcon Kind="ChevronLeft" Width="18" Height="18"
+                                                   IsVisible="{Binding IsSidebarExpanded}"/>
+                            <material:MaterialIcon Kind="ChevronRight" Width="18" Height="18"
+                                                   IsVisible="{Binding !IsSidebarExpanded}"/>
+                        </Panel>
+                    </Button>
+
+                    <ListBox SelectedIndex="{Binding SelectedNavIndex, Mode=TwoWay}"
+                             Classes="SidebarNavList">
+                        <ListBoxItem Classes="SidebarNavItem">
+                            <Grid ColumnDefinitions="20, Auto">
+                                <material:MaterialIcon Kind="LayersTriple" Width="20" Height="20" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="Pods" Margin="8,0,0,0" VerticalAlignment="Center"
+                                           IsVisible="{Binding IsSidebarExpanded}"/>
+                            </Grid>
+                        </ListBoxItem>
+                        <ListBoxItem Classes="SidebarNavItem">
+                            <Grid ColumnDefinitions="20, Auto">
+                                <material:MaterialIcon Kind="ShareVariant" Width="20" Height="20" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="Services" Margin="8,0,0,0" VerticalAlignment="Center"
+                                           IsVisible="{Binding IsSidebarExpanded}"/>
+                            </Grid>
+                        </ListBoxItem>
+                        <ListBoxItem Classes="SidebarNavItem">
+                            <Grid ColumnDefinitions="20, Auto">
+                                <material:MaterialIcon Kind="Cog" Width="20" Height="20" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="Settings" Margin="8,0,0,0" VerticalAlignment="Center"
+                                           IsVisible="{Binding IsSidebarExpanded}"/>
+                            </Grid>
+                        </ListBoxItem>
+                    </ListBox>
+
+                </DockPanel>
             </Border>
 
             <!-- MAIN CONTENT AREA -->
