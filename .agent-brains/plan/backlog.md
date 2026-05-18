@@ -5,12 +5,17 @@
 - [ ] Monitor bug reports and address UI/UX improvements.
 
 ## In Progress
-- [ ] PR for `feature/pr-review-script` — `scripts/pr-review.ps1` AI code review script.
-- [ ] Write and commit script documentation under `scripts/documents/`.
+- [ ] `feat/left-sidebar-navigation` — collapsible left sidebar replacing top TabControl. See `left-sidebar-navigation.md`.
 
 ## Atomic Plans
 - `modern-release-flow-status.md` — Phase 1 & 2 complete.
 - `pr-review-script.md` — AI code review script (✅ implemented, awaiting PR merge).
+- `script-documentation.md` — script docs under `scripts/documents/` (✅ implemented, awaiting PR merge).
+- `left-sidebar-navigation.md` — collapsible left sidebar (🔄 active).
+
+## Deferred (script PRs)
+- **PR for `feature/pr-review-script`** — `scripts/pr-review.ps1` implemented; PR creation deferred.
+- **Script documentation PR** — docs under `scripts/documents/` implemented; PR creation deferred.
 
 ## Completed
 - [x] Initialized workspace via Centralized Agent Framework `project-initializer` skill.
