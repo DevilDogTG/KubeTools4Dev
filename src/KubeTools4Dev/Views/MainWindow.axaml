@@ -59,23 +59,26 @@
 
                     <ListBox SelectedIndex="{Binding SelectedNavIndex, Mode=TwoWay}"
                              Classes="SidebarNavList">
-                        <ListBoxItem Classes="SidebarNavItem">
-                            <Grid ColumnDefinitions="20, Auto">
-                                <material:MaterialIcon Kind="LayersTriple" Width="20" Height="20" VerticalAlignment="Center"/>
+                        <ListBoxItem Classes="SidebarNavItem" ToolTip.Tip="Pods">
+                            <Grid ColumnDefinitions="20,*">
+                                <material:MaterialIcon Kind="LayersTriple" Width="20" Height="20"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="1" Text="Pods" Margin="8,0,0,0" VerticalAlignment="Center"
                                            IsVisible="{Binding IsSidebarExpanded}"/>
                             </Grid>
                         </ListBoxItem>
-                        <ListBoxItem Classes="SidebarNavItem">
-                            <Grid ColumnDefinitions="20, Auto">
-                                <material:MaterialIcon Kind="ShareVariant" Width="20" Height="20" VerticalAlignment="Center"/>
+                        <ListBoxItem Classes="SidebarNavItem" ToolTip.Tip="Services">
+                            <Grid ColumnDefinitions="20,*">
+                                <material:MaterialIcon Kind="ShareVariant" Width="20" Height="20"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="1" Text="Services" Margin="8,0,0,0" VerticalAlignment="Center"
                                            IsVisible="{Binding IsSidebarExpanded}"/>
                             </Grid>
                         </ListBoxItem>
-                        <ListBoxItem Classes="SidebarNavItem">
-                            <Grid ColumnDefinitions="20, Auto">
-                                <material:MaterialIcon Kind="Cog" Width="20" Height="20" VerticalAlignment="Center"/>
+                        <ListBoxItem Classes="SidebarNavItem" ToolTip.Tip="Settings">
+                            <Grid ColumnDefinitions="20,*">
+                                <material:MaterialIcon Kind="Cog" Width="20" Height="20"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="1" Text="Settings" Margin="8,0,0,0" VerticalAlignment="Center"
                                            IsVisible="{Binding IsSidebarExpanded}"/>
                             </Grid>
