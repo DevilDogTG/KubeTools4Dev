@@ -22,6 +22,9 @@
 - [x] Implemented `finish-feature` skill (v2) — self-contained preflight + PR create/update workflow; replaced `scripts/finish-feature.ps1`.
 - [x] Implemented `pr-review` skill — self-contained AI code review; replaced `scripts/pr-review.ps1`.
 - [x] Removed `scripts/` directory — all workflows now live in `.agent-brains/skills/`.
+- [x] Added `SidebarViewModel` unit tests + extracted sidebar state to Core (32 tests).
+- [x] Applied pr-review findings to `feature/pod-detail-popup-window`: `[LoggerMessage]`, primary constructors, 10 new unit tests in `KubeTools4Dev.Tests`. Build 0W/0E, tests 42/42.
+- [x] Merged PR #28 — replace split panel with independent popup windows for logs/describe (+ `KubeTools4Dev.Tests` project). Total: 42 tests.
 
 ## Deferred
 - **Phase 3: Streamlined Release Automation** — changelog gen, version bump, GitHub release. Needs scoping discussion.

@@ -5,7 +5,8 @@ KubeTools4Dev is a cross-platform desktop application built with Avalonia UI and
 ## Project Structure
 - **KubeTools4Dev**: The primary Avalonia application, housing the ViewModels, Views, and UI logic.
 - **KubeTools4Dev.Core**: The core library containing models, configuration settings, and services (e.g., `KubernetesService`, `PortForwardService`, `SettingsService`).
-- **KubeTools4Dev.Core.Tests**: xUnit + NSubstitute test project (23 tests: `SettingsModelTests`, `SettingsServiceTests`, `PortForwardServiceTests`). Added `InternalsVisibleTo` in Core csproj.
+- **KubeTools4Dev.Core.Tests**: xUnit + NSubstitute test project (32 tests: `SettingsModelTests`, `SettingsServiceTests`, `PortForwardServiceTests`, `SidebarViewModelTests`). `InternalsVisibleTo` in Core csproj.
+- **KubeTools4Dev.Tests**: xUnit + NSubstitute test project targeting the UI assembly (10 tests: `PodDetailViewModelTests`). `InternalsVisibleTo` in KubeTools4Dev csproj. Tests use `protected virtual DispatchToUIAsync` hook to bypass Avalonia dispatcher.
 
 ## Developer Workflow (Modern Release Flow)
 Trunk-based development off `main`.
@@ -24,3 +25,6 @@ Trunk-based development off `main`.
 - PR #18 (`feature/test-coverage`) — test coverage + finish-feature script enhancements. Awaiting merge.
 - PR #22 (`feature/align-release-flow`) — aligned release flow and versioning with JoystickGremlinSharp.
 - `feature/pr-review-script` — new `scripts/pr-review.ps1` AI code review script. Awaiting PR.
+
+## Recently Merged
+- PR #28 (`feature/pod-detail-popup-window`) — merged 2026-05-19. Replaced split panel with independent non-modal popup windows for logs and describe. Added `KubeTools4Dev.Tests` project (10 tests). Total test count: 42.
