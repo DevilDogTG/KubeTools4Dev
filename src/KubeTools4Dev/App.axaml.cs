@@ -77,6 +77,14 @@ public partial class App : Application
         services.AddTransient<PodListViewModel>();
         services.AddTransient<ServiceListViewModel>();
         services.AddSingleton<SettingsViewModel>();
+        services.AddTransient<PodDetailViewModel>();
+        services.AddTransient<Func<PodViewModel, int, PodDetailViewModel>>(sp => (pod, tab) =>
+        {
+            var vm = sp.GetRequiredService<PodDetailViewModel>();
+            vm.Pod = pod;
+            vm.IsLogsView = tab == 0;
+            return vm;
+        });
 
         base.OnFrameworkInitializationCompleted();
     }
