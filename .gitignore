@@ -420,3 +420,4 @@ FodyWeavers.xsd
 logs/
 dist/
 .agent/
+.claude/
