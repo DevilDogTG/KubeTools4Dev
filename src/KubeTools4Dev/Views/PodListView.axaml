@@ -29,13 +29,7 @@
 	</UserControl.Styles>
 
 	<Grid>
-		<Grid.ColumnDefinitions>
-			<ColumnDefinition Width="*" />
-			<ColumnDefinition Width="Auto" />
-			<ColumnDefinition Width="{Binding PanelWidth, Mode=TwoWay}" />
-		</Grid.ColumnDefinitions>
-
-		<Grid Grid.Column="0" RowDefinitions="Auto, *">
+		<Grid RowDefinitions="Auto, *">
 			<StackPanel Orientation="Horizontal"
 						Spacing="10"
 						Margin="10">
@@ -144,53 +138,6 @@
 					</DataGridTemplateColumn>
 				</DataGrid.Columns>
 			</DataGrid>
-		</Grid>
-
-		<!-- Splitter -->
-		<GridSplitter Grid.Column="1" 
-					  Width="4" 
-					  Background="#444444" 
-					  IsVisible="{Binding IsPanelOpen}" 
-					  HorizontalAlignment="Center"
-					  VerticalAlignment="Stretch"/>
-
-		<!-- Side Panel -->
-		<Grid Grid.Column="2" RowDefinitions="Auto,*" Background="#252526" IsVisible="{Binding IsPanelOpen}">
-			<StackPanel Orientation="Horizontal" Margin="10,10,10,0">
-				<TextBlock Text="{Binding SelectedPodDetail.Name, StringFormat='Pod: {0}'}"
-						   FontWeight="Bold"
-						   FontSize="14"
-						   VerticalAlignment="Center"/>
-				<Button Content="Close"
-						Command="{Binding ClosePanelCommand}"
-						Margin="10,0,0,0"/>
-			</StackPanel>
-
-			<TabControl Grid.Row="1" SelectedIndex="{Binding SelectedTabIndex}" Margin="10">
-				<TabItem Header="Logs">
-					<ScrollViewer x:Name="LogsScrollViewer" ScrollChanged="LogsScrollViewer_ScrollChanged">
-						<ItemsControl ItemsSource="{Binding PodLogsList}">
-							<ItemsControl.ItemTemplate>
-								<DataTemplate>
-									<TextBlock Text="{Binding}" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
-								</DataTemplate>
-							</ItemsControl.ItemTemplate>
-						</ItemsControl>
-					</ScrollViewer>
-				</TabItem>
-				<TabItem Header="Describe">
-					<ScrollViewer>
-						<TextBox Text="{Binding PodDescribeText}"
-								 IsReadOnly="True"
-								 FontFamily="Consolas"
-								 FontSize="12"
-								 TextWrapping="Wrap"
-								 AcceptsReturn="True"
-								 Background="Transparent"
-								 BorderThickness="0"/>
-					</ScrollViewer>
-				</TabItem>
-			</TabControl>
 		</Grid>
 	</Grid>
 </UserControl>
