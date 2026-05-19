@@ -57,4 +57,9 @@
   <ItemGroup>
     <ProjectReference Include="..\KubeTools4Dev.Core\KubeTools4Dev.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>KubeTools4Dev.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 </Project>
