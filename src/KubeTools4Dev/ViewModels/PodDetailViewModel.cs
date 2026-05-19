@@ -13,10 +13,12 @@ namespace KubeTools4Dev.ViewModels;
 /// View model for the pod detail popup window, managing log streaming and describe output.
 /// Each instance is independent and owns its own lifecycle and cancellation token.
 /// </summary>
-public partial class PodDetailViewModel : ViewModelBase, IDisposable
+public partial class PodDetailViewModel(
+    ILogger<PodDetailViewModel> logger,
+    IKubernetesService kubeService) : ViewModelBase, IDisposable
 {
-    private readonly IKubernetesService _kubeService;
-    private readonly ILogger<PodDetailViewModel> _logger;
+    private readonly ILogger<PodDetailViewModel> _logger = logger;
+    private readonly IKubernetesService _kubeService = kubeService;
     private CancellationTokenSource? _logStreamCts;
 
     [ObservableProperty]
@@ -38,17 +40,6 @@ public partial class PodDetailViewModel : ViewModelBase, IDisposable
     private bool _isDescribeLoading;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="PodDetailViewModel"/> class.
-    /// </summary>
-    /// <param name="logger">The logger.</param>
-    /// <param name="kubeService">The Kubernetes service.</param>
-    public PodDetailViewModel(ILogger<PodDetailViewModel> logger, IKubernetesService kubeService)
-    {
-        _logger = logger;
-        _kubeService = kubeService;
-    }
-
-    /// <summary>
     /// Starts the initial operation (log streaming or describe load) based on <see cref="IsLogsView"/>.
     /// Must be called after <see cref="Pod"/> and <see cref="IsLogsView"/> are set.
     /// </summary>
@@ -64,7 +55,11 @@ public partial class PodDetailViewModel : ViewModelBase, IDisposable
             _ = LoadDescribeAsync();
     }
 
-    private async Task StartLogStreamAsync()
+    /// <summary>Dispatches an action to the UI thread. Override in derived classes to control dispatch, e.g. in unit tests.</summary>
+    protected virtual Task DispatchToUIAsync(Action action) =>
+        Dispatcher.UIThread.InvokeAsync(action).GetTask();
+
+    internal async Task StartLogStreamAsync()
     {
         _logStreamCts?.Cancel();
         _logStreamCts = new CancellationTokenSource();
@@ -79,7 +74,7 @@ public partial class PodDetailViewModel : ViewModelBase, IDisposable
             {
                 if (token.IsCancellationRequested) break;
 
-                await Dispatcher.UIThread.InvokeAsync(() =>
+                await DispatchToUIAsync(() =>
                 {
                     if (PodLogsList.Count > 1000)
                         PodLogsList.RemoveAt(0);
@@ -93,13 +88,13 @@ public partial class PodDetailViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error streaming logs for {PodName}", Pod.Name);
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            LogStreamError(ex, Pod.Name);
+            await DispatchToUIAsync(() =>
                 PodLogsList.Add($"Error streaming logs: {ex.Message}"));
         }
     }
 
-    private async Task LoadDescribeAsync()
+    internal async Task LoadDescribeAsync()
     {
         IsDescribeLoading = true;
         PodDescribeText = string.Empty;
@@ -110,7 +105,7 @@ public partial class PodDetailViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error loading describe for {PodName}", Pod.Name);
+            LogDescribeError(ex, Pod.Name);
             PodDescribeText = $"Error loading describe: {ex.Message}";
         }
         finally
@@ -118,6 +113,12 @@ public partial class PodDetailViewModel : ViewModelBase, IDisposable
             IsDescribeLoading = false;
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Error streaming logs for {PodName}")]
+    private partial void LogStreamError(Exception ex, string podName);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Error loading describe output for {PodName}")]
+    private partial void LogDescribeError(Exception ex, string podName);
 
     /// <inheritdoc/>
     public void Dispose()

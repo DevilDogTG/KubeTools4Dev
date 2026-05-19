@@ -17,20 +17,13 @@ public partial class PodDetailWindow : Window
     /// This parameterless constructor is required by the Avalonia XAML runtime loader.
     /// Use <see cref="PodDetailWindow(PodDetailViewModel)"/> for all runtime usage.
     /// </summary>
-    public PodDetailWindow()
-    {
-        InitializeComponent();
-    }
+    public PodDetailWindow() => InitializeComponent();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PodDetailWindow"/> class with a view model.
     /// </summary>
     /// <param name="viewModel">The view model for this window.</param>
-    public PodDetailWindow(PodDetailViewModel viewModel)
-    {
-        InitializeComponent();
-        DataContext = viewModel;
-    }
+    public PodDetailWindow(PodDetailViewModel viewModel) : this() => DataContext = viewModel;
 
     /// <inheritdoc/>
     protected override void OnOpened(EventArgs e)
