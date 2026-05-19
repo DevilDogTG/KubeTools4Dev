@@ -3,6 +3,7 @@ version: 1.1
 profiles:
   - base-developer
   - csharp-developer
+  - github-scm
   - kubernetes-devops
 strict_override: false
 ---
@@ -30,7 +31,8 @@ You MUST NOT keep your plans in internal context only.
 
 ## Git Workflow
 - Always create a new branch (`feature/` or `bugfix/` prefix) before making any code changes.
-- Use `scripts/finish-feature.ps1` to run preflights and create/update PRs.
+- Use the `finish-feature` skill to run preflights and create/update PRs.
+- Use the `pr-review` skill to run an AI code review and post findings on a PR.
 - Never commit directly to `main`.
 
 ## Coding Standards
@@ -42,6 +44,6 @@ You MUST NOT keep your plans in internal context only.
 - Run: `dotnet test src/KubeTools4Dev.Core.Tests/KubeTools4Dev.Core.Tests.csproj`
 - All tests must pass before finishing a feature.
 
-## Key Contracts
-- `finish-feature.ps1` posts `<!-- finish-feature-update -->` + `<!-- head-sha: SHA -->` comments on PRs.
-- Future `pr-review` script: detects these markers → AI review → posts `<!-- pr-review-findings -->`.
+## PR Comment Contracts
+- `finish-feature` skill posts `<!-- finish-feature-update -->` + `<!-- head-sha: SHA -->` on PRs.
+- `pr-review` skill detects these markers → reviews diff → posts `<!-- pr-review-findings -->` + `<!-- review-status: approved|needs-work -->` + `<!-- review-sha: SHA -->`.
