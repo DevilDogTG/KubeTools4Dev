@@ -213,7 +213,8 @@ public class PodDetailViewModelTests
         yield break;
     }
 
-    private static async IAsyncEnumerable<string> BlockingLines(CancellationToken token)
+    private static async IAsyncEnumerable<string> BlockingLines(
+        [EnumeratorCancellation] CancellationToken token = default)
     {
         await Task.Delay(Timeout.Infinite, token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         yield break;
