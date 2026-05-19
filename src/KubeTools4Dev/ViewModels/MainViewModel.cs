@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DMNSN.Core;
 using KubeTools4Dev.Core.Services.Interfaces;
+using KubeTools4Dev.Core.ViewModels;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 
@@ -35,42 +36,8 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isConnected;
 
-    /// <summary>
-    /// Whether the left sidebar is in expanded (icon + text) or collapsed (icon only) state.
-    /// </summary>
-    [ObservableProperty]
-    private bool _isSidebarExpanded = true;
-
-    /// <summary>Gets the pixel width of the sidebar based on its expanded/collapsed state.</summary>
-    public double SidebarWidth => IsSidebarExpanded ? 180.0 : 52.0;
-
-    partial void OnIsSidebarExpandedChanged(bool value) => OnPropertyChanged(nameof(SidebarWidth));
-
-    /// <summary>
-    /// Toggles the sidebar between expanded and collapsed states.
-    /// </summary>
-    [RelayCommand]
-    private void ToggleSidebar() => IsSidebarExpanded = !IsSidebarExpanded;
-
-    /// <summary>
-    /// The selected navigation index (0=Pods, 1=Services, 2=Settings).
-    /// </summary>
-    [ObservableProperty]
-    private int _selectedNavIndex = 0;
-
-    /// <summary>Gets a value indicating whether the Pods view is visible.</summary>
-    public bool IsPodsVisible => SelectedNavIndex == 0;
-    /// <summary>Gets a value indicating whether the Services view is visible.</summary>
-    public bool IsServicesVisible => SelectedNavIndex == 1;
-    /// <summary>Gets a value indicating whether the Settings view is visible.</summary>
-    public bool IsSettingsVisible => SelectedNavIndex == 2;
-
-    partial void OnSelectedNavIndexChanged(int value)
-    {
-        OnPropertyChanged(nameof(IsPodsVisible));
-        OnPropertyChanged(nameof(IsServicesVisible));
-        OnPropertyChanged(nameof(IsSettingsVisible));
-    }
+    /// <summary>Gets the sidebar navigation state (expanded/collapsed + active view).</summary>
+    public SidebarViewModel Sidebar { get; } = new();
 
     /// <summary>
     /// The pod list
