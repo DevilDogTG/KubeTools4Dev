@@ -5,11 +5,14 @@
 - [ ] Monitor bug reports and address UI/UX improvements.
 
 ## In Progress
-- [ ] `feat/left-sidebar-navigation` — collapsible left sidebar replacing top TabControl. See `left-sidebar-navigation.md`.
+_(none)_
 
 ## Atomic Plans
 - `modern-release-flow-status.md` — Phase 1 & 2 complete.
-- `left-sidebar-navigation.md` — collapsible left sidebar (🔄 active).
+
+## Archived Plans
+- `archive/align-release-flow.md` — archived 2026-05-19 (work completed via PR #22).
+- `archive/left-sidebar-navigation.md` — archived 2026-05-19 (completed and merged, PR #28).
 
 ## Completed
 - [x] Initialized workspace via Centralized Agent Framework `project-initializer` skill.
