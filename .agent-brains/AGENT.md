@@ -25,6 +25,8 @@ You MUST NOT keep your plans in internal context only.
 3. Update memory/overview.md at session end.
 
 ## Workspace Rules
+- At the start of every new session, I must scan and briefly summarize the active rules and profiles from all loaded context levels (Global, Profile, and Workspace).
+- I must explicitly confirm that I am aligned with the "Filesystem-First Planning" mandate if it is present in the workspace.
 - Ensure all skills added to `./.agent-brains/skills/` are provider-agnostic.
 - Use `./.agent-brains/memory/` to store shared context about the project.
 - Use `./.agent-brains/plan/` to track task execution.
