@@ -35,7 +35,7 @@
 
             <!-- LEFT SIDEBAR NAVIGATION -->
             <Border Grid.Column="0" Classes="SidebarNav" CornerRadius="4" Margin="0,0,5,0"
-                    Width="{Binding SidebarWidth}">
+                    Width="{Binding Sidebar.SidebarWidth}">
                 <Border.Transitions>
                     <Transitions>
                         <DoubleTransition Property="Width" Duration="0:0:0.2"/>
@@ -45,26 +45,26 @@
 
                     <!-- Collapse / expand toggle -->
                     <Button DockPanel.Dock="Top"
-                            Command="{Binding ToggleSidebarCommand}"
+                            Command="{Binding Sidebar.ToggleSidebarCommand}"
                             Classes="SidebarToggle"
                             HorizontalAlignment="Right"
                             Margin="4,4,4,2">
                         <Panel>
                             <material:MaterialIcon Kind="ChevronLeft" Width="18" Height="18"
-                                                   IsVisible="{Binding IsSidebarExpanded}"/>
+                                                   IsVisible="{Binding Sidebar.IsSidebarExpanded}"/>
                             <material:MaterialIcon Kind="ChevronRight" Width="18" Height="18"
-                                                   IsVisible="{Binding !IsSidebarExpanded}"/>
+                                                   IsVisible="{Binding !Sidebar.IsSidebarExpanded}"/>
                         </Panel>
                     </Button>
 
-                    <ListBox SelectedIndex="{Binding SelectedNavIndex, Mode=TwoWay}"
+                    <ListBox SelectedIndex="{Binding Sidebar.SelectedNavIndex, Mode=TwoWay}"
                              Classes="SidebarNavList">
                         <ListBoxItem Classes="SidebarNavItem" ToolTip.Tip="Pods">
                             <Grid ColumnDefinitions="20,*">
                                 <material:MaterialIcon Kind="LayersTriple" Width="20" Height="20"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="1" Text="Pods" Margin="8,0,0,0" VerticalAlignment="Center"
-                                           IsVisible="{Binding IsSidebarExpanded}"/>
+                                           IsVisible="{Binding Sidebar.IsSidebarExpanded}"/>
                             </Grid>
                         </ListBoxItem>
                         <ListBoxItem Classes="SidebarNavItem" ToolTip.Tip="Services">
@@ -72,7 +72,7 @@
                                 <material:MaterialIcon Kind="ShareVariant" Width="20" Height="20"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="1" Text="Services" Margin="8,0,0,0" VerticalAlignment="Center"
-                                           IsVisible="{Binding IsSidebarExpanded}"/>
+                                           IsVisible="{Binding Sidebar.IsSidebarExpanded}"/>
                             </Grid>
                         </ListBoxItem>
                         <ListBoxItem Classes="SidebarNavItem" ToolTip.Tip="Settings">
@@ -80,7 +80,7 @@
                                 <material:MaterialIcon Kind="Cog" Width="20" Height="20"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="1" Text="Settings" Margin="8,0,0,0" VerticalAlignment="Center"
-                                           IsVisible="{Binding IsSidebarExpanded}"/>
+                                           IsVisible="{Binding Sidebar.IsSidebarExpanded}"/>
                             </Grid>
                         </ListBoxItem>
                     </ListBox>
@@ -91,13 +91,13 @@
             <!-- MAIN CONTENT AREA -->
             <Border Grid.Column="1" Background="{DynamicResource SemiColorBackground0}" CornerRadius="4">
                 <Panel>
-                    <Panel IsVisible="{Binding IsPodsVisible}">
+                    <Panel IsVisible="{Binding Sidebar.IsPodsVisible}">
                         <views:PodListView DataContext="{Binding PodList}"/>
                     </Panel>
-                    <Panel IsVisible="{Binding IsServicesVisible}">
+                    <Panel IsVisible="{Binding Sidebar.IsServicesVisible}">
                         <views:ServiceListView DataContext="{Binding ServiceList}"/>
                     </Panel>
-                    <Panel IsVisible="{Binding IsSettingsVisible}">
+                    <Panel IsVisible="{Binding Sidebar.IsSettingsVisible}">
                         <views:SettingsView DataContext="{Binding Settings}"/>
                     </Panel>
                 </Panel>
