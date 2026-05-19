@@ -28,3 +28,4 @@ Trunk-based development off `main`.
 
 ## Recently Merged
 - PR #28 (`feature/pod-detail-popup-window`) — merged 2026-05-19. Replaced split panel with independent non-modal popup windows for logs and describe. Added `KubeTools4Dev.Tests` project (10 tests). Total test count: 42.
+- `chore/session-init-rules` — pushed 2026-05-19. Standardized session initialization behavior in `AGENT.md` and `GEMINI.md` to ensure rule verification and planning alignment at session start. Refactored `onboard.ps1` for intelligent rule merging.
