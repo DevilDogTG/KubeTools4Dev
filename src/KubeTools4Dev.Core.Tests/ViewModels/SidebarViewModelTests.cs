@@ -55,19 +55,22 @@ public class SidebarViewModelTests
         Assert.Equal(0, _sut.SelectedNavIndex);
         Assert.True(_sut.IsPodsVisible);
         Assert.False(_sut.IsServicesVisible);
+        Assert.False(_sut.IsDeploymentsVisible);
         Assert.False(_sut.IsSettingsVisible);
     }
 
     [Theory]
-    [InlineData(0, true, false, false)]
-    [InlineData(1, false, true, false)]
-    [InlineData(2, false, false, true)]
-    public void SelectedNavIndex_UpdatesVisibilityFlags(int index, bool pods, bool services, bool settings)
+    [InlineData(0, true, false, false, false)]
+    [InlineData(1, false, true, false, false)]
+    [InlineData(2, false, false, true, false)]
+    [InlineData(3, false, false, false, true)]
+    public void SelectedNavIndex_UpdatesVisibilityFlags(int index, bool pods, bool services, bool deployments, bool settings)
     {
         _sut.SelectedNavIndex = index;
 
         Assert.Equal(pods, _sut.IsPodsVisible);
         Assert.Equal(services, _sut.IsServicesVisible);
+        Assert.Equal(deployments, _sut.IsDeploymentsVisible);
         Assert.Equal(settings, _sut.IsSettingsVisible);
     }
 
@@ -82,6 +85,7 @@ public class SidebarViewModelTests
         Assert.Contains(nameof(SidebarViewModel.SelectedNavIndex), raised);
         Assert.Contains(nameof(SidebarViewModel.IsPodsVisible), raised);
         Assert.Contains(nameof(SidebarViewModel.IsServicesVisible), raised);
+        Assert.Contains(nameof(SidebarViewModel.IsDeploymentsVisible), raised);
         Assert.Contains(nameof(SidebarViewModel.IsSettingsVisible), raised);
     }
 }
