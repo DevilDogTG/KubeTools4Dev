@@ -116,6 +116,7 @@ public partial class PortForwardService(
                     
                     listener.DualMode = true;
                     listener.NoDelay = true; // Disable Nagle's algorithm for lower latency
+                    listener.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                     
                     listener.Bind(ipEndPoint);
                     listener.Listen(100);
@@ -220,10 +221,16 @@ public partial class PortForwardService(
             {
                 break;
             }
-            catch (SocketException)
+            catch (SocketException ex)
             {
-                // Listener closed
-                break;
+                if (ex.SocketErrorCode == SocketError.OperationAborted || ex.SocketErrorCode == SocketError.Interrupted)
+                {
+                    // Listener closed
+                    break;
+                }
+                
+                // Ignore errors caused by aborted connections from the client (e.g., ConnectionReset)
+                continue;
             }
             catch (ObjectDisposedException)
             {
@@ -274,6 +281,9 @@ public partial class PortForwardService(
                         webSocketSubProtocol: "v4.channel.k8s.io",
                         cancellationToken: connectCts.Token)
                     .ConfigureAwait(false);
+                
+                // Disable connection timeout now that we are connected
+                timeoutCts.CancelAfter(Timeout.InfiniteTimeSpan);
             }
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
             {
