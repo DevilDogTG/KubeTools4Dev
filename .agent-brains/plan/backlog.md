@@ -1,16 +1,17 @@
 # Backlog
 
 ## Pending
-- [ ] Merge `feature/test-coverage` into `main` (PR #18 — open, ready for review).
-- [ ] Monitor bug reports and address UI/UX improvements.
+_(none)_
 
 ## In Progress
 _(none)_
 
 ## Atomic Plans
-- `modern-release-flow-status.md` — Phase 1 & 2 complete.
+_(none)_
 
 ## Archived Plans
+- `archive/automated-publishing.md` — archived 2026-05-20 (Phase 3 deferred).
+- `archive/modern-release-flow-status.md` — archived 2026-05-20 (Phase 1 & 2 complete).
 - `archive/align-release-flow.md` — archived 2026-05-19 (work completed via PR #22).
 - `archive/left-sidebar-navigation.md` — archived 2026-05-19 (completed and merged, PR #28).
 
@@ -28,6 +29,3 @@ _(none)_
 - [x] Added `SidebarViewModel` unit tests + extracted sidebar state to Core (32 tests).
 - [x] Applied pr-review findings to `feature/pod-detail-popup-window`: `[LoggerMessage]`, primary constructors, 10 new unit tests in `KubeTools4Dev.Tests`. Build 0W/0E, tests 42/42.
 - [x] Merged PR #28 — replace split panel with independent popup windows for logs/describe (+ `KubeTools4Dev.Tests` project). Total: 42 tests.
-
-## Deferred
-- **Phase 3: Streamlined Release Automation** — changelog gen, version bump, GitHub release. Needs scoping discussion.
