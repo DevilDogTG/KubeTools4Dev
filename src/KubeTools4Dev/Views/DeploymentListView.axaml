@@ -1,0 +1,110 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+			 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+			 xmlns:vm="using:KubeTools4Dev.ViewModels"
+			 mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="500"
+			 x:Class="KubeTools4Dev.Views.DeploymentListView"
+			 x:DataType="vm:DeploymentListViewModel">
+
+	<UserControl.Styles>
+		<Style Selector="DataGridColumnHeadersPresenter">
+			<Setter Property="MinHeight" Value="30"/>
+			<Setter Property="Height" Value="30"/>
+		</Style>
+		<Style Selector="DataGridColumnHeader">
+			<Setter Property="Padding" Value="5,0"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="DataGridRow">
+			<Setter Property="Height" Value="22"/>
+			<Setter Property="Margin" Value="3,2,3,0"/>
+			<Setter Property="MinHeight" Value="22"/>
+		</Style>
+		<Style Selector="DataGridCell">
+			<Setter Property="Height" Value="22"/>
+			<Setter Property="MinHeight" Value="22"/>
+			<Setter Property="Padding" Value="3,0"/>
+		</Style>
+	</UserControl.Styles>
+
+	<Grid RowDefinitions="Auto, Auto, *">
+		<!-- Toolbar -->
+		<StackPanel Grid.Row="0"
+					Orientation="Horizontal"
+					Spacing="10"
+					Margin="10">
+			<TextBox Text="{Binding FilterText}"
+					 PlaceholderText="Filter deployments..."
+					 Width="220" Height="20"/>
+			<TextBlock Text="{Binding Deployments.Count, StringFormat='Total: {0}'}"
+					   VerticalAlignment="Center"/>
+			<TextBlock Text="{Binding LastRefreshTime, StringFormat='Last Updated: {0}'}"
+					   VerticalAlignment="Center"
+					   Margin="10,0,0,0"/>
+			<ProgressBar IsIndeterminate="True"
+						 IsVisible="{Binding IsLoading}" />
+		</StackPanel>
+
+		<!-- Error message -->
+		<TextBlock Grid.Row="1"
+				   Text="{Binding ErrorMessage}"
+				   IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+				   Foreground="Red"
+				   TextWrapping="Wrap"
+				   MaxHeight="60"
+				   Margin="10,0,10,4"/>
+
+		<!-- Data grid -->
+		<DataGrid Grid.Row="2"
+				  AutoGenerateColumns="False"
+				  CanUserResizeColumns="True"
+				  CanUserSortColumns="True"
+				  FontSize="12"
+				  GridLinesVisibility="Horizontal"
+				  IsReadOnly="True"
+				  ItemsSource="{Binding Deployments}"
+				  Margin="0,0,0,0"
+				  RowHeight="20"
+				  VerticalScrollBarVisibility="Visible">
+			<DataGrid.Columns>
+				<DataGridTextColumn Binding="{Binding Namespace}"
+									Header="Namespace"
+									Width="Auto"/>
+				<DataGridTextColumn Binding="{Binding Name}"
+									Header="Name"
+									Width="*"/>
+				<DataGridTextColumn Binding="{Binding DesiredReplicas}"
+									Header="Desired"
+									Width="60"/>
+				<DataGridTextColumn Binding="{Binding ReadyReplicas}"
+									Header="Ready"
+									Width="60"/>
+				<DataGridTextColumn Binding="{Binding AvailableReplicas}"
+									Header="Available"
+									Width="70"/>
+				<DataGridTextColumn Binding="{Binding ImageTag}"
+									Header="Image Tag"
+									Width="200"/>
+				<DataGridTemplateColumn Header="Actions" Width="160">
+					<DataGridTemplateColumn.CellTemplate>
+						<DataTemplate>
+							<StackPanel Orientation="Horizontal" Spacing="5" Margin="5,0" VerticalAlignment="Center">
+								<Button Content="Restart"
+										Command="{Binding $parent[UserControl].((vm:DeploymentListViewModel)DataContext).RolloutRestartCommand}"
+										CommandParameter="{Binding}"
+										Padding="5,0"
+										Height="20"/>
+								<Button Content="Edit"
+										Command="{Binding $parent[UserControl].((vm:DeploymentListViewModel)DataContext).EditDeploymentCommand}"
+										CommandParameter="{Binding}"
+										Padding="5,0"
+										Height="20"/>
+							</StackPanel>
+						</DataTemplate>
+					</DataGridTemplateColumn.CellTemplate>
+				</DataGridTemplateColumn>
+			</DataGrid.Columns>
+		</DataGrid>
+	</Grid>
+</UserControl>
