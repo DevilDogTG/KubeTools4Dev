@@ -18,11 +18,12 @@
 - **Auto-Refresh**: Configurable refresh interval to keep data up-to-date.
 
 ### 🔗 Service Management & Port Forwarding
-- **Service Discovery**: browse all available services and their TCP ports.
+- **Service Discovery**: Browse all available services and their TCP ports.
 - **One-Click Port Forwarding**: Start port forwarding for any service with a single click.
 - **Visual Status**: Clear visual indicators for active forwarding sessions.
 - **Stop All**: Instantly stop all active port forwarding sessions with a dedicated "Stop All" button.
 - **Exclusion Rules**: Permanently exclude specific services to prevent accidental forwarding (configurable in Settings).
+- **Resilient Sessions**: Port-forward connections survive client disconnects and browser refreshes without silently dropping. The listener recovers from aborted connections automatically, and sessions are never terminated by an idle timeout — ensuring stable long-running tunnels.
 
 ### ⚙️ Settings
 - **General**: Configure application logging levels and view the log file path.
@@ -67,14 +68,14 @@ Before running KubeTools4Dev, ensure you have the following installed:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Developer Scripts
+## Developer Workflows (Agent Skills)
 
-The `scripts/` directory contains PowerShell workflow scripts for contributors. Full documentation is available in [`scripts/documents/`](scripts/documents/).
+Contributor workflows are managed as AI agent skills stored in [`.agent-brains/skills/`](.agent-brains/skills/). Invoke them with the `sk-` prefix in a Gemini/Copilot/Claude session.
 
-| Script | Description |
-|--------|-------------|
-| [`finish-feature.ps1`](scripts/finish-feature.ps1) | Runs preflights (clean tree, rebase, build, test) then creates or updates the GitHub PR with an AI-generated description. |
-| [`pr-review.ps1`](scripts/pr-review.ps1) | Reviews the PR diff with AI and posts structured findings (🔴 Critical / 🟡 Warning / 🔵 Info) as a GitHub comment. |
+| Skill | Description |
+|-------|-------------|
+| `sk-finish-feature` | Runs preflights (clean tree, rebase from main, build, test) then creates or updates the GitHub PR with an AI-generated description. |
+| `sk-pr-review` | Reviews the PR diff with AI and posts structured findings (🔴 Critical / 🟡 Warning / 🔵 Info) as a GitHub comment. |
 
 ## Author
 
