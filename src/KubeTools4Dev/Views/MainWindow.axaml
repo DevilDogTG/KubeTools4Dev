@@ -75,6 +75,14 @@
                                            IsVisible="{Binding Sidebar.IsSidebarExpanded}"/>
                             </Grid>
                         </ListBoxItem>
+                        <ListBoxItem Classes="SidebarNavItem" ToolTip.Tip="Deployments">
+                            <Grid ColumnDefinitions="20,*">
+                                <material:MaterialIcon Kind="AlphaD" Width="20" Height="20"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="Deployments" Margin="8,0,0,0" VerticalAlignment="Center"
+                                           IsVisible="{Binding Sidebar.IsSidebarExpanded}"/>
+                            </Grid>
+                        </ListBoxItem>
                         <ListBoxItem Classes="SidebarNavItem" ToolTip.Tip="Settings">
                             <Grid ColumnDefinitions="20,*">
                                 <material:MaterialIcon Kind="Cog" Width="20" Height="20"
@@ -96,6 +104,9 @@
                     </Panel>
                     <Panel IsVisible="{Binding Sidebar.IsServicesVisible}">
                         <views:ServiceListView DataContext="{Binding ServiceList}"/>
+                    </Panel>
+                    <Panel IsVisible="{Binding Sidebar.IsDeploymentsVisible}">
+                        <views:DeploymentListView DataContext="{Binding DeploymentList}"/>
                     </Panel>
                     <Panel IsVisible="{Binding Sidebar.IsSettingsVisible}">
                         <views:SettingsView DataContext="{Binding Settings}"/>
