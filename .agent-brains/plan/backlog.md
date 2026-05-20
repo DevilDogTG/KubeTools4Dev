@@ -1,7 +1,7 @@
 # Backlog
 
 ## Pending
-- `fix-port-forward-drops.md` — Active plan to fix silent port-forward drops.
+_(none)_
 
 ## In Progress
 _(none)_
@@ -10,6 +10,7 @@ _(none)_
 _(none)_
 
 ## Archived Plans
+- `archive/fix-port-forward-drops.md` — archived 2026-05-20 (PR #31 approved, pending merge).
 - `archive/automated-publishing.md` — archived 2026-05-20 (Phase 3 deferred).
 - `archive/modern-release-flow-status.md` — archived 2026-05-20 (Phase 1 & 2 complete).
 - `archive/align-release-flow.md` — archived 2026-05-19 (work completed via PR #22).
@@ -29,3 +30,4 @@ _(none)_
 - [x] Added `SidebarViewModel` unit tests + extracted sidebar state to Core (32 tests).
 - [x] Applied pr-review findings to `feature/pod-detail-popup-window`: `[LoggerMessage]`, primary constructors, 10 new unit tests in `KubeTools4Dev.Tests`. Build 0W/0E, tests 42/42.
 - [x] Merged PR #28 — replace split panel with independent popup windows for logs/describe (+ `KubeTools4Dev.Tests` project). Total: 42 tests.
+- [x] Fixed silent port-forward drops (PR #31 ✅ Approved): resilient listener loop, ReuseAddress, no idle timeout. Added edge-case tests (34 total). Refactored fakes. Updated README.
