@@ -1,7 +1,7 @@
 # Backlog
 
 ## Pending
-_(none)_
+- `fix-port-forward-drops.md` — Active plan to fix silent port-forward drops.
 
 ## In Progress
 _(none)_
