@@ -20,8 +20,8 @@ KubeTools4Dev is a cross-platform desktop application built with Avalonia UI and
 
 # Mandate: Filesystem-First Planning
 You MUST NOT keep your plans in internal context only.
-1. Read \`./.agent-brains/AGENT.md\`.
-2. Write plan to \`./.agent-brains/plan/\` BEFORE writing code.
+1. Read `\./.agent-brains/AGENT.md\`.
+2. Write plan to `\./.agent-brains/plan/\` BEFORE writing code.
 3. Update memory/overview.md at session end.
 
 ## Workspace Rules
@@ -45,6 +45,9 @@ You MUST NOT keep your plans in internal context only.
 - Test project: `src/KubeTools4Dev.Core.Tests` (xUnit + NSubstitute, net10.0).
 - Run: `dotnet test src/KubeTools4Dev.Core.Tests/KubeTools4Dev.Core.Tests.csproj`
 - All tests must pass before finishing a feature.
+- **Socket/network seams**: When testing services that use raw .NET socket or network primitives, prefer **Subclass-and-Override** (`protected internal virtual` methods) over introducing new interfaces. Avoids interface proliferation for infrastructure concerns that are inherently hard to mock.
+- **Shared-state isolation**: xUnit test classes that mutate any `static` or shared state (e.g., `PortForwardService.ConnectionTimeout`) **must** implement `IDisposable` and restore the original value in `Dispose()` to be safe under parallel test execution.
+- **Fakes folder**: Reusable test subclasses and fakes live in `src/KubeTools4Dev.Core.Tests/Fakes/`. Extend existing fakes (e.g., `TestablePortForwardService`) rather than re-implementing mocks inline.
 
 ## PR Comment Contracts
 - `finish-feature` skill posts `<!-- finish-feature-update -->` + `<!-- head-sha: SHA -->` on PRs.
