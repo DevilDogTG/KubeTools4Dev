@@ -22,7 +22,7 @@ public partial class PortForwardService(
     /// <summary>
     /// Connection timeout for WebSocket connections.
     /// </summary>
-    private static readonly TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(30);
+    internal static TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Retry delay when errors occur.
@@ -116,7 +116,9 @@ public partial class PortForwardService(
                     
                     listener.DualMode = true;
                     listener.NoDelay = true; // Disable Nagle's algorithm for lower latency
+                    // ReuseAddress allows bypassing TIME_WAIT for developer convenience on localhost.
                     listener.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                    listener.ExclusiveAddressUse = false; // Document intent that port sharing is allowed to bypass TIME_WAIT
                     
                     listener.Bind(ipEndPoint);
                     listener.Listen(100);
@@ -189,7 +191,7 @@ public partial class PortForwardService(
     /// <summary>
     /// Accepts incoming connections and forwards each one with its own WebSocket tunnel.
     /// </summary>
-    private async Task AcceptAndForwardConnectionsAsync(
+    internal async Task AcceptAndForwardConnectionsAsync(
         Socket listener,
         string serviceName,
         string namespaceName,
@@ -201,7 +203,7 @@ public partial class PortForwardService(
             try
             {
                 // Accept connection
-                var handler = await listener.AcceptAsync(cancellationToken);
+                var handler = await AcceptSocketAsync(listener, cancellationToken);
                 
                 // Set keep-alive on the local socket to prevent it from being dropped during idle debugging sessions
                 handler.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
@@ -240,9 +242,17 @@ public partial class PortForwardService(
     }
 
     /// <summary>
+    /// Accepts a socket connection. Virtual for testing.
+    /// </summary>
+    protected internal virtual ValueTask<Socket> AcceptSocketAsync(Socket listener, CancellationToken cancellationToken)
+    {
+        return listener.AcceptAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// Handles a single connection with its own WebSocket tunnel to the pod.
     /// </summary>
-    private async Task HandleSingleConnectionAsync(
+    internal async Task HandleSingleConnectionAsync(
         Socket handler,
         string serviceName,
         string namespaceName,
@@ -273,14 +283,11 @@ public partial class PortForwardService(
 
             try
             {
-                webSocket = await kubernetesService.Client
-                    .WebSocketNamespacedPodPortForwardAsync(
-                        name: podName,
-                        @namespace: namespaceName,
-                        ports: [remotePort],
-                        webSocketSubProtocol: "v4.channel.k8s.io",
-                        cancellationToken: connectCts.Token)
-                    .ConfigureAwait(false);
+                webSocket = await ConnectWebSocketAsync(
+                    podName,
+                    namespaceName,
+                    remotePort,
+                    connectCts.Token).ConfigureAwait(false);
                 
                 // Disable connection timeout now that we are connected
                 timeoutCts.CancelAfter(Timeout.InfiniteTimeSpan);
@@ -340,6 +347,19 @@ public partial class PortForwardService(
             try { demuxer?.Dispose(); } catch { }
             try { webSocket?.Dispose(); } catch { }
         }
+    }
+
+    /// <summary>
+    /// Connects to the Kubernetes pod via WebSocket. Virtual for testing.
+    /// </summary>
+    protected internal virtual Task<WebSocket> ConnectWebSocketAsync(string podName, string namespaceName, int remotePort, CancellationToken cancellationToken)
+    {
+        return kubernetesService.Client.WebSocketNamespacedPodPortForwardAsync(
+            name: podName,
+            @namespace: namespaceName,
+            ports: [remotePort],
+            webSocketSubProtocol: "v4.channel.k8s.io",
+            cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -422,7 +442,7 @@ public partial class PortForwardService(
     /// <summary>
     /// Gets the pod name from cache or resolves it if needed.
     /// </summary>
-    private async Task<string?> GetPodNameAsync(string serviceName, string namespaceName, CancellationToken cancellationToken)
+    protected internal virtual async Task<string?> GetPodNameAsync(string serviceName, string namespaceName, CancellationToken cancellationToken)
     {
         var cacheKey = $"{namespaceName}/{serviceName}";
         if (_podNameCache.TryGetValue(cacheKey, out var cached) && DateTime.UtcNow < cached.Expiration)
