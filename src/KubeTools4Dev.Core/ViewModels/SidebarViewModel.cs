@@ -22,7 +22,7 @@ public partial class SidebarViewModel : ObservableObject
     [RelayCommand]
     private void ToggleSidebar() => IsSidebarExpanded = !IsSidebarExpanded;
 
-    /// <summary>Gets or sets the selected navigation index (0 = Pods, 1 = Services, 2 = Settings).</summary>
+    /// <summary>Gets or sets the selected navigation index (0 = Pods, 1 = Services, 2 = Deployments, 3 = Settings → was 2).</summary>
     [ObservableProperty]
     private int _selectedNavIndex;
 
@@ -32,13 +32,17 @@ public partial class SidebarViewModel : ObservableObject
     /// <summary>Gets a value indicating whether the Services view is visible.</summary>
     public bool IsServicesVisible => SelectedNavIndex == 1;
 
+    /// <summary>Gets a value indicating whether the Deployments view is visible.</summary>
+    public bool IsDeploymentsVisible => SelectedNavIndex == 2;
+
     /// <summary>Gets a value indicating whether the Settings view is visible.</summary>
-    public bool IsSettingsVisible => SelectedNavIndex == 2;
+    public bool IsSettingsVisible => SelectedNavIndex == 3;
 
     partial void OnSelectedNavIndexChanged(int value)
     {
         OnPropertyChanged(nameof(IsPodsVisible));
         OnPropertyChanged(nameof(IsServicesVisible));
+        OnPropertyChanged(nameof(IsDeploymentsVisible));
         OnPropertyChanged(nameof(IsSettingsVisible));
     }
 }
