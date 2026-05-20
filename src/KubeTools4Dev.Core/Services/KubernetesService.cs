@@ -3,6 +3,7 @@ using k8s;
 using k8s.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace KubeTools4Dev.Core.Services;
 
@@ -246,6 +247,121 @@ public class KubernetesService(
                 yield return (type, item);
             }
         }
+    }
+
+    /// <summary>
+    /// Gets the deployments asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <returns>A list of deployments in the specified namespace.</returns>
+    public async Task<IEnumerable<V1Deployment>> GetDeploymentsAsync(string namespaceName = "default")
+    {
+        return (
+            IsAllNamespaces(namespaceName)
+                ? await Client.AppsV1.ListDeploymentForAllNamespacesAsync()
+                : await Client.AppsV1.ListNamespacedDeploymentAsync(namespaceName)
+            ).Items;
+    }
+
+    /// <summary>
+    /// Watches the deployments asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>An async enumerable of watch events.</returns>
+    public async IAsyncEnumerable<(WatchEventType Type, V1Deployment Item)> WatchDeploymentsAsync(
+        string namespaceName = "default",
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+        CancellationToken cancellationToken = default)
+    {
+        if (IsAllNamespaces(namespaceName))
+        {
+            await foreach (var (type, item) in Client.AppsV1
+                .WatchListDeploymentForAllNamespacesAsync(cancellationToken: cancellationToken))
+            {
+                yield return (type, item);
+            }
+        }
+        else
+        {
+            await foreach (var (type, item) in Client.AppsV1
+                .WatchListNamespacedDeploymentAsync(
+                    namespaceName,
+                    cancellationToken: cancellationToken))
+            {
+                yield return (type, item);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Patches the deployment asynchronous using a Strategic Merge Patch.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="deploymentName">Name of the deployment.</param>
+    /// <param name="replicas">The desired replica count.</param>
+    /// <param name="imageTag">The full image tag to apply to the first container.</param>
+    /// <returns>A task representing the asynchronous patch operation.</returns>
+    public async Task PatchDeploymentAsync(string namespaceName, string deploymentName, int replicas, string imageTag)
+    {
+        var current = await Client.AppsV1.ReadNamespacedDeploymentAsync(deploymentName, namespaceName);
+        var containerName = current.Spec.Template.Spec.Containers[0].Name;
+
+        var patchBody = JsonSerializer.Serialize(new
+        {
+            spec = new
+            {
+                replicas,
+                template = new
+                {
+                    spec = new
+                    {
+                        containers = new[]
+                        {
+                            new { name = containerName, image = imageTag }
+                        }
+                    }
+                }
+            }
+        });
+
+        await Client.AppsV1.PatchNamespacedDeploymentAsync(
+            new V1Patch(patchBody, V1Patch.PatchType.StrategicMergePatch),
+            deploymentName,
+            namespaceName);
+    }
+
+    /// <summary>
+    /// Restarts the deployment asynchronous by annotating the pod template metadata.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="deploymentName">Name of the deployment.</param>
+    /// <returns>A task representing the asynchronous restart operation.</returns>
+    public async Task RestartDeploymentAsync(string namespaceName, string deploymentName)
+    {
+        var timestamp = DateTime.UtcNow.ToString("o");
+
+        var patchBody = JsonSerializer.Serialize(new
+        {
+            spec = new
+            {
+                template = new
+                {
+                    metadata = new
+                    {
+                        annotations = new Dictionary<string, string>
+                        {
+                            ["kubectl.kubernetes.io/restartedAt"] = timestamp
+                        }
+                    }
+                }
+            }
+        });
+
+        await Client.AppsV1.PatchNamespacedDeploymentAsync(
+            new V1Patch(patchBody, V1Patch.PatchType.MergePatch),
+            deploymentName,
+            namespaceName);
     }
 
     /// <summary>
