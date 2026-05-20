@@ -127,4 +127,73 @@ public class DeploymentViewModelTests
 
         Assert.Equal(0, vm.DesiredReplicas);
     }
+
+    [Fact]
+    public void ImageTag_IsEmptyString_WhenContainersIsEmpty()
+    {
+        var deployment = new V1Deployment
+        {
+            Metadata = new V1ObjectMeta { Name = "x", NamespaceProperty = "y" },
+            Spec = new V1DeploymentSpec
+            {
+                Replicas = 1,
+                Selector = new V1LabelSelector(),
+                Template = new V1PodTemplateSpec
+                {
+                    Spec = new V1PodSpec { Containers = [] }
+                }
+            },
+            Status = new V1DeploymentStatus()
+        };
+
+        var vm = new DeploymentViewModel(deployment);
+
+        Assert.Equal(string.Empty, vm.ImageTag);
+    }
+
+    [Fact]
+    public void ReadyReplicas_IsZero_WhenStatusReadyReplicasIsNull()
+    {
+        var deployment = new V1Deployment
+        {
+            Metadata = new V1ObjectMeta { Name = "x", NamespaceProperty = "y" },
+            Spec = new V1DeploymentSpec
+            {
+                Replicas = 1,
+                Selector = new V1LabelSelector(),
+                Template = new V1PodTemplateSpec
+                {
+                    Spec = new V1PodSpec { Containers = [new V1Container { Name = "app", Image = "img:1" }] }
+                }
+            },
+            Status = new V1DeploymentStatus { ReadyReplicas = null }
+        };
+
+        var vm = new DeploymentViewModel(deployment);
+
+        Assert.Equal(0, vm.ReadyReplicas);
+    }
+
+    [Fact]
+    public void AvailableReplicas_IsZero_WhenStatusAvailableReplicasIsNull()
+    {
+        var deployment = new V1Deployment
+        {
+            Metadata = new V1ObjectMeta { Name = "x", NamespaceProperty = "y" },
+            Spec = new V1DeploymentSpec
+            {
+                Replicas = 1,
+                Selector = new V1LabelSelector(),
+                Template = new V1PodTemplateSpec
+                {
+                    Spec = new V1PodSpec { Containers = [new V1Container { Name = "app", Image = "img:1" }] }
+                }
+            },
+            Status = new V1DeploymentStatus { AvailableReplicas = null }
+        };
+
+        var vm = new DeploymentViewModel(deployment);
+
+        Assert.Equal(0, vm.AvailableReplicas);
+    }
 }

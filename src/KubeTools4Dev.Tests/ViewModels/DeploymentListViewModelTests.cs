@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using System;
+using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -162,6 +164,74 @@ public class DeploymentListViewModelTests
         vm.CancelCommand.Execute(null);
 
         Assert.False(vm.IsConfirmed);
+    }
+
+    // ── EditDeploymentDialogViewModel: whitespace image tag ───────────────────
+
+    [Fact]
+    public void EditDialog_ConfirmCommand_RejectsWhiteSpaceOnlyImageTag()
+    {
+        var vm = new EditDeploymentDialogViewModel("app", 2, "   ");
+
+        vm.ConfirmCommand.Execute(null);
+
+        Assert.False(vm.IsConfirmed);
+        Assert.False(string.IsNullOrEmpty(vm.ErrorMessage));
+    }
+
+    // ── UpdateFilteredList ────────────────────────────────────────────────────
+
+    [Fact]
+    public void UpdateFilteredList_EmptyFilter_ReturnsAllItems()
+    {
+        var vm = MakeVm();
+        AddDeploymentsToVm(vm,
+            MakeDeploymentVm("api", "production"),
+            MakeDeploymentVm("web", "staging"));
+
+        // Set to a filter first so clearing it triggers OnFilterTextChanged
+        vm.FilterText = "api";
+        vm.FilterText = string.Empty;
+
+        Assert.Equal(2, vm.Deployments.Count);
+    }
+
+    [Fact]
+    public void UpdateFilteredList_FilterByNamespace_ReturnsMatchingItems()
+    {
+        var vm = MakeVm();
+        AddDeploymentsToVm(vm,
+            MakeDeploymentVm("api", "production"),
+            MakeDeploymentVm("web", "staging"));
+
+        vm.FilterText = "staging";
+
+        Assert.Single(vm.Deployments);
+        Assert.Equal("web", vm.Deployments[0].Name);
+    }
+
+    [Fact]
+    public void UpdateFilteredList_FilterByName_ReturnsMatchingItems()
+    {
+        var vm = MakeVm();
+        AddDeploymentsToVm(vm,
+            MakeDeploymentVm("api", "production"),
+            MakeDeploymentVm("web", "staging"));
+
+        vm.FilterText = "api";
+
+        Assert.Single(vm.Deployments);
+        Assert.Equal("api", vm.Deployments[0].Name);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static void AddDeploymentsToVm(DeploymentListViewModel vm, params DeploymentViewModel[] items)
+    {
+        var field = typeof(DeploymentListViewModel)
+            .GetField("_allDeployments", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var list = (List<DeploymentViewModel>)field.GetValue(vm)!;
+        list.AddRange(items);
     }
 
     // ── Test double ───────────────────────────────────────────────────────────
