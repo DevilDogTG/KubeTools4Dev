@@ -88,4 +88,42 @@ public interface IKubernetesService
     IAsyncEnumerable<(WatchEventType Type, V1Service Item)> WatchServicesAsync(
         string namespaceName = "default",
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the deployments asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace. Pass empty string or "*" for all namespaces.</param>
+    /// <returns>A list of deployments in the specified namespace.</returns>
+    Task<IEnumerable<V1Deployment>> GetDeploymentsAsync(string namespaceName = "default");
+
+    /// <summary>
+    /// Watches the deployments asynchronous.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace. Pass empty string or "*" for all namespaces.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>An async enumerable of watch events containing the event type and the affected deployment.</returns>
+    IAsyncEnumerable<(WatchEventType Type, V1Deployment Item)> WatchDeploymentsAsync(
+        string namespaceName = "default",
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Patches the deployment asynchronous. Updates replica count and/or image tag on the first container
+    /// using a Strategic Merge Patch so that other containers are not affected.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="deploymentName">Name of the deployment.</param>
+    /// <param name="replicas">The desired replica count (must be ≥ 0).</param>
+    /// <param name="imageTag">The full image tag to apply to the first container (e.g. "nginx:1.25").</param>
+    /// <returns>A task representing the asynchronous patch operation.</returns>
+    Task PatchDeploymentAsync(string namespaceName, string deploymentName, int replicas, string imageTag);
+
+    /// <summary>
+    /// Restarts the deployment asynchronous. Applies a JSON Merge Patch setting the
+    /// <c>kubectl.kubernetes.io/restartedAt</c> annotation on the pod template metadata,
+    /// which causes a rolling restart equivalent to <c>kubectl rollout restart</c>.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="deploymentName">Name of the deployment.</param>
+    /// <returns>A task representing the asynchronous restart operation.</returns>
+    Task RestartDeploymentAsync(string namespaceName, string deploymentName);
 }
