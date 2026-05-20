@@ -1,0 +1,63 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:KubeTools4Dev.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="300"
+        x:Class="KubeTools4Dev.Views.EditDeploymentDialog"
+        x:DataType="vm:EditDeploymentDialogViewModel"
+        Icon="avares://KubeTools4Dev/Assets/app-icon.png"
+        Title="Edit Deployment"
+        Width="420" Height="300"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="16">
+        <!-- Deployment name header -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6" Margin="0,0,0,16">
+            <TextBlock Text="Deployment:" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding DeploymentName}" FontWeight="Bold" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Editable fields -->
+        <StackPanel Grid.Row="1" Spacing="12">
+            <StackPanel Spacing="4">
+                <TextBlock Text="Replica Count:" FontSize="12"/>
+                <NumericUpDown Value="{Binding Replicas}"
+                               Minimum="0"
+                               Increment="1"
+                               FormatString="0"
+                               Width="120"
+                               HorizontalAlignment="Left"/>
+            </StackPanel>
+            <StackPanel Spacing="4">
+                <TextBlock Text="Image Tag:" FontSize="12"/>
+                <TextBox Text="{Binding ImageTag}"
+                         PlaceholderText="e.g. nginx:1.25"
+                         Width="380"/>
+            </StackPanel>
+
+            <!-- Error message -->
+            <TextBlock Text="{Binding ErrorMessage}"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       Foreground="Red"
+                       TextWrapping="Wrap"
+                       MaxHeight="40"/>
+        </StackPanel>
+
+        <!-- Action buttons -->
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Spacing="8"
+                    Margin="0,16,0,0">
+            <Button Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    Width="80"/>
+            <Button Content="Confirm"
+                    Command="{Binding ConfirmCommand}"
+                    Classes="accent"
+                    Width="80"/>
+        </StackPanel>
+    </Grid>
+</Window>
