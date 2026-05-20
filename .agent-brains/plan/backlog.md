@@ -4,7 +4,8 @@
 _(none)_
 
 ## In Progress
-_(none)_
+- `plan/team-dispatch-poc.md` — PoC: automated agent team dispatch pipeline + Deployments page feature.
+- `plan/deployments-page.md` — Deployments page: list view, Rollout Restart action, Edit dialog (replica count + image tag).
 
 ## Atomic Plans
 _(none)_
