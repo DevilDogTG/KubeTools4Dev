@@ -76,6 +76,7 @@ public partial class App : Application
         // Transient is safer if they are "owned" by MainViewModel but we want DI to build them.
         services.AddTransient<PodListViewModel>();
         services.AddTransient<ServiceListViewModel>();
+        services.AddTransient<DeploymentListViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddTransient<PodDetailViewModel>();
         services.AddTransient<Func<PodViewModel, int, PodDetailViewModel>>(sp => (pod, tab) =>

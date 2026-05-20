@@ -50,6 +50,13 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     [ObservableProperty]
     private ServiceListViewModel _serviceList;
+
+    /// <summary>
+    /// The deployment list
+    /// </summary>
+    [ObservableProperty]
+    private DeploymentListViewModel _deploymentList;
+
     /// <summary>
     /// The settings view model
     /// </summary>
@@ -62,12 +69,14 @@ public partial class MainViewModel : ViewModelBase
     /// <param name="kubeService">The kube service.</param>
     /// <param name="podListViewModel">The pod list view model.</param>
     /// <param name="serviceListViewModel">The service list view model.</param>
+    /// <param name="deploymentListViewModel">The deployment list view model.</param>
     /// <param name="settingsViewModel">The settings view model.</param>
     /// <param name="logger">The logger.</param>
     public MainViewModel(
         IKubernetesService kubeService,
         PodListViewModel podListViewModel,
         ServiceListViewModel serviceListViewModel,
+        DeploymentListViewModel deploymentListViewModel,
         SettingsViewModel settingsViewModel,
         ILogger<MainViewModel> logger)
     {
@@ -76,6 +85,7 @@ public partial class MainViewModel : ViewModelBase
 
         PodList = podListViewModel;
         ServiceList = serviceListViewModel;
+        DeploymentList = deploymentListViewModel;
         Settings = settingsViewModel;
 
         // Auto-connect on start
@@ -89,6 +99,7 @@ public partial class MainViewModel : ViewModelBase
     {
         _logger.Information("Starting cleanup application");
         ServiceList?.Cleanup();
+        DeploymentList?.Dispose();
     }
 
     /// <summary>
@@ -114,6 +125,7 @@ public partial class MainViewModel : ViewModelBase
             IsConnected = true;
             await PodList.InitializeAsync();
             await ServiceList.InitializeAsync();
+            await DeploymentList.InitializeAsync();
         }
         else
         {
