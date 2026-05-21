@@ -1,7 +1,7 @@
 # Backlog
 
 ## Pending
-_(none)_
+- **Profile composition per role** — Extend `dev-team/team.md` (L0 + L2) to support `profiles: []` list per role and `profiles_append: []` for workspace augmentation. Update `sk-team-start` to load and merge N profiles in order (last wins on conflict). Replaces current prose "All base-developer rules apply" with a mechanical declaration. Design settled in session 2026-05-20; implement in a dedicated session on its own branch (touches only global `~/.agent-brains/` files, not repo code).
 
 ## In Progress
 - `plan/team-dispatch-poc.md` — PoC: automated agent team dispatch pipeline + Deployments page feature.
