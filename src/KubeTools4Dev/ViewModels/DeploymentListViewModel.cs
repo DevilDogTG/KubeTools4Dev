@@ -49,6 +49,11 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
     private DispatcherTimer? _refreshTimer;
 
     /// <summary>
+    /// Guards against double-dispose.
+    /// </summary>
+    private bool _disposed;
+
+    /// <summary>
     /// The current filter text.
     /// </summary>
     [ObservableProperty]
@@ -142,6 +147,8 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
     /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources.</param>
     protected virtual void Dispose(bool disposing)
     {
+        if (_disposed) return;
+        _disposed = true;
         if (disposing)
         {
             if (_refreshTimer != null)
@@ -220,7 +227,7 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
         if (owner is not null)
             await dialog.ShowDialog(owner);
         else
-            dialog.Show();
+            dialog.Show(); // non-blocking fallback for headless/test envs; IsConfirmed will be false
     }
 
     /// <summary>
