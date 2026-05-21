@@ -3,8 +3,6 @@
 ## Pending
 
 ## In Progress
-- `plan/team-dispatch-poc.md` — PoC: automated agent team dispatch pipeline + Deployments page feature.
-- `plan/deployments-page.md` — Deployments page: list view, Rollout Restart action, Edit dialog (replica count + image tag).
 
 ## Atomic Plans
 _(none)_
@@ -17,7 +15,8 @@ _(none)_
 - `archive/left-sidebar-navigation.md` — archived 2026-05-19 (completed and merged, PR #28).
 
 ## Completed
-- [x] Profile composition per role: `team.md` v2.0 `roles:` block, N-profile loading in `sk-team-start` v2.0 + `sk-team-dispatch` v1.2, prose cleanup in team-developer/team-reviewer profiles, workspace `profiles_append` example (QA PASS 2026-05-21).
+- [x] Profile composition per role: `team.md` v2.0 `roles:` block, N-profile loading in `sk-team-start` v2.0 + `sk-team-dispatch` v1.2, prose cleanup in team-developer/team-reviewer profiles, workspace `profiles_append` example (QA PASS 2026-05-21). PR #34 ✅ Merged.
+- [x] Agent team PoC + Deployments page: `sk-team-dispatch` extended to Copilot CLI, full pipeline run, Deployments page feature (QA PASS, 66/66 tests). PR #32 ✅ Merged. Release v1.2.7 published.
 - [x] Initialized workspace via Centralized Agent Framework `project-initializer` skill.
 - [x] Synchronized `main` and `develop` and deleted local `develop`.
 - [x] Cleaned up 9 stale local branches (`features/*`, `hotfix/*`, `release/*`).
