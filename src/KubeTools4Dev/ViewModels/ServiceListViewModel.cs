@@ -29,7 +29,12 @@ public partial class ServiceListViewModel : ViewModelBase
     /// <summary>
     /// The kube service
     /// </summary>
-    private readonly IKubernetesService _kubeService;
+    private IKubernetesService _kubeService;
+
+    /// <summary>
+    /// The current namespace filter (empty = all namespaces).
+    /// </summary>
+    private string _namespaceName = "";
 
     /// <summary>
     /// The logger
@@ -42,9 +47,14 @@ public partial class ServiceListViewModel : ViewModelBase
     private readonly ILoggerFactory _loggerFactory;
 
     /// <summary>
+    /// The cluster connection manager (used for cross-cluster port-conflict detection).
+    /// </summary>
+    private readonly IClusterConnectionManager _connectionManager;
+
+    /// <summary>
     /// The port forward service
     /// </summary>
-    private readonly IPortForwardService _portForwardService;
+    private IPortForwardService _portForwardService;
 
     /// <summary>
     /// The settings service
@@ -82,18 +92,21 @@ public partial class ServiceListViewModel : ViewModelBase
     /// <param name="kubeService">The kube service.</param>
     /// <param name="portForwardService">The port forward service.</param>
     /// <param name="settingsService">The settings service.</param>
+    /// <param name="connectionManager">The cluster connection manager for cross-cluster port-conflict checks.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="loggerFactory">The logger factory.</param>
     public ServiceListViewModel(
         IKubernetesService kubeService,
         IPortForwardService portForwardService,
         ISettingsService settingsService,
+        IClusterConnectionManager connectionManager,
         ILogger<ServiceListViewModel> logger,
         ILoggerFactory loggerFactory)
     {
         _kubeService = kubeService;
         _portForwardService = portForwardService;
         _settingsService = settingsService;
+        _connectionManager = connectionManager;
         _logger = logger;
         _loggerFactory = loggerFactory;
 
@@ -112,6 +125,26 @@ public partial class ServiceListViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Switches the view to a different cluster service, port-forward service, and namespace, then re-initializes.
+    /// </summary>
+    public async Task UpdateScopeAsync(
+        IKubernetesService kubeService,
+        IPortForwardService portForwardService,
+        string namespaceName)
+    {
+        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource?.Dispose();
+        _cancellationTokenSource = null;
+        _portForwardService.StopAll();
+
+        _kubeService = kubeService;
+        _portForwardService = portForwardService;
+        _namespaceName = namespaceName;
+
+        await InitializeAsync();
+    }
+
+    /// <summary>
     /// Initializes the asynchronous.
     /// </summary>
     public async Task InitializeAsync()
@@ -121,7 +154,7 @@ public partial class ServiceListViewModel : ViewModelBase
         {
             if (!_kubeService.IsConnected) return;
 
-            var services = await _kubeService.GetServicesAsync();
+            var services = await _kubeService.GetServicesAsync(_namespaceName);
 
             // Filter out internal kubernetes service or headless
             var relevantServices = services.Where(s =>
@@ -160,7 +193,10 @@ public partial class ServiceListViewModel : ViewModelBase
                         svc,
                         port,
                         _portForwardService,
-                        _settingsService);
+                        _settingsService)
+                    {
+                        IsPortInUseCheck = _connectionManager.IsLocalPortInUse
+                    };
                     viewModel.PropertyChanged += OnServicePropertyChanged;
                     _allServices.Add(viewModel);
                 }
@@ -398,7 +434,7 @@ public partial class ServiceListViewModel : ViewModelBase
                     continue;
                 }
 
-                await foreach (var (type, item) in _kubeService.WatchServicesAsync("", cancellationToken: token))
+                await foreach (var (type, item) in _kubeService.WatchServicesAsync(_namespaceName, cancellationToken: token))
                 {
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
@@ -445,7 +481,10 @@ public partial class ServiceListViewModel : ViewModelBase
                                             item,
                                             port,
                                             _portForwardService,
-                                            _settingsService);
+                                            _settingsService)
+                                        {
+                                            IsPortInUseCheck = _connectionManager.IsLocalPortInUse
+                                        };
                                         newVm.PropertyChanged += OnServicePropertyChanged;
                                         _allServices.Add(newVm);
                                     }

@@ -96,6 +96,9 @@ public class SettingsService : ISettingsService
     public ServicesSettings Services => _settings.Services;
 
     /// <inheritdoc />
+    public ClustersSettings Clusters => _settings.Clusters;
+
+    /// <inheritdoc />
     public event Action? SettingsChanged;
 
     /// <inheritdoc />
@@ -181,6 +184,7 @@ public class SettingsService : ISettingsService
                     _settings.General ??= new GeneralSettings();
                     _settings.Pods ??= new PodsSettings();
                     _settings.Services ??= new ServicesSettings();
+                    _settings.Clusters ??= new ClustersSettings();
                 }
             }
             catch (Exception ex)

@@ -29,7 +29,12 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// The kube service
     /// </summary>
-    private readonly IKubernetesService _kubeService;
+    private IKubernetesService _kubeService;
+
+    /// <summary>
+    /// The current namespace filter (empty = all namespaces).
+    /// </summary>
+    private string _namespaceName = "";
     /// <summary>
     /// The logger
     /// </summary>
@@ -111,6 +116,22 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
+    /// Switches the view to a different cluster service and namespace, then re-initializes.
+    /// </summary>
+    public async Task UpdateScopeAsync(IKubernetesService kubeService, string namespaceName)
+    {
+        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource?.Dispose();
+        _cancellationTokenSource = null;
+        _refreshTimer.Stop();
+
+        _kubeService = kubeService;
+        _namespaceName = namespaceName;
+
+        await InitializeAsync();
+    }
+
+    /// <summary>
     /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
     /// </summary>
     public void Dispose()
@@ -129,8 +150,8 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
         {
             if (!_kubeService.IsConnected) return;
 
-            // Initial Load - All Namespaces
-            var pods = await _kubeService.GetPodsAsync(""); // "" = All namespaces
+            // Initial Load
+            var pods = await _kubeService.GetPodsAsync(_namespaceName);
             var podVms = pods.Select(p => new PodViewModel(p));
 
             _allPods.Clear();
@@ -325,8 +346,7 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
         {
             try
             {
-                // Watch all namespaces
-                await foreach (var (type, item) in _kubeService.WatchPodsAsync("", cancellationToken: token))
+                await foreach (var (type, item) in _kubeService.WatchPodsAsync(_namespaceName, cancellationToken: token))
                 {
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {

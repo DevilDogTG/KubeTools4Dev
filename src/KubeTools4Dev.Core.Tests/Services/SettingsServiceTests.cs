@@ -139,4 +139,43 @@ public class SettingsServiceTests : IDisposable
         var svc = CreateService();
         Assert.Equal(string.Empty, svc.GetDefaultLogPath());
     }
+
+    [Fact]
+    public void Save_ThenLoad_RoundtripsClusterEntry()
+    {
+        var svc = CreateService();
+        var entry = new ClusterEntry
+        {
+            Id = Guid.NewGuid(),
+            KubeConfigPath = "/home/user/.kube/config",
+            ContextName = "my-context",
+            DisplayName = "My Cluster",
+            IsEnabled = true
+        };
+        svc.Clusters.Clusters.Add(entry);
+        svc.Save();
+
+        var svc2 = CreateService();
+
+        Assert.Single(svc2.Clusters.Clusters);
+        var loaded = svc2.Clusters.Clusters[0];
+        Assert.Equal(entry.Id, loaded.Id);
+        Assert.Equal(entry.KubeConfigPath, loaded.KubeConfigPath);
+        Assert.Equal(entry.ContextName, loaded.ContextName);
+        Assert.Equal(entry.DisplayName, loaded.DisplayName);
+        Assert.True(loaded.IsEnabled);
+    }
+
+    [Fact]
+    public void Load_MissingClustersKey_ClustersPropertyIsNotNull()
+    {
+        var partial = new { General = new { LogLevel = "Debug" } };
+        File.WriteAllText(SettingsFilePath, JsonSerializer.Serialize(partial));
+
+        var svc = CreateService();
+
+        Assert.NotNull(svc.Clusters);
+        Assert.Empty(svc.Clusters.Clusters);
+        Assert.True(svc.Clusters.AutoDiscoverDefaultKubeConfig);
+    }
 }

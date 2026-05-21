@@ -1,0 +1,85 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:KubeTools4Dev.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="400"
+        x:Class="KubeTools4Dev.Views.AddClusterDialog"
+        x:DataType="vm:AddClusterDialogViewModel"
+        Icon="avares://KubeTools4Dev/Assets/app-icon.png"
+        Title="Add Cluster"
+        Width="520" Height="420"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="16">
+
+        <!-- Path row -->
+        <TextBlock Grid.Row="0" Text="Kubeconfig file path:" Margin="0,0,0,4" FontWeight="SemiBold"/>
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,12">
+            <TextBox Grid.Column="0"
+                     Text="{Binding KubeConfigPath}"
+                     PlaceholderText="Path to kubeconfig file…"
+                     Margin="0,0,6,0"/>
+            <Button Grid.Column="1" x:Name="BrowseButton"
+                    Content="Browse…"
+                    Margin="0,0,6,0"
+                    Width="80"/>
+            <Button Grid.Column="2"
+                    Content="Load"
+                    Command="{Binding LoadContextsCommand}"
+                    Width="60"/>
+        </Grid>
+
+        <!-- Context list -->
+        <Grid Grid.Row="2" RowDefinitions="Auto,*">
+            <TextBlock Grid.Row="0" Text="Select contexts to add:"
+                       Margin="0,0,0,4" FontSize="12" Opacity="0.7"/>
+            <ListBox Grid.Row="1"
+                     ItemsSource="{Binding AvailableContexts}"
+                     SelectionMode="Multiple"
+                     BorderThickness="1"
+                     CornerRadius="4">
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="vm:SelectableContext">
+                        <CheckBox IsChecked="{Binding IsSelected}"
+                                  Content="{Binding Name}"
+                                  Padding="4,2"/>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+
+        <!-- Error message -->
+        <TextBlock Grid.Row="3"
+                   Text="{Binding ErrorMessage}"
+                   IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   Foreground="Red"
+                   TextWrapping="Wrap"
+                   Margin="0,8,0,0"
+                   MaxHeight="36"/>
+
+        <!-- Loading indicator -->
+        <ProgressBar Grid.Row="3"
+                     IsIndeterminate="True"
+                     IsVisible="{Binding IsLoadingContexts}"
+                     Height="4"
+                     Margin="0,8,0,0"/>
+
+        <!-- Action buttons -->
+        <StackPanel Grid.Row="4"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Spacing="8"
+                    Margin="0,12,0,0">
+            <Button Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    Width="80"/>
+            <Button Content="Add"
+                    Command="{Binding ConfirmCommand}"
+                    Classes="accent"
+                    Width="80"/>
+        </StackPanel>
+
+    </Grid>
+</Window>

@@ -165,6 +165,24 @@ public partial class PortForwardService(
     }
 
     /// <summary>
+    /// Returns the set of local ports currently being actively forwarded.
+    /// </summary>
+    public IReadOnlySet<int> GetActiveLocalPorts()
+    {
+        var ports = new HashSet<int>();
+        foreach (var key in _activeForwards.Keys)
+        {
+            // Key format: "{namespace}/{service}:{localPort}"
+            var colonIdx = key.LastIndexOf(':');
+            if (colonIdx >= 0 && int.TryParse(key.AsSpan(colonIdx + 1), out var port))
+            {
+                ports.Add(port);
+            }
+        }
+        return ports;
+    }
+
+    /// <summary>
     /// Stops all active port forwards.
     /// </summary>
     public void StopAll()

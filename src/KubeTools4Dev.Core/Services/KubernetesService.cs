@@ -39,22 +39,37 @@ public class KubernetesService(
     public bool IsConnected => _client != null;
 
     /// <summary>
-    /// Connects the asynchronous.
+    /// Connects using the default context of the given kubeconfig file (or the system default).
     /// </summary>
-    /// <param name="kubeConfigPath">The kube configuration path.</param>
-    /// <returns>Current context name</returns>
-    public async Task<string> ConnectAsync(string? kubeConfigPath = null)
+    public Task<string> ConnectAsync(string? kubeConfigPath = null)
+        => ConnectAsync(kubeConfigPath, contextName: null);
+
+    /// <summary>
+    /// Connects to a specific context within a kubeconfig file.
+    /// </summary>
+    public async Task<string> ConnectAsync(string? kubeConfigPath, string? contextName)
     {
         try
         {
-            logger.Information("Connecting to Kubernetes...");
-            KubernetesClientConfiguration config = string.IsNullOrEmpty(kubeConfigPath)
-                ? KubernetesClientConfiguration.BuildDefaultConfig()
-                : KubernetesClientConfiguration.BuildConfigFromConfigFile(kubeConfigPath);
+            logger.LogInformation("Connecting to Kubernetes (context: {Context})...", contextName ?? "default");
+            KubernetesClientConfiguration config;
+
+            if (string.IsNullOrEmpty(kubeConfigPath))
+            {
+                config = KubernetesClientConfiguration.BuildDefaultConfig();
+            }
+            else if (string.IsNullOrEmpty(contextName))
+            {
+                config = KubernetesClientConfiguration.BuildConfigFromConfigFile(kubeConfigPath);
+            }
+            else
+            {
+                config = KubernetesClientConfiguration.BuildConfigFromConfigFile(
+                    kubeconfig: new FileInfo(kubeConfigPath),
+                    currentContext: contextName);
+            }
 
             _client = new Kubernetes(config);
-
-            // Verify connection by listing nodes or just checking api versions
             await _client.Version.GetCodeAsync();
 
             logger.LogInformation("Connected to Kubernetes successfully.");
@@ -62,10 +77,25 @@ public class KubernetesService(
         }
         catch (Exception ex)
         {
-            // Log error
             logger.Error(ex, "Failed to connect to Kubernetes");
             _client = null;
             return string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Enumerates all context names from the given kubeconfig file without creating a connection.
+    /// </summary>
+    public static IReadOnlyList<string> EnumerateContexts(string kubeConfigPath)
+    {
+        try
+        {
+            var config = KubernetesClientConfiguration.LoadKubeConfig(kubeConfigPath);
+            return config.Contexts?.Select(c => c.Name).ToList() ?? [];
+        }
+        catch
+        {
+            return [];
         }
     }
 
@@ -364,6 +394,15 @@ public class KubernetesService(
             new V1Patch(patchBody, V1Patch.PatchType.MergePatch),
             deploymentName,
             namespaceName);
+    }
+
+    /// <summary>
+    /// Gets all namespace names in the cluster.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetNamespacesAsync()
+    {
+        var result = await Client.CoreV1.ListNamespaceAsync();
+        return result.Items?.Select(n => n.Metadata.Name).ToList() ?? [];
     }
 
     /// <summary>

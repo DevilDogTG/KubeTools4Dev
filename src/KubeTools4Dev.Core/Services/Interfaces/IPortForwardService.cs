@@ -25,4 +25,9 @@ public interface IPortForwardService
     /// Stops all active port forwards.
     /// </summary>
     void StopAll();
+
+    /// <summary>
+    /// Returns the set of local ports currently being actively forwarded by this instance.
+    /// </summary>
+    IReadOnlySet<int> GetActiveLocalPorts();
 }

@@ -4,36 +4,30 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="using:KubeTools4Dev.Views"
+        xmlns:coreVm="using:KubeTools4Dev.Core.ViewModels"
         xmlns:material="using:Material.Icons.Avalonia"
-        mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="700"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
         x:Class="KubeTools4Dev.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="avares://KubeTools4Dev/Assets/app-icon.png"
         Title="Kubernetes Tools (for Developer)">
 
     <Grid RowDefinitions="Auto, *">
-        <!-- Header / Status Bar -->
-        <Border Grid.Row="0" Margin="5" Padding="3" Background="{DynamicResource SemiColorBackground0}" CornerRadius="4">
-             <Grid ColumnDefinitions="Auto, *, Auto">
-                 <StackPanel Orientation="Horizontal" Spacing="10" Grid.Column="0">
-                     <TextBlock Text="Status:" VerticalAlignment="Center" FontWeight="Bold"/>
-                     <TextBlock Text="{Binding ConnectionStatus}" VerticalAlignment="Center"/>
-                     <Button Content="Reconnect" Command="{Binding ConnectCommand}" IsVisible="{Binding !IsConnected}" Classes="Warning Small"/>
-                 </StackPanel>
 
-                 <TextBlock Grid.Column="2" 
-                            Text="{Binding ClusterName, StringFormat='Cluster: {0}'}" 
-                            VerticalAlignment="Center" 
-                            FontWeight="SemiBold"
-                            Margin="10,0"
-                            IsVisible="{Binding IsConnected}"/>
-             </Grid>
+        <!-- Header / Title Bar -->
+        <Border Grid.Row="0" Margin="5,5,5,0" Padding="10,4" Background="{DynamicResource SemiColorBackground0}" CornerRadius="4">
+            <Grid ColumnDefinitions="Auto, *, Auto">
+                <StackPanel Orientation="Horizontal" Spacing="8" Grid.Column="0" VerticalAlignment="Center">
+                    <material:MaterialIcon Kind="Kubernetes" Width="20" Height="20"/>
+                    <TextBlock Text="KubeTools4Dev" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
         </Border>
 
         <!-- Body: Sidebar + Content -->
         <Grid Grid.Row="1" ColumnDefinitions="Auto, *" Margin="5">
 
-            <!-- LEFT SIDEBAR NAVIGATION -->
+            <!-- LEFT SIDEBAR -->
             <Border Grid.Column="0" Classes="SidebarNav" CornerRadius="4" Margin="0,0,5,0"
                     Width="{Binding Sidebar.SidebarWidth}">
                 <Border.Transitions>
@@ -57,41 +51,25 @@
                         </Panel>
                     </Button>
 
-                    <ListBox SelectedIndex="{Binding Sidebar.SelectedNavIndex, Mode=TwoWay}"
-                             Classes="SidebarNavList">
-                        <ListBoxItem Classes="SidebarNavItem" ToolTip.Tip="Pods">
-                            <Grid ColumnDefinitions="20,*">
-                                <material:MaterialIcon Kind="LayersTriple" Width="20" Height="20"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                <TextBlock Grid.Column="1" Text="Pods" Margin="8,0,0,0" VerticalAlignment="Center"
-                                           IsVisible="{Binding Sidebar.IsSidebarExpanded}"/>
-                            </Grid>
-                        </ListBoxItem>
-                        <ListBoxItem Classes="SidebarNavItem" ToolTip.Tip="Services">
-                            <Grid ColumnDefinitions="20,*">
-                                <material:MaterialIcon Kind="ShareVariant" Width="20" Height="20"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                <TextBlock Grid.Column="1" Text="Services" Margin="8,0,0,0" VerticalAlignment="Center"
-                                           IsVisible="{Binding Sidebar.IsSidebarExpanded}"/>
-                            </Grid>
-                        </ListBoxItem>
-                        <ListBoxItem Classes="SidebarNavItem" ToolTip.Tip="Deployments">
-                            <Grid ColumnDefinitions="20,*">
-                                <material:MaterialIcon Kind="AlphaD" Width="20" Height="20"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                <TextBlock Grid.Column="1" Text="Deployments" Margin="8,0,0,0" VerticalAlignment="Center"
-                                           IsVisible="{Binding Sidebar.IsSidebarExpanded}"/>
-                            </Grid>
-                        </ListBoxItem>
-                        <ListBoxItem Classes="SidebarNavItem" ToolTip.Tip="Settings">
-                            <Grid ColumnDefinitions="20,*">
-                                <material:MaterialIcon Kind="Cog" Width="20" Height="20"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                <TextBlock Grid.Column="1" Text="Settings" Margin="8,0,0,0" VerticalAlignment="Center"
-                                           IsVisible="{Binding Sidebar.IsSidebarExpanded}"/>
-                            </Grid>
-                        </ListBoxItem>
-                    </ListBox>
+                    <!-- Settings button at bottom -->
+                    <Button DockPanel.Dock="Bottom"
+                            Command="{Binding ShowSettingsCommand}"
+                            Classes="SidebarNavItem"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Margin="4,2,4,4"
+                            ToolTip.Tip="Settings">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <material:MaterialIcon Kind="Cog" Width="18" Height="18"/>
+                            <TextBlock Text="Settings" VerticalAlignment="Center"
+                                       IsVisible="{Binding Sidebar.IsSidebarExpanded}"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Cluster Tree (wrapper panel handles IsVisible so DataContext binding stays clean) -->
+                    <Panel IsVisible="{Binding Sidebar.IsSidebarExpanded}">
+                        <views:ClusterTreeView DataContext="{Binding ClusterTree}"/>
+                    </Panel>
 
                 </DockPanel>
             </Border>
@@ -99,18 +77,43 @@
             <!-- MAIN CONTENT AREA -->
             <Border Grid.Column="1" Background="{DynamicResource SemiColorBackground0}" CornerRadius="4">
                 <Panel>
-                    <Panel IsVisible="{Binding Sidebar.IsPodsVisible}">
+
+                    <!-- Welcome / empty state -->
+                    <Panel IsVisible="{Binding IsWelcomePanelVisible}">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                            <material:MaterialIcon Kind="Kubernetes" Width="64" Height="64" Opacity="0.3"
+                                                   HorizontalAlignment="Center"/>
+                            <TextBlock Text="Select a resource from the cluster tree"
+                                       HorizontalAlignment="Center"
+                                       Opacity="0.5"
+                                       FontSize="14"/>
+                            <TextBlock Text="Double-click a cluster to connect"
+                                       HorizontalAlignment="Center"
+                                       Opacity="0.4"
+                                       FontSize="12"/>
+                        </StackPanel>
+                    </Panel>
+
+                    <!-- Pods -->
+                    <Panel IsVisible="{Binding IsPodsPanelVisible}">
                         <views:PodListView DataContext="{Binding PodList}"/>
                     </Panel>
-                    <Panel IsVisible="{Binding Sidebar.IsServicesVisible}">
+
+                    <!-- Services -->
+                    <Panel IsVisible="{Binding IsServicesPanelVisible}">
                         <views:ServiceListView DataContext="{Binding ServiceList}"/>
                     </Panel>
-                    <Panel IsVisible="{Binding Sidebar.IsDeploymentsVisible}">
+
+                    <!-- Deployments -->
+                    <Panel IsVisible="{Binding IsDeploymentsPanelVisible}">
                         <views:DeploymentListView DataContext="{Binding DeploymentList}"/>
                     </Panel>
-                    <Panel IsVisible="{Binding Sidebar.IsSettingsVisible}">
+
+                    <!-- Settings -->
+                    <Panel IsVisible="{Binding IsSettingsPanelVisible}">
                         <views:SettingsView DataContext="{Binding Settings}"/>
                     </Panel>
+
                 </Panel>
             </Border>
 
