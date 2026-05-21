@@ -1,65 +1,64 @@
 # Handover: Reviewer → QA
-**Team:** dev-team  
-**Date:** 2026-05-20  
-**From:** reviewer  
+
+**Team:** dev-team
+**Task:** team-profile-composition
+**Date:** 2025-07-14
+**From:** reviewer
 **To:** qa
 
 ---
 
-## What Was Done
+## Review Result
 
-- Checked out `feature/deployments-page` and reviewed the full diff against `main` (23 files, +2017 / -7 lines).
-- Verified all 18 plan checklist items are implemented (service layer, viewmodels, views, wiring, tests).
-- Verified compliance against architecture notes AN-01 through AN-08.
-- Performed security scan: no hardcoded secrets or injection vectors found.
-- Checked standard compliance: XML doc, logging, async/CancellationToken, IDisposable pattern.
-- Ran test gate: **59/59 tests passed** (`dotnet test --no-build`, 2.4 s).
-- Wrote full review notes at `.agent-brains/teams/dev-team/review-deployments-page.md`.
+**PASS** — All 8 acceptance criteria verified against actual on-disk file content. No blocking issues. One non-blocking finding (missing 4-profile limit guard in `sk-team-start`). One suggestion (placeholder alias inconsistency in `team-dispatch.md`). Framework changes are internally consistent and safe to validate end-to-end.
 
 ---
 
-## Decisions Made
+## What QA Must Validate
 
-- **Verdict: PASS**
-- Three non-blocking issues and three suggestions documented in review notes — none block QA.
-- NB-01 (logging pattern): pre-existing codebase-wide non-compliance with `[LoggerMessage]` standard; new code follows the established pattern. No blocking action.
-- NB-02 (missing finalizer): class has no unmanaged resources; risk is negligible.
-- NB-03 (plan AC-12 text): plan document contains a 1-based vs 0-based index ambiguity. Implementation is correct (0-based, consistent with codebase). AC-12 text should be updated in the plan but does not block QA.
+QA must perform end-to-end validation of the profile-composition framework. Verify the following:
 
----
+1. **AC-1** — Open `~/.agent-brains/teams/dev-team/team.md`. Confirm `version: 2.0`, a `roles:` block with `profiles:` lists for all five roles, the collision rule (`last profile wins`), and the ≤4-profile limit, all present.
 
-## Open Questions / Items QA Should Be Aware Of
+2. **AC-2** — Open `~/.agent-brains/profiles/team-developer/AGENT.md`. Confirm no `## Base Profile` section and no "All rules from the `base-developer` profile apply" text.
 
-- **NB-01**: `DeploymentListViewModel` uses direct `_logger.LogError(...)` calls (no `[LoggerMessage]`). Pre-existing pattern — does not block, but the codebase has a logging technical debt to address globally.
-- **NB-02**: `IDisposable` finalizer absent from `DeploymentListViewModel`. Low risk (managed resources only) but not fully compliant with the "full Dispose(bool) pattern" standard.
-- **NB-03**: Plan Acceptance Criteria AC-12 says `SelectedNavIndex == 3` for Deployments; actual implementation uses `SelectedNavIndex == 2` (0-based). Implementation is correct; AC-12 text is the error. QA should validate against the *implementation* (0-based: Pods=0, Services=1, Deployments=2, Settings=3).
-- **S-01**: `ShowEditDialogAsync` fallback to `dialog.Show()` (non-blocking) when running headless. Unreachable in production but creates a non-awaited dialog path in test/CI environments. Covered by the `protected virtual ShowEditDialogAsync` override in tests.
-- Developer OQ-03: `RolloutRestartCommand` only surfaces errors, not success. No toast/snackbar on successful restart. AC-06 asks for "a success or error notification" — QA should verify whether the test criteria consider a cleared `ErrorMessage` (empty string) as satisfying the success notification requirement, or whether a positive `StatusMessage` is needed.
+3. **AC-3** — Open `~/.agent-brains/profiles/team-reviewer/AGENT.md`. Confirm Review Rule 4 makes no reference to `base-developer`.
 
----
+4. **AC-4** — Open `~/.agent-brains/skills/team-start/team-start.md`. Confirm Step 3 reads global `profiles:`, appends workspace `profiles_append:`, loads files in order, and concatenates (last wins). Confirm the announce block in Step 5 uses `Profiles: [...]`.
 
-## Expected From Next Role (QA)
+5. **AC-5** — Open `~/.agent-brains/skills/team-dispatch/team-dispatch.md`. Confirm Step 4a wraps each inlined profile with `--- BEGIN PROFILE: [profile-id] ---` / `--- END PROFILE: [profile-id] ---` separators. Confirm Copilot CLI Notes section references the same format.
 
-- Validate all 15 acceptance criteria in `.agent-brains/plan/deployments-page.md` (note: validate AC-12 against 0-based index 2, not the text's "index 3").
-- Pay special attention to:
-  - **AC-06**: Verify "success or error notification" requirement for Rollout Restart — the current implementation only shows error (no explicit success message). Determine if this is a gap.
-  - **AC-08 / AC-09**: Dialog validation path — the test suite covers this with unit tests; QA should confirm the DataGrid row updates on the next watch event or immediate refresh after edit.
-  - **AC-5**: Live watch loop update without full reload.
-  - **AC-10**: Error displayed (not swallowed) on Kubernetes API failure.
-- Write additional edge-case tests if coverage is missing.
-- Produce QA report at `.agent-brains/teams/dev-team/qa-deployments-page.md` with final PASS/FAIL verdict.
+6. **AC-6** — Confirm `R:\DevDogs\KubeTools4Dev\.agent-brains\teams\dev-team\team.md` exists and contains `profiles_append: [csharp-developer]` for the `developer` role, with no `profiles:` key.
+
+7. **AC-7** — Confirm the workspace `team.md` comment block documents the effective set as `[base-developer, team-developer, csharp-developer]`.
+
+8. **AC-8** — Re-confirm the `sk-team-start` announce block (Step 5) shows `Profiles: [...]` and not the old `(team-[role] profile active)` text.
+
+### End-to-End Scenario (recommended)
+
+Simulate a `sk-team-start as developer` invocation mentally or by dry-run trace:
+- Global `team.md` gives `profiles: [base-developer, team-developer]`.
+- Workspace `team.md` gives `profiles_append: [csharp-developer]`.
+- Resolved list: `[base-developer, team-developer, csharp-developer]` — 3 entries, within the ≤4 limit.
+- Each profile file path resolves to `~/.agent-brains/profiles/[id]/AGENT.md`.
+- Announce block should show: `Profiles: base-developer, team-developer, csharp-developer`.
 
 ---
 
-## Key Files
+## Files Changed
 
-| File | Purpose |
-|---|---|
-| `.agent-brains/teams/dev-team/review-deployments-page.md` | Full review notes (this handover references) |
-| `.agent-brains/plan/deployments-page.md` | Plan + 15 acceptance criteria + architecture notes |
-| `src/KubeTools4Dev/ViewModels/DeploymentListViewModel.cs` | Main list VM (watch loop, commands, IDisposable) |
-| `src/KubeTools4Dev/ViewModels/EditDeploymentDialogViewModel.cs` | Dialog VM (validation, CloseCallback) |
-| `src/KubeTools4Dev.Core/Services/KubernetesService.cs` | New service methods (patch strategies) |
-| `src/KubeTools4Dev.Tests/ViewModels/DeploymentListViewModelTests.cs` | 8 command + validation tests |
-| `src/KubeTools4Dev.Tests/ViewModels/DeploymentViewModelTests.cs` | 5 property mapping tests |
-| `src/KubeTools4Dev.Core.Tests/ViewModels/SidebarViewModelTests.cs` | Updated sidebar index tests |
+| File | Location | Change Summary |
+|------|----------|----------------|
+| `team.md` (global) | `~/.agent-brains/teams/dev-team/team.md` | Migrated to v2.0: `roles:` block, Profile Resolution Rules section, updated table and Cross-Provider line |
+| `team-start.md` | `~/.agent-brains/skills/team-start/team-start.md` | Bumped to v2.0: N-profile resolution algorithm in Step 3, updated announce block to `Profiles: [...]` |
+| `team-dispatch.md` | `~/.agent-brains/skills/team-dispatch/team-dispatch.md` | Bumped to v1.2: Step 4a inlines all N profiles with BEGIN/END separators, updated Copilot CLI Notes |
+| `team-developer/AGENT.md` | `~/.agent-brains/profiles/team-developer/AGENT.md` | Removed `## Base Profile` section and "All base-developer rules apply" prose |
+| `team-reviewer/AGENT.md` | `~/.agent-brains/profiles/team-reviewer/AGENT.md` | Rule 4 rewritten to remove `base-developer` reference; rule text preserved as self-contained statement |
+| `team.md` (workspace) | `R:\DevDogs\KubeTools4Dev\.agent-brains\teams\dev-team\team.md` | New file: workspace override using `profiles_append: [csharp-developer]` for developer role |
+
+---
+
+## Non-blocking Findings for QA Awareness
+
+**NB-1 — `sk-team-start` has no 4-profile limit guard.**
+The `## Profile Resolution Rules` in `team.md` documents a maximum of 4 profiles per role, but `sk-team-start` Step 3 does not validate or reject lists exceeding this limit. This does not affect correctness of the current configuration (which has 3 profiles for the developer role) but could silently allow future violations. Flagged for a follow-up fix by the Developer.

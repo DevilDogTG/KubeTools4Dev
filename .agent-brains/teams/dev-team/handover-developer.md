@@ -1,153 +1,34 @@
-# Developer Handover Memo — Deployments Page
+# Handover: Developer → Reviewer
 
-> **From:** developer role (Copilot)  
-> **To:** dev-team (next role: QA / reviewer)  
-> **Branch:** `feature/deployments-page`  
-> **Date:** 2026-05-20  
-> **Build:** ✅ 0W / 0E (`dotnet build -warnaserror`)  
-> **Tests:** ✅ 59/59 passed (`dotnet test`)
-
----
+**Team:** dev-team  
+**Task:** team-profile-composition  
+**Date:** 2026-05-21  
+**From:** developer  
+**To:** reviewer
 
 ## What Was Done
 
-All 18 checklist items in `deployments-page.md` are complete. The feature adds a fully functional **Deployments** page to KubeTools4Dev — live-watching Kubernetes deployments across all namespaces, allowing replica count / image tag edits via a modal dialog, and supporting rollout restarts.
-
-### Items 1.1 & 1.2 — Service layer
-
-Added four methods to `IKubernetesService`:
-
-| Method | Description |
-|---|---|
-| `GetDeploymentsAsync(namespace, ct)` | One-shot list (all or single namespace) |
-| `WatchDeploymentsAsync(namespace, onEvent, ct)` | Long-running Kubernetes watch |
-| `PatchDeploymentAsync(name, namespace, replicas, imageTag, ct)` | Strategic Merge Patch — reads existing container name first, builds patch |
-| `RestartDeploymentAsync(name, namespace, ct)` | JSON Merge Patch on `spec.template.metadata.annotations` with ISO 8601 timestamp |
-
-### Items 2.1–2.3 — Core ViewModels
-
-- `DeploymentViewModel` wraps `V1Deployment` with 6 observable properties and an `Update()` method.
-- `SidebarViewModel` gained `IsDeploymentsVisible` at index 2 (0-based). Settings shifted to index 3.
-- `SidebarViewModelTests` updated: `[InlineData]` expanded to 4 parameters, new `IsDeploymentsVisible` assertions.
-
-### Items 3.1–3.4 — List & Dialog ViewModels
-
-- `DeploymentListViewModel`: watch loop, `ObservableCollection<DeploymentViewModel>`, filter, `DispatcherTimer` for `LastRefreshTime`, `RolloutRestartCommand`, `EditDeploymentCommand`, `IDisposable`. `ShowEditDialogAsync` is `protected virtual` for testability.
-- `EditDeploymentDialogViewModel`: `Replicas`, `ImageTag`, `ErrorMessage`, `ConfirmCommand` (validates both fields), `CancelCommand`, nullable `CloseCallback` property (set by code-behind, not constructor — so tests can call `ConfirmCommand` without a real window).
-
-### Items 4.1–4.3 — Views
-
-- `DeploymentListView.axaml` — filter bar + DataGrid (7 columns: Namespace, Name, Desired, Ready, Available, Image Tag, Actions).
-- `EditDeploymentDialog.axaml` — Window modal: deployment name label, `NumericUpDown` (replicas), `TextBox` (image tag), error TextBlock, Confirm / Cancel.
-- `MainWindow.axaml` — Deployments `ListBoxItem` (index 2, `AlphaD` MaterialIcon) and `DeploymentListView` Panel bound to `Sidebar.IsDeploymentsVisible`.
-
-### Items 5.1–5.2 — Wiring
-
-- `MainViewModel` injects `DeploymentListViewModel`, calls `InitializeAsync()` in `Connect()`, `Dispose()` in `Cleanup()`.
-- `App.axaml.cs` registers `DeploymentListViewModel` as `Transient`.
-
-### Items 6.1–6.2 — Tests
-
-| File | Tests |
-|---|---|
-| `DeploymentViewModelTests.cs` | 5 tests: property mapping, `Update()`, image tag parsing, null containers, null replicas |
-| `DeploymentListViewModelTests.cs` | 8 tests: RolloutRestart success/failure/error-clear, EditDeployment confirm/cancel, dialog validation (negative replicas, empty image tag) |
-
----
-
-## Decisions & Deviations
-
-### D-01 — Sidebar indices (0-based, not 1-based)
-
-The architect handover memo used language like "index 3 for deployments" and "index 4 for settings". The existing code and tests use **0-based** indices:
-
-| Page | Index |
-|---|---|
-| Pods | 0 |
-| Services | 1 |
-| Deployments | **2** (new) |
-| Settings | **3** (shifted from 2) |
-
-This is the correct implementation. The `SidebarViewModelTests` `[InlineData]` entries confirm it.
-
-### D-02 — No `RefreshIntervalSeconds` property
-
-The plan mentioned a "refresh interval spinner". Deployments are driven by a **Kubernetes watch** (streaming), not polling. The `DispatcherTimer` only updates `LastRefreshTime` (a UI label). Adding a user-configurable timer interval would require `ISettingsService` coupling out of scope for this iteration.
-
-### D-03 — `DispatcherTimer` deferred to `InitializeAsync()`
-
-Created in `InitializeAsync()` instead of the constructor so xUnit tests can instantiate `DeploymentListViewModel` without an Avalonia platform/dispatcher. If created in the constructor the test would throw `InvalidOperationException` (no Avalonia dispatcher on the thread).
-
-### D-04 — `EditDeploymentDialogViewModel.CloseCallback` pattern
-
-Used a nullable `Action? CloseCallback` property (set by code-behind, not injected via constructor) so tests can exercise `ConfirmCommand` and `CancelCommand` without passing a real dialog-closing action. The code-behind sets `vm.CloseCallback = () => dialog.Close()` before calling `ShowDialog`.
-
-### D-05 — `ShowEditDialogAsync` is `protected virtual`
-
-This allows `TestableDeploymentListViewModel` (inner class in the test file) to override the method and capture the dialog VM for assertions — without needing a real Avalonia window.
-
-### D-06 — Strategic Merge Patch container name
-
-`PatchDeploymentAsync` first performs a `ReadNamespacedDeploymentAsync` to obtain `containers[0].Name`. This is mandatory for Kubernetes to locate the right container via the merge key (`name`). Without it the patch is rejected.
-
----
-
-## Open Questions
-
-| ID | Question | Status |
-|---|---|---|
-| OQ-01 | Should `EditDeploymentDialog` support multi-container deployments (editing each container's image separately)? | Out of scope for this iteration. Currently always patches `containers[0]`. |
-| OQ-02 | Should the `DispatcherTimer` interval (currently hardcoded 30 s) be user-configurable via Settings? | Deferred. No `ISettingsService` coupling today. |
-| OQ-03 | Should `RolloutRestartCommand` show a toast/snackbar notification on success? | Currently only surfaces errors via `ErrorMessage`. Consider adding a `StatusMessage` property for positive feedback. |
-
----
-
-## Key Files
-
-### New files
-| File | Purpose |
-|---|---|
-| `src/KubeTools4Dev/ViewModels/DeploymentViewModel.cs` | Wraps `V1Deployment`, 6 observable props, `Update()` |
-| `src/KubeTools4Dev/ViewModels/DeploymentListViewModel.cs` | List VM: watch loop, filter, commands, `IDisposable` |
-| `src/KubeTools4Dev/ViewModels/EditDeploymentDialogViewModel.cs` | Dialog VM: validation, CloseCallback pattern |
-| `src/KubeTools4Dev/Views/DeploymentListView.axaml(.cs)` | DataGrid view with 7 columns + action buttons |
-| `src/KubeTools4Dev/Views/EditDeploymentDialog.axaml(.cs)` | Modal dialog: replicas + image tag edit |
-| `src/KubeTools4Dev.Tests/ViewModels/DeploymentViewModelTests.cs` | 5 unit tests |
-| `src/KubeTools4Dev.Tests/ViewModels/DeploymentListViewModelTests.cs` | 8 unit tests |
-
-### Modified files
 | File | Change |
-|---|---|
-| `src/KubeTools4Dev.Core/Services/Interfaces/IKubernetesService.cs` | +4 method signatures |
-| `src/KubeTools4Dev.Core/Services/KubernetesService.cs` | +4 method implementations, `using System.Text.Json` |
-| `src/KubeTools4Dev.Core/ViewModels/SidebarViewModel.cs` | `IsDeploymentsVisible` added, Settings shifted |
-| `src/KubeTools4Dev.Core.Tests/ViewModels/SidebarViewModelTests.cs` | 4-parameter `[InlineData]`, new assertions |
-| `src/KubeTools4Dev/ViewModels/MainViewModel.cs` | `_deploymentList` field + wiring |
-| `src/KubeTools4Dev/App.axaml.cs` | `AddTransient<DeploymentListViewModel>()` |
-| `src/KubeTools4Dev/Views/MainWindow.axaml` | Deployments sidebar item + DeploymentListView panel |
+|------|--------|
+| `~/.agent-brains/teams/dev-team/team.md` | Migrated to v2.0: bumped version, added `roles:` YAML block with `profiles:` lists per role, updated Roles table column header, updated Cross-Provider Usage line (added Copilot CLI), updated Skills Used (coordinator description), added `## Profile Resolution Rules` section |
+| `~/.agent-brains/skills/team-start/team-start.md` | Bumped to v2.0: rewrote Step 2 to note v2.0 `profiles:` format, rewrote Step 3 to N-profile resolution algorithm (global list + `profiles_append` append, load in order, concatenate), updated announce block to `Profiles: [...]`, updated validation checklist |
+| `~/.agent-brains/skills/team-dispatch/team-dispatch.md` | Bumped to v1.2: rewrote Step 4a to resolve effective profile list and inline all N profiles with `--- BEGIN PROFILE: [id] ---` / `--- END PROFILE: [id] ---` separators, updated Step 2 to note v2.0 format, updated Copilot CLI Notes, updated validation checklist |
+| `~/.agent-brains/profiles/team-developer/AGENT.md` | Removed `## Base Profile` section and "All base-developer rules apply" from opening paragraph |
+| `~/.agent-brains/profiles/team-reviewer/AGENT.md` | Replaced Review Rule 4 to remove `base-developer` reference; rule text preserved as self-contained statement |
+| `R:\DevDogs\KubeTools4Dev\.agent-brains\teams\dev-team\team.md` | Created new workspace override file using `profiles_append: [csharp-developer]` for developer role with comments documenting effective set `[base-developer, team-developer, csharp-developer]` |
+| `R:\DevDogs\KubeTools4Dev\.agent-brains\plan\team-profile-composition.md` | Marked all Steps 2–8 checklist items `[x]` |
 
----
+## Acceptance Criteria Checklist
 
-## Commits
+- [x] **AC-1:** `team.md` frontmatter has `version: 2.0`, `roles:` block, `## Profile Resolution Rules` section with collision rule ("last profile wins") and ≤ 4 profile limit documented.
+- [x] **AC-2:** `team-developer/AGENT.md` has no `## Base Profile` section and no "All base-developer rules apply" text.
+- [x] **AC-3:** `team-reviewer/AGENT.md` Rule 4 no longer names `base-developer` as a rules source.
+- [x] **AC-4:** `sk-team-start` Step 3 resolves N profiles: reads global `profiles:` list, appends workspace `profiles_append:` if present, loads each file in order, concatenates into effective rule set.
+- [x] **AC-5:** `sk-team-dispatch` Step 4a inlines all N profiles with `--- BEGIN PROFILE: [id] ---` / `--- END PROFILE: [id] ---` separators in resolved list order.
+- [x] **AC-6:** Workspace `team.md` exists at `R:\DevDogs\KubeTools4Dev\.agent-brains\teams\dev-team\team.md` using `profiles_append: [csharp-developer]` for the developer role.
+- [x] **AC-7:** Effective developer set documented as `[base-developer, team-developer, csharp-developer]` in workspace `team.md` comment block.
+- [x] **AC-8:** `sk-team-start` announce block outputs `Profiles: [resolved profile IDs, comma-separated]` replacing the old `(team-[role] profile active)` format.
 
-> Commits made on `feature/deployments-page` after branch creation from `main`.
+## Deviations from Architecture
 
-1. `feat: add deployment service methods to IKubernetesService and KubernetesService`
-2. `feat: add DeploymentViewModel and update SidebarViewModel for deployments nav`
-3. `feat: add DeploymentListViewModel and EditDeploymentDialogViewModel`
-4. `feat: add DeploymentListView and EditDeploymentDialog views`
-5. `feat: wire DeploymentListView into MainWindow sidebar`
-6. `feat: wire DeploymentListViewModel into MainViewModel and DI`
-7. `test: add DeploymentViewModelTests and DeploymentListViewModelTests`
-8. `chore: mark all 18 plan items complete, add deviations, write developer handover memo`
-
----
-
-## Handoff Notes for Next Role (QA / Reviewer)
-
-- All 18 plan items are `[x]` in `deployments-page.md`.
-- Build is clean at 0W/0E. Tests are 59/59 green.
-- The `feature/deployments-page` branch is ready for PR / code review.
-- No secrets or credentials were introduced.
-- Integration with a live cluster requires a valid kubeconfig; the unit tests mock `IKubernetesService` — no cluster needed.
-- Main risk area: `ShowEditDialogAsync` uses `Application.Current?.ApplicationLifetime` to get the main window owner. In headless / test environments this will `Show()` rather than `ShowDialog()`, meaning it won't await the dialog close. This is acceptable for a developer tool but should be noted during review.
+None. All changes implemented exactly as specified in the Architect's handover and AN-01 through AN-05 / ADR-001.

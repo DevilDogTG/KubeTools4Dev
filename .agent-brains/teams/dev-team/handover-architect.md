@@ -1,7 +1,8 @@
 # Handover: Architect → Developer
 
 **Team:** dev-team  
-**Date:** 2026-05-20  
+**Task:** team-profile-composition  
+**Date:** 2026-05-21  
 **From:** architect  
 **To:** developer
 
@@ -9,56 +10,150 @@
 
 ## What Was Done
 
-- Read all key existing files: `IKubernetesService.cs`, `KubernetesService.cs`, `PodViewModel.cs`, `ServiceViewModel.cs`, `PodListViewModel.cs`, `ServiceListViewModel.cs`, `SidebarViewModel.cs`, `MainViewModel.cs`, `PodDetailWindow.axaml`, `App.axaml.cs`.
-- Confirmed all existing patterns (ViewModel assembly placement, watch loop structure, DI registration, dialog type, error handling).
-- Appended `## Architecture Notes` (AN-01 through AN-09) to `plan/deployments-page.md`.
-- Wrote ADR-002 to `memory/adr-002-deployments-patch-strategy.md` covering the patch format decisions.
-- All 18 checklist items in the plan are now fully specified with zero architectural ambiguity remaining.
+- Verified `csharp-developer` profile exists at `C:\Users\SupawatTanmanee\.agent-brains\profiles\csharp-developer\AGENT.md` — Step 7 is unblocked.
+- Decided v2.0 `team.md` schema: **Option A** — YAML frontmatter `roles:` block with per-role `profiles:` lists. Full example in AN-01.
+- Decided workspace override format: minimal frontmatter-only file using `profiles_append:` per role. Full example in AN-02.
+- Decided profile concatenation separator for `sk-team-dispatch` prompts: `--- BEGIN PROFILE: [id] ---` / `--- END PROFILE: [id] ---` block format. Full example in AN-03.
+- Confirmed all plan steps are correct; flagged one implicit requirement in Step 2 (the `## Profile Resolution Rules` section, required by AC-1).
+- Recorded all decisions in `## Architecture Notes` of the plan file (ADR-001 + AN-01 through AN-05).
+
+All planner open questions are resolved. No blockers remain.
 
 ---
 
-## Decisions Made
+## Architecture Notes Reference
 
-| Decision | What | Why |
-|---|---|---|
-| **Patch strategy (`PatchDeploymentAsync`)** | Strategic Merge Patch (`application/strategic-merge-patch+json`) | JSON Merge Patch replaces the entire `containers` array, deleting sidecars; Strategic Merge Patch uses `name` as merge key — safe for multi-container deployments. See ADR-002. |
-| **Rollout restart mechanism** | JSON Merge Patch: set `kubectl.kubernetes.io/restartedAt` annotation on `spec.template.metadata.annotations` | Annotations are a map; merge patch adds/updates one key without touching others. Functionally identical to `kubectl rollout restart`. |
-| **Error notification** | Per-ViewModel `ErrorMessage` `[ObservableProperty]` string, bound to in-view `TextBlock` | No existing notification service in the codebase. Minimal, testable, consistent with `EditDeploymentDialogViewModel` spec in the plan. |
-| **Edit dialog type** | `Window` with `ShowDialog(owner)` | Existing codebase only has `PodDetailWindow` (a `Window`). No `ContentDialog` infrastructure exists. Consistent and low cost. |
-| **ViewModel assembly** | `DeploymentViewModel`, `DeploymentListViewModel`, `EditDeploymentDialogViewModel` all in `src/KubeTools4Dev/ViewModels/` (UI assembly) | Matches `PodViewModel`, `ServiceViewModel`, `PodListViewModel`, `ServiceListViewModel`. Only `SidebarViewModel` lives in Core (no Avalonia/k8s deps). |
-| **Watch loop resilience** | `while (!token.IsCancellationRequested)` + `catch (OCE) { break; }` + `Task.Delay(5000)` on error | Identical to `PodListViewModel.WatchPodsAsync` and `ServiceListViewModel.WatchServicesAsync`. No additional resilience library. |
-
----
-
-## Open Questions / Blockers
-
-None. All decisions are made. All interface signatures are specified in AN-06.
+| Ref | What it means for you |
+|-----|----------------------|
+| **ADR-001** | You are implementing Option A (YAML frontmatter `roles:` block). Do not put profiles data in the markdown body. |
+| **AN-01** | Exact frontmatter YAML you must produce for `team.md` (global). Also specifies the `## Profile Resolution Rules` markdown section you must add. |
+| **AN-02** | Exact full file content for the workspace `team.md` at `R:\DevDogs\KubeTools4Dev\.agent-brains\teams\dev-team\team.md`. Copy it verbatim. |
+| **AN-03** | Separator format for `sk-team-dispatch` role prompts. Use `--- BEGIN PROFILE: [id] ---` / `--- END PROFILE: [id] ---`. |
+| **AN-04** | `csharp-developer` profile is verified to exist. Step 7 may proceed. |
+| **AN-05** | Per-file summary including the exact replacement text for `team-reviewer/AGENT.md` Rule 4. Use it. |
 
 ---
 
-## Expected From Next Role (Developer)
+## Zero-Ambiguity Checklist for Developer
 
-- Implement all 18 checklist items in `plan/deployments-page.md` **in order** (interface first, then Core ViewModels, then List VM, then Views, then Wiring, then Tests).
-- Follow architecture notes **exactly** — do not deviate from patch types, ViewModel assembly placement, or error notification pattern without updating the ADR.
-- **Do not use JSON Merge Patch for `PatchDeploymentAsync`** — it will delete sidecar containers. Use Strategic Merge Patch (AN-01, ADR-002).
-- Pre-read the deployment before patching to obtain `containers[0].name` for the Strategic Merge Patch container entry.
-- Clear `ErrorMessage` at the **start** of each command (before the `try`) to avoid stale error display (AN-09, Risk R-04).
-- Implement `IDisposable` on `DeploymentListViewModel` (cancel CTS in `Dispose(bool)`) to avoid watch loop leak (AN-09, Risk R-03).
-- Run `dotnet build -warnaserror` (task 7.1) and `dotnet test` (task 7.2) before handing over.
+Work through Steps 2–7 in order. Each step refers to the AN note that specifies exactly what to write.
+
+### Step 2 — Migrate `~/.agent-brains/teams/dev-team/team.md` to v2.0
+
+1. Change `version: 1.0` → `version: 2.0` in the frontmatter.
+2. Add the `roles:` block to the frontmatter exactly as shown in **AN-01**:
+   ```yaml
+   roles:
+     planner:
+       profiles: [team-planner]
+     architect:
+       profiles: [team-architect]
+     developer:
+       profiles: [base-developer, team-developer]
+     reviewer:
+       profiles: [base-developer, team-reviewer]
+     qa:
+       profiles: [team-qa]
+   ```
+3. In the markdown body's Roles table, update the `Profile` column header/annotation to indicate "see frontmatter `roles.[role].profiles`".
+4. Append the `## Profile Resolution Rules` section to the markdown body exactly as shown in **AN-01**. This section is **required by AC-1** even though the checklist item doesn't name it.
+5. Leave all other body sections (Handoff Rules, State Files, Skills Used, Cross-Provider Usage) unchanged.
+
+### Step 3 — Update `~/.agent-brains/skills/team-start/team-start.md`
+
+Rewrite **Step 2** of the procedure to note the skill must parse the v2.0 `profiles:` list from the `roles:` frontmatter block (not a single `Profile` string).
+
+Rewrite **Step 3** of the procedure to the following algorithm:
+1. Read `roles.[role].profiles` from the global `team.md` frontmatter. This is the base list.
+2. Check for a workspace `team.md` at `./.agent-brains/teams/[team-name]/team.md`. If it exists and declares `roles.[role].profiles_append`, append those profile IDs to the list.
+3. For each profile ID in the resolved list (in order): load `~/.agent-brains/profiles/[profile-id]/AGENT.md`. If a file does not exist, report an error and stop.
+4. Concatenate all profile contents in order. The combined text is the effective rule set for this session.
+
+Update the `=== Team Session ===` announce block: replace `(team-[role] profile active)` with `Profiles: [resolved profile IDs, comma-separated]`.
+
+Update the Validation checklist: change "Role profile loaded (team-[role]/AGENT.md exists)" to "All role profiles in effective list loaded successfully."
+
+### Step 4 — Update `~/.agent-brains/skills/team-dispatch/team-dispatch.md`
+
+Rewrite **Step 4a** (Build the role prompt) to:
+1. Resolve the effective profile list using the same L0 + `profiles_append` merge logic as Step 3 in `team-start` above.
+2. Inline the full content of each profile file in resolved order. Wrap each with the **AN-03** separator:
+   ```
+   --- BEGIN PROFILE: [profile-id] ---
+   [full verbatim content of ~/.agent-brains/profiles/[profile-id]/AGENT.md]
+   --- END PROFILE: [profile-id] ---
+   ```
+   Leave a blank line between each END/BEGIN pair.
+3. Update the existing instruction line to read: _"You are acting as the [role] on team [team-name]. Read your role profiles above (listed in order; last profile wins on any conflict). Complete all deliverables listed for your role…"_
+
+Update the **Copilot CLI Notes** section: replace "the full contents of `~/.agent-brains/profiles/team-[role]/AGENT.md` (role mandate, responsibilities, rules)" with "the full text of all profiles in the effective list, inlined in order using `--- BEGIN PROFILE: [id] ---` / `--- END PROFILE: [id] ---` separators."
+
+Update the **Validation checklist**: change "Each role agent given full inline context (profile + team config + handover memo)" to "Each role agent given full inline context (all profiles in effective list + team config + handover memo)."
+
+### Step 5 — Clean `~/.agent-brains/profiles/team-developer/AGENT.md`
+
+Remove the entire `## Base Profile` section. This is currently:
+```
+## Base Profile
+All rules from the `base-developer` profile apply: security-first, SOLID, cross-platform scripting, safe-delete/rename, PR description format, and scope discipline.
+```
+Delete this section and the blank lines surrounding it. Do not alter any other content.
+
+Verify no other sentence in the file references `base-developer` as a named rule source.
+
+### Step 6 — Clean `~/.agent-brains/profiles/team-reviewer/AGENT.md`
+
+In **Review Rule 4**, replace:
+```
+Apply all `base-developer` rules: naming, scope discipline, no TODO without a ticket, no broken references.
+```
+With:
+```
+Apply standard rules: naming conventions, scope discipline, no TODO comment without a tracking ticket, no broken file or symbol references.
+```
+The rules are preserved as explicit text; only the reference to `base-developer` as a named rules source is removed.
+
+Verify no other sentence in the file references `base-developer` as a named rule source.
+
+### Step 7 — Create workspace `team.md`
+
+Create the file at `R:\DevDogs\KubeTools4Dev\.agent-brains\teams\dev-team\team.md` with the **exact content from AN-02**:
+
+```yaml
+---
+# Workspace override for dev-team — KubeTools4Dev
+#
+# This file EXTENDS the global ~/.agent-brains/teams/dev-team/team.md.
+# Use profiles_append: to append profiles to the global list for a role.
+# DO NOT use profiles: here — that replaces the global list entirely.
+#
+# Effective developer profile set in this workspace:
+#   [base-developer, team-developer, csharp-developer]
+#   (global: [base-developer, team-developer]  +  append: [csharp-developer])
+
+id: dev-team
+version: workspace-1.0
+roles:
+  developer:
+    profiles_append: [csharp-developer]
+---
+```
+
+No markdown body. No other content.
+
+### Step 8 — Self-verify
+
+Check each of the 8 Acceptance Criteria in the plan against the files you have modified. Then write `handover-developer.md`.
 
 ---
 
-## Key Files
+## No Open Questions
 
-| File | Role |
-|---|---|
-| `plan/deployments-page.md` | Full plan + 18-item checklist + all architecture notes (AN-01 to AN-09) |
-| `memory/adr-002-deployments-patch-strategy.md` | ADR for patch format decision |
-| `src/KubeTools4Dev.Core/Services/Interfaces/IKubernetesService.cs` | Add 4 new method signatures (exact signatures in AN-06) |
-| `src/KubeTools4Dev.Core/Services/KubernetesService.cs` | Implement 4 new methods (implementation notes in AN-06) |
-| `src/KubeTools4Dev.Core/ViewModels/SidebarViewModel.cs` | Add `IsDeploymentsVisible` (index 3), shift `IsSettingsVisible` to index 4 |
-| `src/KubeTools4Dev/ViewModels/MainViewModel.cs` | Add `DeploymentListViewModel _deploymentList`; inject in ctor; call `InitializeAsync()` in `Connect()`; call `Dispose()` in `Cleanup()` |
-| `src/KubeTools4Dev/App.axaml.cs` | Register `DeploymentListViewModel` as `Transient` |
-| `src/KubeTools4Dev/Views/MainWindow.axaml` | Add Deployments sidebar `ListBoxItem` at index 3; add `DeploymentListView` panel |
-| `src/KubeTools4Dev/Views/PodListView.axaml` | Reference for DataGrid + filter bar structure to mirror |
-| `src/KubeTools4Dev/Views/PodDetailWindow.axaml` | Reference for Window dialog pattern to follow |
+All planner-flagged open questions are resolved:
+
+| Question | Resolution |
+|----------|-----------|
+| Does `csharp-developer` profile exist? | **Yes** — verified at `C:\Users\SupawatTanmanee\.agent-brains\profiles\csharp-developer\AGENT.md` (AN-04). Step 7 is unblocked. |
+| What is the exact v2.0 `team.md` schema format? | **Decided** — Option A (YAML frontmatter `roles:` block). Full example in AN-01. |
+| What is the profile concatenation separator for `sk-team-dispatch`? | **Decided** — `--- BEGIN PROFILE: [id] ---` / `--- END PROFILE: [id] ---`. Full example in AN-03. |
+| What does the workspace `profiles_append` file look like? | **Decided** — Minimal YAML frontmatter only. Full example in AN-02. |
