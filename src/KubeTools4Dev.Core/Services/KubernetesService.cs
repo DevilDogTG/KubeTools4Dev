@@ -305,7 +305,9 @@ public class KubernetesService(
     public async Task PatchDeploymentAsync(string namespaceName, string deploymentName, int replicas, string imageTag)
     {
         var current = await Client.AppsV1.ReadNamespacedDeploymentAsync(deploymentName, namespaceName);
-        var containerName = current.Spec.Template.Spec.Containers[0].Name;
+        var container = current.Spec?.Template?.Spec?.Containers?.FirstOrDefault()
+            ?? throw new InvalidOperationException($"Deployment '{deploymentName}' has no containers to patch.");
+        var containerName = container.Name;
 
         var patchBody = JsonSerializer.Serialize(new
         {
