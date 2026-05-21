@@ -1,9 +1,10 @@
 # Plan: Deployments Page
 
-**Status:** active  
+**Status:** pr-open  
 **Created:** 2026-05-20  
 **Author role:** planner  
 **Team:** dev-team
+**PR:** #32 (draft) — https://github.com/DevilDogTG/KubeTools4Dev/pull/32
 
 ---
 
@@ -365,3 +366,10 @@ Task RestartDeploymentAsync(string namespaceName, string deploymentName);
 | R-02 | `ShowDialog` owner resolution fails if `MainWindow` is not yet set | Low | Low | Guard with null check; fall back to `Show()` (same guard as `OpenPodDetailWindow`) |
 | R-03 | Watch loop leaks if `Cleanup()` is not called on navigation away | Low | Medium | `DeploymentListViewModel` must implement `IDisposable` and cancel CTS in `Dispose(bool)` |
 | R-04 | `ErrorMessage` not cleared between commands gives stale error appearance | Medium | Low | Clear `ErrorMessage = string.Empty` at the start of each command before the `try` block |
+
+---
+
+## Progress Log
+
+- 2026-05-20: Feature implemented, reviewed (PASS), and QA'd (PASS, 66/66 tests, 0W/0E).
+- 2026-05-21: PR #32 opened as draft — https://github.com/DevilDogTG/KubeTools4Dev/pull/32
