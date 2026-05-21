@@ -51,10 +51,10 @@ The system must:
 - [x] Validate dispatch flow still gates on handover memo existence.
 
 ### Phase 3 — Dispatch the pipeline
-- [ ] Confirm updated skill.
-- [ ] Run dispatch for the Deployments page feature.
-- [ ] Verify all 5 handover memos are produced.
-- [ ] Confirm QA PASS before merge.
+- [x] Confirm updated skill.
+- [x] Run dispatch for the Deployments page feature.
+- [x] Verify all 5 role handover memos are produced.
+- [x] Confirm QA PASS before merge.
 
 ## Progress Log
 - 2026-05-20: Plan created by Planner role (PoC session). Infrastructure directory created.
