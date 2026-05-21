@@ -25,6 +25,11 @@ internal class SettingsModel
     /// Gets or sets the services settings.
     /// </summary>
     public ServicesSettings Services { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the cluster registry settings.
+    /// </summary>
+    public ClustersSettings Clusters { get; set; } = new();
 }
 
 /// <summary>

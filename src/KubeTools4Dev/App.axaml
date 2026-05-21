@@ -2,9 +2,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:themes="clr-namespace:Material.Styles.Themes;assembly=Material.Styles"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:converters="using:KubeTools4Dev.Converters"
              x:Class="KubeTools4Dev.App"
              RequestedThemeVariant="Dark">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+
+    <Application.Resources>
+        <converters:ClusterStatusToBrushConverter x:Key="ClusterStatusToBrushConverter"/>
+        <converters:ResourceKindToIconConverter x:Key="ResourceKindToIconConverter"/>
+        <SolidColorBrush x:Key="SemiColorDanger" Color="#FFD32F2F"/>
+    </Application.Resources>
 
     <Application.Styles>
         <themes:MaterialTheme BaseTheme="Dark" PrimaryColor="Blue" SecondaryColor="Lime" />
@@ -72,6 +79,39 @@
 
         <Style Selector="ListBoxItem.SidebarNavItem:selected:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource PrimaryHueDarkBrush}"/>
+        </Style>
+
+        <!-- Add Cluster button in sidebar -->
+        <Style Selector="Button.SidebarNavItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.SidebarNavItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PrimaryHueLightBrush}"/>
+        </Style>
+
+        <!-- TreeView sidebar styles -->
+        <Style Selector="TreeView">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="4"/>
+        </Style>
+        <Style Selector="TreeViewItem">
+            <Setter Property="Padding" Value="4,3"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+        <Style Selector="TreeViewItem:selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PrimaryHueMidBrush}"/>
+        </Style>
+        <Style Selector="TreeViewItem:selected">
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryHueMidForegroundBrush}"/>
+        </Style>
+        <Style Selector="TreeViewItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PrimaryHueLightBrush}"/>
         </Style>
     </Application.Styles>
 </Application>

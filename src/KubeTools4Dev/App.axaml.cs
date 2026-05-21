@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using KubeTools4Dev.Core.Services;
 using KubeTools4Dev.Core.Services.Interfaces;
+using KubeTools4Dev.Core.ViewModels;
 using KubeTools4Dev.ViewModels;
 using KubeTools4Dev.Views;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,23 +63,24 @@ public partial class App : Application
         // Logging
         services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog(dispose: true));
 
-        // Core Services
-        services.AddSingleton<IKubernetesService, KubernetesService>();
-        services.AddSingleton<IPortForwardService, PortForwardService>();
+        // Core Services — per-cluster services are now managed by ClusterConnectionManager
+        services.AddSingleton<IKubernetesServiceFactory, KubernetesServiceFactory>();
+        services.AddSingleton<IPortForwardServiceFactory, PortForwardServiceFactory>();
+        services.AddSingleton<IClusterConnectionManager, ClusterConnectionManager>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IUpdateService, UpdateService>();
 
-        // ViewModels
-        // MainViewModel as Singleton (usually shared for the main window)
+        // Core ViewModels
+        services.AddSingleton<ClusterTreeViewModel>();
+
+        // App ViewModels
         services.AddSingleton<MainViewModel>();
-        // Child ViewModels - can be Singleton or Transient depending on whether they need to share state or be recreated.
-        // Given MainViewModel holds references to them, Singleton is redundant if Main is Singleton, but safe.
-        // Transient is safer if they are "owned" by MainViewModel but we want DI to build them.
         services.AddTransient<PodListViewModel>();
         services.AddTransient<ServiceListViewModel>();
         services.AddTransient<DeploymentListViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddTransient<PodDetailViewModel>();
+        services.AddTransient<AddClusterDialogViewModel>();
         services.AddTransient<Func<PodViewModel, int, PodDetailViewModel>>(sp => (pod, tab) =>
         {
             var vm = sp.GetRequiredService<PodDetailViewModel>();

@@ -32,6 +32,14 @@ public interface IKubernetesService
     Task<string> ConnectAsync(string? kubeConfigPath = null);
 
     /// <summary>
+    /// Connects to a specific context within a kubeconfig file.
+    /// </summary>
+    /// <param name="kubeConfigPath">Path to the kubeconfig file.</param>
+    /// <param name="contextName">The context name to use.</param>
+    /// <returns>The resolved context name, or empty string on failure.</returns>
+    Task<string> ConnectAsync(string? kubeConfigPath, string? contextName);
+
+    /// <summary>
     /// Gets the pods asynchronous.
     /// </summary>
     /// <param name="namespaceName">Name of the namespace.</param>
@@ -126,4 +134,10 @@ public interface IKubernetesService
     /// <param name="deploymentName">Name of the deployment.</param>
     /// <returns>A task representing the asynchronous restart operation.</returns>
     Task RestartDeploymentAsync(string namespaceName, string deploymentName);
+
+    /// <summary>
+    /// Gets all namespace names in the cluster.
+    /// </summary>
+    /// <returns>A read-only list of namespace names.</returns>
+    Task<IReadOnlyList<string>> GetNamespacesAsync();
 }

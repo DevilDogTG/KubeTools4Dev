@@ -31,7 +31,12 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// The Kubernetes service used to fetch and patch deployments.
     /// </summary>
-    private readonly IKubernetesService _kubernetesService;
+    private IKubernetesService _kubernetesService;
+
+    /// <summary>
+    /// The current namespace filter (empty = all namespaces).
+    /// </summary>
+    private string _namespaceName = "";
 
     /// <summary>
     /// The logger.
@@ -96,6 +101,22 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
         _logger = logger;
     }
 
+    /// <summary>
+    /// Switches the view to a different cluster service and namespace, then re-initializes.
+    /// </summary>
+    public async Task UpdateScopeAsync(IKubernetesService kubernetesService, string namespaceName)
+    {
+        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource?.Dispose();
+        _cancellationTokenSource = null;
+        _refreshTimer?.Stop();
+
+        _kubernetesService = kubernetesService;
+        _namespaceName = namespaceName;
+
+        await InitializeAsync();
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {
@@ -113,7 +134,7 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
         {
             if (!_kubernetesService.IsConnected) return;
 
-            var deployments = await _kubernetesService.GetDeploymentsAsync("");
+            var deployments = await _kubernetesService.GetDeploymentsAsync(_namespaceName);
             _allDeployments.Clear();
             _allDeployments.AddRange(deployments.Select(d => new DeploymentViewModel(d)));
             UpdateFilteredList();
@@ -277,7 +298,7 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
         {
             try
             {
-                await foreach (var (type, item) in _kubernetesService.WatchDeploymentsAsync("", cancellationToken: token))
+                await foreach (var (type, item) in _kubernetesService.WatchDeploymentsAsync(_namespaceName, cancellationToken: token))
                 {
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {

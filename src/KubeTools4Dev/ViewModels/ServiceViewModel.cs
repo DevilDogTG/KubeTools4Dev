@@ -53,6 +53,12 @@ public partial class ServiceViewModel : ObservableObject
     private readonly ISettingsService _settingsService;
 
     /// <summary>
+    /// Optional callback that returns <c>true</c> when a local port is already in use by another cluster's port-forward.
+    /// When set, checked before starting a new forward; if the port is taken, the forward is rejected with a warning.
+    /// </summary>
+    public Func<int, bool>? IsPortInUseCheck { get; set; }
+
+    /// <summary>
     /// The duration text
     /// </summary>
     [ObservableProperty]
@@ -250,6 +256,13 @@ public partial class ServiceViewModel : ObservableObject
     /// </summary>
     private async void StartForwarding()
     {
+        if (IsPortInUseCheck?.Invoke(LocalPort) == true)
+        {
+            Status = $"Port {LocalPort} in use";
+            IsForwarding = false;
+            return;
+        }
+
         Status = "Starting";
         _pfCancellationTokenSource?.Cancel();
 
