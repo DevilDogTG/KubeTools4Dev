@@ -27,6 +27,8 @@
                                Minimum="0"
                                Increment="1"
                                FormatString="0"
+                               Height="28"
+                               FontSize="12"
                                Width="120"
                                HorizontalAlignment="Left"/>
             </StackPanel>
@@ -34,6 +36,8 @@
                 <TextBlock Text="Image Tag:" FontSize="12"/>
                 <TextBox Text="{Binding ImageTag}"
                          PlaceholderText="e.g. nginx:1.25"
+                         Height="28"
+                         FontSize="12"
                          Width="380"/>
             </StackPanel>
 
@@ -53,10 +57,14 @@
                     Margin="0,16,0,0">
             <Button Content="Cancel"
                     Command="{Binding CancelCommand}"
+                    Height="28"
+                    FontSize="12"
                     Width="80"/>
             <Button Content="Confirm"
                     Command="{Binding ConfirmCommand}"
                     Classes="accent"
+                    Height="28"
+                    FontSize="12"
                     Width="80"/>
         </StackPanel>
     </Grid>
