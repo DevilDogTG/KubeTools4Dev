@@ -108,6 +108,9 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
         _cancellationTokenSource = null;
         _refreshTimer?.Stop();
 
+        _allDeployments.Clear();
+        UpdateFilteredList();
+
         _kubernetesService = kubernetesService;
         _namespaceName = namespaceName;
 

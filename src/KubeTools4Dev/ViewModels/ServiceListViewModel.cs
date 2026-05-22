@@ -131,6 +131,9 @@ public partial class ServiceListViewModel : ViewModelBase
         _cancellationTokenSource = null;
         _portForwardService?.StopAll();
 
+        _allServices.Clear();
+        UpdateFilteredList();
+
         _kubeService = kubeService;
         _portForwardService = portForwardService;
         _namespaceName = namespaceName;

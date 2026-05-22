@@ -65,7 +65,7 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool _isLoading;
 
-    private readonly Func<PodViewModel, int, PodDetailViewModel> _podDetailFactory;
+    private readonly Func<PodViewModel, IKubernetesService, int, PodDetailViewModel> _podDetailFactory;
 
     /// <summary>
     /// The last refresh time
@@ -94,7 +94,7 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     public PodListViewModel(
         ILogger<PodListViewModel> logger,
         ISettingsService settingsService,
-        Func<PodViewModel, int, PodDetailViewModel> podDetailFactory)
+        Func<PodViewModel, IKubernetesService, int, PodDetailViewModel> podDetailFactory)
     {
         _logger = logger;
         _settingsService = settingsService;
@@ -121,6 +121,9 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
         _cancellationTokenSource?.Dispose();
         _cancellationTokenSource = null;
         _refreshTimer.Stop();
+
+        _allPods.Clear();
+        UpdateFilteredList();
 
         _kubeService = kubeService;
         _namespaceName = namespaceName;
@@ -394,7 +397,7 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
 
     private void OpenPodDetailWindow(PodViewModel pod, int tabIndex)
     {
-        var vm = _podDetailFactory(pod, tabIndex);
+        var vm = _podDetailFactory(pod, _kubeService!, tabIndex);
         var window = new Views.PodDetailWindow(vm);
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime d && d.MainWindow is not null)
             window.Show(d.MainWindow);

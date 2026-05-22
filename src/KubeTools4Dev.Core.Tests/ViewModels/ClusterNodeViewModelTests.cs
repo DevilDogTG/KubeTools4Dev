@@ -91,4 +91,51 @@ public class ClusterNodeViewModelTests
         // After successful connect, ErrorMessage should be null
         Assert.Null(sut.ErrorMessage);
     }
+
+    // ── ToggleAndConnectCommand ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task ToggleAndConnectCommand_Expanding_WhenDisconnected_CallsConnect()
+    {
+        _manager.SuccessfulClusterIds.Add("id-1");
+        var sut = new ClusterNodeViewModel("id-1", "my-cluster", _manager);
+        // Initial state: IsExpanded = false, Status = Disconnected
+
+        var connectingObserved = false;
+        sut.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ClusterNodeViewModel.Status) &&
+                sut.Status == ClusterConnectionStatus.Connecting)
+                connectingObserved = true;
+        };
+
+        await sut.ToggleAndConnectCommand.ExecuteAsync(null);
+
+        Assert.True(sut.IsExpanded);
+        Assert.True(connectingObserved);
+        Assert.Equal(ClusterConnectionStatus.Connected, sut.Status);
+    }
+
+    [Fact]
+    public async Task ToggleAndConnectCommand_Collapsing_DoesNotCallConnect()
+    {
+        _manager.SuccessfulClusterIds.Add("id-1");
+        var sut = new ClusterNodeViewModel("id-1", "my-cluster", _manager);
+        await sut.ConnectCommand.ExecuteAsync(null); // already connected, IsExpanded stays false
+
+        var connectingObserved = false;
+        sut.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ClusterNodeViewModel.Status) &&
+                sut.Status == ClusterConnectionStatus.Connecting)
+                connectingObserved = true;
+        };
+
+        await sut.ToggleAndConnectCommand.ExecuteAsync(null); // expand (no re-connect: already connected)
+        await sut.ToggleAndConnectCommand.ExecuteAsync(null); // collapse
+
+        Assert.False(sut.IsExpanded);
+        Assert.False(connectingObserved);
+        Assert.Equal(ClusterConnectionStatus.Connected, sut.Status);
+    }
 }
