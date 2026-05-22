@@ -27,9 +27,9 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     private readonly List<PodViewModel> _allPods = [];
 
     /// <summary>
-    /// The kube service
+    /// The kube service; set by <see cref="UpdateScopeAsync"/> before first use.
     /// </summary>
-    private IKubernetesService _kubeService;
+    private IKubernetesService? _kubeService;
 
     /// <summary>
     /// The current namespace filter (empty = all namespaces).
@@ -89,17 +89,14 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     /// Initializes a new instance of the <see cref="PodListViewModel" /> class.
     /// </summary>
     /// <param name="logger">The logger.</param>
-    /// <param name="kubeService">The kube service.</param>
     /// <param name="settingsService">The settings service.</param>
     /// <param name="podDetailFactory">Factory for creating pod detail popup view models.</param>
     public PodListViewModel(
         ILogger<PodListViewModel> logger,
-        IKubernetesService kubeService,
         ISettingsService settingsService,
         Func<PodViewModel, int, PodDetailViewModel> podDetailFactory)
     {
         _logger = logger;
-        _kubeService = kubeService;
         _settingsService = settingsService;
         _podDetailFactory = podDetailFactory;
 
@@ -145,6 +142,7 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     /// </summary>
     public async Task InitializeAsync()
     {
+        if (_kubeService is null) return;
         IsLoading = true;
         try
         {
@@ -273,7 +271,7 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            if (!_kubeService.IsConnected) return;
+            if (_kubeService is null || !_kubeService.IsConnected) return;
 
             var metrics = await _kubeService.GetPodMetricsAsync("");
             if (metrics?.Items == null) return;
@@ -346,7 +344,7 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
         {
             try
             {
-                await foreach (var (type, item) in _kubeService.WatchPodsAsync(_namespaceName, cancellationToken: token))
+                await foreach (var (type, item) in _kubeService!.WatchPodsAsync(_namespaceName, cancellationToken: token))
                 {
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {

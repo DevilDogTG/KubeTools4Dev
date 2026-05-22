@@ -27,9 +27,9 @@ public partial class ServiceListViewModel : ViewModelBase
     private readonly List<ServiceViewModel> _allServices = [];
 
     /// <summary>
-    /// The kube service
+    /// The kube service; set by <see cref="UpdateScopeAsync"/> before first use.
     /// </summary>
-    private IKubernetesService _kubeService;
+    private IKubernetesService? _kubeService;
 
     /// <summary>
     /// The current namespace filter (empty = all namespaces).
@@ -52,9 +52,9 @@ public partial class ServiceListViewModel : ViewModelBase
     private readonly IClusterConnectionManager _connectionManager;
 
     /// <summary>
-    /// The port forward service
+    /// The port forward service; set by <see cref="UpdateScopeAsync"/> before first use.
     /// </summary>
-    private IPortForwardService _portForwardService;
+    private IPortForwardService? _portForwardService;
 
     /// <summary>
     /// The settings service
@@ -89,22 +89,16 @@ public partial class ServiceListViewModel : ViewModelBase
     /// <summary>
     /// Initializes a new instance of the <see cref="ServiceListViewModel"/> class.
     /// </summary>
-    /// <param name="kubeService">The kube service.</param>
-    /// <param name="portForwardService">The port forward service.</param>
     /// <param name="settingsService">The settings service.</param>
     /// <param name="connectionManager">The cluster connection manager for cross-cluster port-conflict checks.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="loggerFactory">The logger factory.</param>
     public ServiceListViewModel(
-        IKubernetesService kubeService,
-        IPortForwardService portForwardService,
         ISettingsService settingsService,
         IClusterConnectionManager connectionManager,
         ILogger<ServiceListViewModel> logger,
         ILoggerFactory loggerFactory)
     {
-        _kubeService = kubeService;
-        _portForwardService = portForwardService;
         _settingsService = settingsService;
         _connectionManager = connectionManager;
         _logger = logger;
@@ -121,7 +115,7 @@ public partial class ServiceListViewModel : ViewModelBase
         _settingsService.SettingsChanged -= OnSettingsChanged;
         _cancellationTokenSource?.Cancel();
         _cancellationTokenSource?.Dispose();
-        _portForwardService.StopAll();
+        _portForwardService?.StopAll();
     }
 
     /// <summary>
@@ -135,7 +129,7 @@ public partial class ServiceListViewModel : ViewModelBase
         _cancellationTokenSource?.Cancel();
         _cancellationTokenSource?.Dispose();
         _cancellationTokenSource = null;
-        _portForwardService.StopAll();
+        _portForwardService?.StopAll();
 
         _kubeService = kubeService;
         _portForwardService = portForwardService;
@@ -149,6 +143,7 @@ public partial class ServiceListViewModel : ViewModelBase
     /// </summary>
     public async Task InitializeAsync()
     {
+        if (_kubeService is null || _portForwardService is null) return;
         IsLoading = true;
         try
         {
@@ -290,7 +285,7 @@ public partial class ServiceListViewModel : ViewModelBase
     {
         try
         {
-            var currentServices = await _kubeService.GetServicesAsync();
+            var currentServices = await _kubeService!.GetServicesAsync();
             var currentKeys = new HashSet<string>(currentServices.Select(s => $"{s.Metadata.NamespaceProperty}/{s.Metadata.Name}"));
 
             await Dispatcher.UIThread.InvokeAsync(() =>
@@ -434,7 +429,7 @@ public partial class ServiceListViewModel : ViewModelBase
                     continue;
                 }
 
-                await foreach (var (type, item) in _kubeService.WatchServicesAsync(_namespaceName, cancellationToken: token))
+                await foreach (var (type, item) in _kubeService!.WatchServicesAsync(_namespaceName, cancellationToken: token))
                 {
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
@@ -480,7 +475,7 @@ public partial class ServiceListViewModel : ViewModelBase
                                             _loggerFactory.CreateLogger<ServiceViewModel>(),
                                             item,
                                             port,
-                                            _portForwardService,
+                                            _portForwardService!,
                                             _settingsService)
                                         {
                                             IsPortInUseCheck = _connectionManager.IsLocalPortInUse
