@@ -18,9 +18,6 @@ public partial class MainViewModel : ViewModelBase
     private readonly IClusterConnectionManager _manager;
     private readonly ILogger<MainViewModel> _logger;
 
-    /// <summary>Gets the sidebar panel state (expanded/collapsed).</summary>
-    public SidebarViewModel Sidebar { get; } = new();
-
     /// <summary>Gets the cluster tree navigation state.</summary>
     public ClusterTreeViewModel ClusterTree { get; }
 

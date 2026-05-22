@@ -11,16 +11,26 @@ namespace KubeTools4Dev.Core.ViewModels;
 public partial class ClusterNodeViewModel : ObservableObject
 {
     private readonly IClusterConnectionManager _manager;
+    private readonly Action<ContentScopeContext>? _resourceSelectedCallback;
 
     /// <summary>Initializes a new cluster node.</summary>
+    /// <param name="id">The cluster ID (string form of <see cref="Models.ClusterEntry.Id"/>).</param>
+    /// <param name="displayName">The display name shown in the tree.</param>
+    /// <param name="manager">The cluster connection manager.</param>
+    /// <param name="resourceSelectedCallback">
+    /// Optional callback invoked when the user selects a resource type leaf node inside this cluster.
+    /// Passed down to each <see cref="NamespaceNodeViewModel"/> created on connect.
+    /// </param>
     public ClusterNodeViewModel(
         string id,
         string displayName,
-        IClusterConnectionManager manager)
+        IClusterConnectionManager manager,
+        Action<ContentScopeContext>? resourceSelectedCallback = null)
     {
         Id = id;
         DisplayName = displayName;
         _manager = manager;
+        _resourceSelectedCallback = resourceSelectedCallback;
 
         _manager.ClusterStatusChanged += OnClusterStatusChanged;
     }
@@ -39,6 +49,10 @@ public partial class ClusterNodeViewModel : ObservableObject
     [ObservableProperty]
     private string? _errorMessage;
 
+    /// <summary>Gets or sets whether the namespace list below this cluster is expanded.</summary>
+    [ObservableProperty]
+    private bool _isExpanded = false;
+
     /// <summary>Gets the namespace child nodes; populated after a successful connection.</summary>
     public ObservableCollection<NamespaceNodeViewModel> Namespaces { get; } = [];
 
@@ -49,6 +63,18 @@ public partial class ClusterNodeViewModel : ObservableObject
     /// <summary>Disconnects from this cluster.</summary>
     [RelayCommand]
     private Task Disconnect() => _manager.DisconnectClusterAsync(Id);
+
+    /// <summary>
+    /// Toggles the expanded state and initiates a connection when expanding while disconnected.
+    /// Collapsing never triggers a disconnect so active port-forwards remain alive.
+    /// </summary>
+    [RelayCommand]
+    private async Task ToggleAndConnect()
+    {
+        IsExpanded = !IsExpanded;
+        if (IsExpanded && Status == ClusterConnectionStatus.Disconnected)
+            await _manager.ConnectClusterAsync(Id);
+    }
 
     private async void OnClusterStatusChanged(string clusterId, ClusterConnectionStatus status, string? errorMsg)
     {
@@ -72,7 +98,7 @@ public partial class ClusterNodeViewModel : ObservableObject
             var names = await svc.GetNamespacesAsync() ?? [];
             Namespaces.Clear();
             foreach (var name in names)
-                Namespaces.Add(new NamespaceNodeViewModel(name, Id));
+                Namespaces.Add(new NamespaceNodeViewModel(name, Id, _resourceSelectedCallback));
         }
         catch (Exception ex)
         {

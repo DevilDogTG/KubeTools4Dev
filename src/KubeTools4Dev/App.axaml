@@ -3,6 +3,7 @@
              xmlns:themes="clr-namespace:Material.Styles.Themes;assembly=Material.Styles"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              xmlns:converters="using:KubeTools4Dev.Converters"
+             xmlns:assists="clr-namespace:Material.Styles.Assists;assembly=Material.Styles"
              x:Class="KubeTools4Dev.App"
              RequestedThemeVariant="Dark">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
@@ -53,11 +54,11 @@
         <Style Selector="ListBox.SidebarNavList">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="Padding" Value="4,4"/>
         </Style>
 
         <Style Selector="ListBoxItem.SidebarNavItem">
-            <Setter Property="Padding" Value="10,10"/>
+            <Setter Property="Padding" Value="4,4"/>
             <Setter Property="CornerRadius" Value="4"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="Medium"/>
@@ -81,37 +82,39 @@
             <Setter Property="Background" Value="{DynamicResource PrimaryHueDarkBrush}"/>
         </Style>
 
-        <!-- Add Cluster button in sidebar -->
+        <!-- Add Cluster / Settings buttons in sidebar -->
         <Style Selector="Button.SidebarNavItem">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Padding" Value="8,7"/>
             <Setter Property="CornerRadius" Value="4"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
         </Style>
         <Style Selector="Button.SidebarNavItem:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource PrimaryHueLightBrush}"/>
+            <Setter Property="Background" Value="#20FFFFFF"/>
+            <Setter Property="CornerRadius" Value="4"/>
         </Style>
 
-        <!-- TreeView sidebar styles -->
-        <Style Selector="TreeView">
+        <!-- Custom tree node row buttons (replaces TreeView styles) -->
+        <Style Selector="Button.TreeNodeRow">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="4"/>
+            <Setter Property="Padding" Value="4,5"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+            <Setter Property="assists:ShadowAssist.ShadowDepth" Value="Depth0"/>
         </Style>
-        <Style Selector="TreeViewItem">
-            <Setter Property="Padding" Value="4,3"/>
-            <Setter Property="FontSize" Value="13"/>
+        <Style Selector="Button.TreeNodeRow /template/ Border">
+            <Setter Property="BoxShadow" Value="0 0 0 0 transparent"/>
         </Style>
-        <Style Selector="TreeViewItem:selected /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource PrimaryHueMidBrush}"/>
-        </Style>
-        <Style Selector="TreeViewItem:selected">
-            <Setter Property="Foreground" Value="{DynamicResource PrimaryHueMidForegroundBrush}"/>
-        </Style>
-        <Style Selector="TreeViewItem:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource PrimaryHueLightBrush}"/>
+        <Style Selector="Button.TreeNodeRow:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#20FFFFFF"/>
+            <Setter Property="CornerRadius" Value="4"/>
         </Style>
     </Application.Styles>
 </Application>

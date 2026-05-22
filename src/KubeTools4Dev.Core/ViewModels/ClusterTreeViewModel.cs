@@ -105,7 +105,8 @@ public partial class ClusterTreeViewModel : ObservableObject
                 var clusterNode = new ClusterNodeViewModel(
                     entry.Id.ToString(),
                     entry.DisplayName,
-                    _manager);
+                    _manager,
+                    ctx => ResourceNodeSelected?.Invoke(ctx));
 
                 sourceNode.Clusters.Add(clusterNode);
             }

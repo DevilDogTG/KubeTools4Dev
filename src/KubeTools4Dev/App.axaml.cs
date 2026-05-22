@@ -7,6 +7,7 @@ using KubeTools4Dev.Core.ViewModels;
 using KubeTools4Dev.ViewModels;
 using KubeTools4Dev.Views;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Serilog;
 using System;
 
@@ -79,11 +80,11 @@ public partial class App : Application
         services.AddTransient<ServiceListViewModel>();
         services.AddTransient<DeploymentListViewModel>();
         services.AddSingleton<SettingsViewModel>();
-        services.AddTransient<PodDetailViewModel>();
         services.AddTransient<AddClusterDialogViewModel>();
-        services.AddTransient<Func<PodViewModel, int, PodDetailViewModel>>(sp => (pod, tab) =>
+        services.AddTransient<Func<PodViewModel, IKubernetesService, int, PodDetailViewModel>>(sp => (pod, svc, tab) =>
         {
-            var vm = sp.GetRequiredService<PodDetailViewModel>();
+            var logger = sp.GetRequiredService<ILogger<PodDetailViewModel>>();
+            var vm = new PodDetailViewModel(logger, svc);
             vm.Pod = pod;
             vm.IsLogsView = tab == 0;
             return vm;

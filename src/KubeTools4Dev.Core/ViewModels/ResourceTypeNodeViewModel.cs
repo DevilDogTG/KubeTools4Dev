@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace KubeTools4Dev.Core.ViewModels;
 
@@ -20,4 +21,10 @@ public class ResourceTypeNodeViewModel : ObservableObject
 
     /// <summary>Gets the resource kind this node represents.</summary>
     public ResourceKind Kind { get; }
+
+    /// <summary>
+    /// Gets the command to select this resource type; wired by the parent <see cref="NamespaceNodeViewModel"/>.
+    /// <c>null</c> when no selection callback was provided at construction.
+    /// </summary>
+    public IRelayCommand? SelectCommand { get; init; }
 }

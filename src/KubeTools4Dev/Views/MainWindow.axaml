@@ -24,32 +24,17 @@
             </Grid>
         </Border>
 
-        <!-- Body: Sidebar + Content -->
-        <Grid Grid.Row="1" ColumnDefinitions="Auto, *" Margin="5">
+        <!-- Body: Sidebar + Splitter + Content -->
+        <Grid Grid.Row="1" Margin="5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="240" MinWidth="160" MaxWidth="520"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
             <!-- LEFT SIDEBAR -->
-            <Border Grid.Column="0" Classes="SidebarNav" CornerRadius="4" Margin="0,0,5,0"
-                    Width="{Binding Sidebar.SidebarWidth}">
-                <Border.Transitions>
-                    <Transitions>
-                        <DoubleTransition Property="Width" Duration="0:0:0.2"/>
-                    </Transitions>
-                </Border.Transitions>
+            <Border Grid.Column="0" Classes="SidebarNav" CornerRadius="4">
                 <DockPanel>
-
-                    <!-- Collapse / expand toggle -->
-                    <Button DockPanel.Dock="Top"
-                            Command="{Binding Sidebar.ToggleSidebarCommand}"
-                            Classes="SidebarToggle"
-                            HorizontalAlignment="Right"
-                            Margin="4,4,4,2">
-                        <Panel>
-                            <material:MaterialIcon Kind="ChevronLeft" Width="18" Height="18"
-                                                   IsVisible="{Binding Sidebar.IsSidebarExpanded}"/>
-                            <material:MaterialIcon Kind="ChevronRight" Width="18" Height="18"
-                                                   IsVisible="{Binding !Sidebar.IsSidebarExpanded}"/>
-                        </Panel>
-                    </Button>
 
                     <!-- Settings button at bottom -->
                     <Button DockPanel.Dock="Bottom"
@@ -61,21 +46,25 @@
                             ToolTip.Tip="Settings">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <material:MaterialIcon Kind="Cog" Width="18" Height="18"/>
-                            <TextBlock Text="Settings" VerticalAlignment="Center"
-                                       IsVisible="{Binding Sidebar.IsSidebarExpanded}"/>
+                            <TextBlock Text="Settings" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
 
-                    <!-- Cluster Tree (wrapper panel handles IsVisible so DataContext binding stays clean) -->
-                    <Panel IsVisible="{Binding Sidebar.IsSidebarExpanded}">
-                        <views:ClusterTreeView DataContext="{Binding ClusterTree}"/>
-                    </Panel>
+                    <!-- Cluster Tree -->
+                    <views:ClusterTreeView DataContext="{Binding ClusterTree}"/>
 
                 </DockPanel>
             </Border>
 
+            <!-- RESIZABLE SPLITTER -->
+            <GridSplitter Grid.Column="1"
+                          ResizeDirection="Columns"
+                          Background="Transparent"
+                          Cursor="SizeWestEast"
+                          Width="5"/>
+
             <!-- MAIN CONTENT AREA -->
-            <Border Grid.Column="1" Background="{DynamicResource SemiColorBackground0}" CornerRadius="4">
+            <Border Grid.Column="2" Background="{DynamicResource SemiColorBackground0}" CornerRadius="4">
                 <Panel>
 
                     <!-- Welcome / empty state -->
