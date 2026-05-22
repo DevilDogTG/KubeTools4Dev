@@ -19,7 +19,7 @@ public class ResourceKindToIconConverter : IValueConverter
             {
                 ResourceKind.Pods => MaterialIconKind.LayersTriple,
                 ResourceKind.Services => MaterialIconKind.ShareVariant,
-                ResourceKind.Deployments => MaterialIconKind.AlphaD,
+                ResourceKind.Deployments => MaterialIconKind.RocketLaunch,
                 _ => MaterialIconKind.Help
             }
             : MaterialIconKind.Help;

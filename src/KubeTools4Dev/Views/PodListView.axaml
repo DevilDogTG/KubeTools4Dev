@@ -49,8 +49,8 @@
 					<StackPanel Orientation="Horizontal">
 						<Button Content="-"
 								Command="{Binding DecrementRefreshIntervalCommand}"
-								Padding="8,0"
-								Height="24"
+								Padding="6,0"
+								Height="20"
 								VerticalAlignment="Center"/>
 						<TextBlock Text="{Binding RefreshIntervalSeconds, StringFormat='{}{0}s'}"
 								   VerticalAlignment="Center"
@@ -58,8 +58,8 @@
 								   TextAlignment="Center"/>
 						<Button Content="+"
 								Command="{Binding IncrementRefreshIntervalCommand}"
-								Padding="8,0"
-								Height="24"
+								Padding="6,0"
+								Height="20"
 								VerticalAlignment="Center"/>
 					</StackPanel>
 				</Border>
