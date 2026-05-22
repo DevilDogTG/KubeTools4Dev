@@ -33,8 +33,11 @@ public interface IClusterConnectionManager
     /// <summary>Returns the <see cref="IKubernetesService"/> for a connected cluster, or <c>null</c> if not connected.</summary>
     IKubernetesService? GetService(string clusterId);
 
-    /// <summary>Returns the <see cref="IPortForwardService"/> for a cluster (connected or not — created on demand).</summary>
-    IPortForwardService GetPortForwardService(string clusterId);
+    /// <summary>
+    /// Returns the <see cref="IPortForwardService"/> for a connected cluster, or <c>null</c> if the
+    /// cluster is not currently connected. Callers must guard before starting a port-forward.
+    /// </summary>
+    IPortForwardService? GetPortForwardService(string clusterId);
 
     /// <summary>
     /// Returns <c>true</c> if the given local port is already in use by any active port-forward across all clusters.

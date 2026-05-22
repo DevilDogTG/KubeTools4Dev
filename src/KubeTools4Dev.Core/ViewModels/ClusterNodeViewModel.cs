@@ -8,10 +8,12 @@ namespace KubeTools4Dev.Core.ViewModels;
 /// <summary>
 /// Represents a single Kubernetes cluster/context in the navigation tree.
 /// </summary>
-public partial class ClusterNodeViewModel : ObservableObject
+public partial class ClusterNodeViewModel : ObservableObject, IDisposable
 {
     private readonly IClusterConnectionManager _manager;
     private readonly Action<ContentScopeContext>? _resourceSelectedCallback;
+    private readonly SynchronizationContext? _uiContext;
+    private bool _disposed;
 
     /// <summary>Initializes a new cluster node.</summary>
     /// <param name="id">The cluster ID (string form of <see cref="Models.ClusterEntry.Id"/>).</param>
@@ -31,6 +33,7 @@ public partial class ClusterNodeViewModel : ObservableObject
         DisplayName = displayName;
         _manager = manager;
         _resourceSelectedCallback = resourceSelectedCallback;
+        _uiContext = SynchronizationContext.Current;
 
         _manager.ClusterStatusChanged += OnClusterStatusChanged;
     }
@@ -51,7 +54,7 @@ public partial class ClusterNodeViewModel : ObservableObject
 
     /// <summary>Gets or sets whether the namespace list below this cluster is expanded.</summary>
     [ObservableProperty]
-    private bool _isExpanded = false;
+    private bool _isExpanded;
 
     /// <summary>Gets the namespace child nodes; populated after a successful connection.</summary>
     public ObservableCollection<NamespaceNodeViewModel> Namespaces { get; } = [];
@@ -76,9 +79,31 @@ public partial class ClusterNodeViewModel : ObservableObject
             await _manager.ConnectClusterAsync(Id);
     }
 
-    private async void OnClusterStatusChanged(string clusterId, ClusterConnectionStatus status, string? errorMsg)
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _manager.ClusterStatusChanged -= OnClusterStatusChanged;
+        GC.SuppressFinalize(this);
+    }
+
+    private void OnClusterStatusChanged(string clusterId, ClusterConnectionStatus status, string? errorMsg)
     {
         if (clusterId != Id) return;
+
+        // Already on the captured UI context (or no context at all): apply inline.
+        // Otherwise post to the UI context so ObservableCollection mutations stay on the UI thread.
+        if (_uiContext is null || SynchronizationContext.Current == _uiContext)
+            ApplyStatusUpdate(status, errorMsg);
+        else
+            _uiContext.Post(_ => ApplyStatusUpdate(status, errorMsg), null);
+    }
+
+    private async void ApplyStatusUpdate(ClusterConnectionStatus status, string? errorMsg)
+    {
+        if (_disposed) return;
+
         Status = status;
         ErrorMessage = status == ClusterConnectionStatus.Error ? errorMsg : null;
 
@@ -96,6 +121,9 @@ public partial class ClusterNodeViewModel : ObservableObject
             if (svc is null) return;
 
             var names = await svc.GetNamespacesAsync() ?? [];
+
+            if (_disposed) return;
+
             Namespaces.Clear();
             foreach (var name in names)
                 Namespaces.Add(new NamespaceNodeViewModel(name, Id, _resourceSelectedCallback));

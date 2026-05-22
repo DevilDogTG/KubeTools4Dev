@@ -18,6 +18,7 @@ public partial class ClusterTreeViewModel : ObservableObject
     private readonly IClusterConnectionManager _manager;
     private readonly ISettingsService _settings;
     private readonly ILogger<ClusterTreeViewModel> _logger;
+    private readonly SynchronizationContext? _uiContext;
 
     /// <summary>Gets the top-level kubeconfig source groups shown in the sidebar.</summary>
     public ObservableCollection<KubeConfigSourceNodeViewModel> Sources { get; } = [];
@@ -43,6 +44,7 @@ public partial class ClusterTreeViewModel : ObservableObject
         _manager = manager;
         _settings = settings;
         _logger = logger;
+        _uiContext = SynchronizationContext.Current;
     }
 
     /// <summary>
@@ -56,7 +58,7 @@ public partial class ClusterTreeViewModel : ObservableObject
             await AutoDiscoverDefaultKubeConfigAsync();
         }
 
-        RebuildTree();
+        PostToUi(RebuildTree);
     }
 
     /// <summary>
@@ -65,19 +67,7 @@ public partial class ClusterTreeViewModel : ObservableObject
     public async Task AddSourceAsync(string kubeConfigPath, IEnumerable<string> selectedContexts)
     {
         await _manager.AddKubeConfigSourceAsync(kubeConfigPath, selectedContexts);
-        RebuildTree();
-    }
-
-    /// <summary>
-    /// Called by the view when the user selects a resource type leaf node.
-    /// </summary>
-    public void SelectResourceNode(
-        ResourceTypeNodeViewModel resourceNode,
-        NamespaceNodeViewModel namespaceNode,
-        ClusterNodeViewModel clusterNode)
-    {
-        ResourceNodeSelected?.Invoke(
-            new ContentScopeContext(clusterNode.Id, namespaceNode.Name, resourceNode.Kind));
+        PostToUi(RebuildTree);
     }
 
     [RelayCommand]
@@ -85,10 +75,16 @@ public partial class ClusterTreeViewModel : ObservableObject
 
     /// <summary>
     /// Rebuilds the <see cref="Sources"/> collection from the persisted settings.
-    /// Groups entries by kubeconfig file path.
+    /// Groups entries by kubeconfig file path. Must be called on the UI thread.
     /// </summary>
     private void RebuildTree()
     {
+        // Dispose existing cluster nodes so they unsubscribe from manager events.
+        foreach (var source in Sources)
+        {
+            foreach (var cluster in source.Clusters)
+                cluster.Dispose();
+        }
         Sources.Clear();
 
         var groups = _settings.Clusters.Clusters
@@ -113,6 +109,14 @@ public partial class ClusterTreeViewModel : ObservableObject
 
             Sources.Add(sourceNode);
         }
+    }
+
+    private void PostToUi(Action action)
+    {
+        if (_uiContext is null || SynchronizationContext.Current == _uiContext)
+            action();
+        else
+            _uiContext.Post(_ => action(), null);
     }
 
     private async Task AutoDiscoverDefaultKubeConfigAsync()
