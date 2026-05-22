@@ -5,8 +5,8 @@ KubeTools4Dev is a cross-platform desktop application built with Avalonia UI and
 ## Project Structure
 - **KubeTools4Dev**: The primary Avalonia application, housing the ViewModels, Views, and UI logic.
 - **KubeTools4Dev.Core**: The core library containing models, configuration settings, and services (e.g., `KubernetesService`, `PortForwardService`, `SettingsService`).
-- **KubeTools4Dev.Core.Tests**: xUnit + NSubstitute test project (66 tests). `InternalsVisibleTo` in Core csproj. Fakes live in `Fakes/`.
-- **KubeTools4Dev.Tests**: xUnit + NSubstitute test project targeting the UI assembly. `InternalsVisibleTo` in KubeTools4Dev csproj. Tests use `protected virtual DispatchToUIAsync` hook to bypass Avalonia dispatcher.
+- **KubeTools4Dev.Core.Tests**: xUnit + NSubstitute test project (47 tests). `InternalsVisibleTo` in Core csproj. Fakes live in `Fakes/`.
+- **KubeTools4Dev.Tests**: xUnit + NSubstitute test project targeting the UI assembly (31 tests). `InternalsVisibleTo` in KubeTools4Dev csproj. Tests use `protected virtual DispatchToUIAsync` hook to bypass Avalonia dispatcher.
 
 ## Developer Workflow (Modern Release Flow)
 Trunk-based development off `main`.
@@ -22,14 +22,16 @@ Trunk-based development off `main`.
 - **Subclass-and-Override**: Services using raw .NET socket/network primitives expose `protected internal virtual` methods (e.g., `AcceptSocketAsync`, `ConnectWebSocketAsync`). Tests subclass via `Fakes/TestablePortForwardService`. See ADR-001.
 - **Shared-state isolation**: Test classes mutating `static` state implement `IDisposable` to restore original value.
 - **Fakes folder**: `src/KubeTools4Dev.Core.Tests/Fakes/` — extend rather than re-implement.
+- **xUnit `AsyncTestSyncContext` + captured `SynchronizationContext.Current`**: ViewModels in `Core` that capture `SynchronizationContext.Current` at construction time for UI dispatching will pick up xUnit's `AsyncTestSyncContext` inside `async Task` tests. `Post()` on that context defers work to the thread pool, causing tests to assert before the post runs. Mitigation: in the dispatcher (e.g., `OnClusterStatusChanged`), add a same-context shortcut — `if (_uiContext is null || SynchronizationContext.Current == _uiContext) applyInline(); else _uiContext.Post(...)`. This keeps tests synchronous while still dispatching properly in production. See `ClusterNodeViewModel.cs`.
 
 ## Current Version
 - v1.2.7 (released 2026-05-21)
 
 ## Open PRs
-_(none as of 2026-05-21)_
+_(none as of 2026-05-22)_
 
 ## Recently Merged
+- PR #36 (`feature/multi-cluster-tree-nav`) — merged 2026-05-22. Multi-cluster support: per-cluster `ClusterConnectionManager`, VS Code-style nested-`ItemsControl` sidebar (replaces TreeView), `IDisposable` cascade from `ClusterTreeViewModel`, captured-`SynchronizationContext` UI dispatch, Material `ShadowAssist.ShadowDepth=Depth0` elevation removal. 78 tests passing.
 - PR #34 (`chore/archive-profile-composition`) — merged 2026-05-21. Agent-brains state files for profile-composition pipeline.
 - PR #33 (`release/v1.2.7`) — merged 2026-05-21. Bump version to 1.2.7.
 - PR #32 (`feature/deployments-page`) — merged 2026-05-21. Deployments page: list view, Rollout Restart, Edit (replica count + image tag). 66 tests.
