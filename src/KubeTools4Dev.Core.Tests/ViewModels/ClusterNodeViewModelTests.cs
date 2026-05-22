@@ -79,17 +79,40 @@ public class ClusterNodeViewModelTests
     }
 
     [Fact]
-    public void ErrorMessage_ClearedOnSuccessfulConnect()
+    public async Task ErrorMessage_ClearedOnSuccessfulConnect()
     {
-        _manager.SuccessfulClusterIds.Add("id-1");
         var sut = new ClusterNodeViewModel("id-1", "my-cluster", _manager);
 
-        // Force an error first by not having it in SuccessfulClusterIds for a different id
-        // Then connect successfully
-        _ = sut.ConnectCommand.ExecuteAsync(null);
+        // First attempt fails (id-1 not in SuccessfulClusterIds yet) — sets ErrorMessage
+        await sut.ConnectCommand.ExecuteAsync(null);
+        Assert.Equal(ClusterConnectionStatus.Error, sut.Status);
+        Assert.NotNull(sut.ErrorMessage);
 
-        // After successful connect, ErrorMessage should be null
+        // Second attempt succeeds — ErrorMessage should be cleared
+        _manager.SuccessfulClusterIds.Add("id-1");
+        await sut.ConnectCommand.ExecuteAsync(null);
+
+        Assert.Equal(ClusterConnectionStatus.Connected, sut.Status);
         Assert.Null(sut.ErrorMessage);
+    }
+
+    [Fact]
+    public void Dispose_UnsubscribesFromManagerEvent()
+    {
+        var sut = new ClusterNodeViewModel("id-1", "my-cluster", _manager);
+
+        sut.Dispose();
+
+        // After dispose, status events for this cluster should NOT update the disposed VM.
+        var initialStatus = sut.Status;
+        _manager.SuccessfulClusterIds.Add("id-1");
+        // Fire a status event by triggering connect on the manager directly.
+        _ = _manager.ConnectClusterAsync("id-1");
+
+        // Allow any queued continuations to run.
+        Thread.Sleep(50);
+
+        Assert.Equal(initialStatus, sut.Status);
     }
 
     // ── ToggleAndConnectCommand ───────────────────────────────────────────────

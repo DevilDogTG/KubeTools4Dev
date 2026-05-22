@@ -158,14 +158,18 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        var pf = _manager.GetPortForwardService(ctx.ClusterId);
-
         switch (ctx.Kind)
         {
             case ResourceKind.Pods:
                 await PodList.UpdateScopeAsync(svc, ctx.Namespace);
                 break;
             case ResourceKind.Services:
+                var pf = _manager.GetPortForwardService(ctx.ClusterId);
+                if (pf is null)
+                {
+                    _logger.LogWarning("Cluster {Id} has no port-forward service; skipping Services panel.", ctx.ClusterId);
+                    return;
+                }
                 await ServiceList.UpdateScopeAsync(svc, pf, ctx.Namespace);
                 break;
             case ResourceKind.Deployments:

@@ -80,7 +80,6 @@ public partial class App : Application
         services.AddTransient<ServiceListViewModel>();
         services.AddTransient<DeploymentListViewModel>();
         services.AddSingleton<SettingsViewModel>();
-        services.AddTransient<AddClusterDialogViewModel>();
         services.AddTransient<Func<PodViewModel, IKubernetesService, int, PodDetailViewModel>>(sp => (pod, svc, tab) =>
         {
             var logger = sp.GetRequiredService<ILogger<PodDetailViewModel>>();

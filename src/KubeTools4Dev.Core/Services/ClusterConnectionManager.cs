@@ -10,7 +10,7 @@ namespace KubeTools4Dev.Core.Services;
 /// Manages a pool of per-cluster <see cref="IKubernetesService"/> and <see cref="IPortForwardService"/>
 /// instances, supporting simultaneous connections to multiple Kubernetes clusters.
 /// </summary>
-public class ClusterConnectionManager : IClusterConnectionManager
+public class ClusterConnectionManager : IClusterConnectionManager, IDisposable
 {
     private readonly ISettingsService _settings;
     private readonly IKubernetesServiceFactory _kubeFactory;
@@ -22,6 +22,7 @@ public class ClusterConnectionManager : IClusterConnectionManager
         IPortForwardService PortForwardService);
 
     private readonly ConcurrentDictionary<string, Session> _sessions = new();
+    private bool _disposed;
 
     /// <inheritdoc />
     public event Action<string, ClusterConnectionStatus, string?>? ClusterStatusChanged;
@@ -124,22 +125,27 @@ public class ClusterConnectionManager : IClusterConnectionManager
         => _sessions.TryGetValue(clusterId, out var s) ? s.KubeService : null;
 
     /// <inheritdoc />
-    public IPortForwardService GetPortForwardService(string clusterId)
-    {
-        if (_sessions.TryGetValue(clusterId, out var s))
-            return s.PortForwardService;
-
-        // Return an unconnected instance for the cluster so callers always get a non-null value.
-        // Port-forwards will fail gracefully until the cluster is actually connected.
-        var entry = FindEntry(clusterId);
-        var kubeService = _kubeFactory.Create();
-        var pf = _portForwardFactory.Create(kubeService);
-        return pf;
-    }
+    public IPortForwardService? GetPortForwardService(string clusterId)
+        => _sessions.TryGetValue(clusterId, out var s) ? s.PortForwardService : null;
 
     /// <inheritdoc />
     public bool IsLocalPortInUse(int localPort)
         => _sessions.Values.Any(s => s.PortForwardService.GetActiveLocalPorts().Contains(localPort));
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        foreach (var session in _sessions.Values)
+        {
+            try { session.PortForwardService.StopAll(); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Error stopping port-forwards on shutdown."); }
+        }
+        _sessions.Clear();
+        GC.SuppressFinalize(this);
+    }
 
     private ClusterEntry? FindEntry(string clusterId)
         => _settings.Clusters.Clusters.FirstOrDefault(c => c.Id.ToString() == clusterId);

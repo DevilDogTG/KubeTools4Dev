@@ -62,8 +62,8 @@ public class FakeClusterConnectionManager : IClusterConnectionManager
         => _services.TryGetValue(clusterId, out var s) ? s : null;
 
     /// <inheritdoc/>
-    public IPortForwardService GetPortForwardService(string clusterId)
-        => Substitute.For<IPortForwardService>();
+    public IPortForwardService? GetPortForwardService(string clusterId)
+        => _services.ContainsKey(clusterId) ? Substitute.For<IPortForwardService>() : null;
 
     /// <inheritdoc/>
     public bool IsLocalPortInUse(int localPort) => false;
