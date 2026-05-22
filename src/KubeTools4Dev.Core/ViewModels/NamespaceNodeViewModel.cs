@@ -51,7 +51,7 @@ public partial class NamespaceNodeViewModel : ObservableObject
 
     /// <summary>Gets or sets whether the resource type list under this namespace is expanded.</summary>
     [ObservableProperty]
-    private bool _isExpanded = true;
+    private bool _isExpanded = false;
 
     /// <summary>Gets the fixed resource type children for this namespace.</summary>
     public ObservableCollection<ResourceTypeNodeViewModel> ResourceTypes { get; }

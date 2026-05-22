@@ -31,10 +31,9 @@ public class FakeClusterConnectionManager : IClusterConnectionManager
         => Task.CompletedTask;
 
     /// <inheritdoc/>
-    public async Task ConnectClusterAsync(string clusterId, CancellationToken ct = default)
+    public Task ConnectClusterAsync(string clusterId, CancellationToken ct = default)
     {
         FireStatus(clusterId, ClusterConnectionStatus.Connecting, null);
-        await Task.Yield();
 
         if (SuccessfulClusterIds.Contains(clusterId))
         {
@@ -47,6 +46,8 @@ public class FakeClusterConnectionManager : IClusterConnectionManager
         {
             FireStatus(clusterId, ClusterConnectionStatus.Error, "Simulated failure");
         }
+
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
