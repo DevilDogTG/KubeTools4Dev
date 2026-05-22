@@ -31,7 +31,7 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// The Kubernetes service used to fetch and patch deployments.
     /// </summary>
-    private IKubernetesService _kubernetesService;
+    private IKubernetesService? _kubernetesService;
 
     /// <summary>
     /// The current namespace filter (empty = all namespaces).
@@ -91,13 +91,10 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="DeploymentListViewModel"/> class.
     /// </summary>
-    /// <param name="kubernetesService">The Kubernetes service.</param>
     /// <param name="logger">The logger.</param>
     public DeploymentListViewModel(
-        IKubernetesService kubernetesService,
         ILogger<DeploymentListViewModel> logger)
     {
-        _kubernetesService = kubernetesService;
         _logger = logger;
     }
 
@@ -129,6 +126,7 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
     /// </summary>
     public async Task InitializeAsync()
     {
+        if (_kubernetesService is null) return;
         IsLoading = true;
         try
         {
@@ -192,7 +190,7 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
         ErrorMessage = string.Empty;
         try
         {
-            await _kubernetesService.RestartDeploymentAsync(deployment.Namespace, deployment.Name);
+            await _kubernetesService!.RestartDeploymentAsync(deployment.Namespace, deployment.Name);
         }
         catch (Exception ex)
         {
@@ -220,7 +218,7 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
 
             if (vm.IsConfirmed)
             {
-                await _kubernetesService.PatchDeploymentAsync(
+                await _kubernetesService!.PatchDeploymentAsync(
                     deployment.Namespace,
                     deployment.Name,
                     vm.Replicas,
@@ -298,7 +296,7 @@ public partial class DeploymentListViewModel : ViewModelBase, IDisposable
         {
             try
             {
-                await foreach (var (type, item) in _kubernetesService.WatchDeploymentsAsync(_namespaceName, cancellationToken: token))
+                await foreach (var (type, item) in _kubernetesService!.WatchDeploymentsAsync(_namespaceName, cancellationToken: token))
                 {
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {

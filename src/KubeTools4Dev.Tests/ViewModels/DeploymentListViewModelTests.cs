@@ -21,8 +21,14 @@ public class DeploymentListViewModelTests
     private readonly IKubernetesService _kubeService = Substitute.For<IKubernetesService>();
     private readonly ILogger<DeploymentListViewModel> _logger = Substitute.For<ILogger<DeploymentListViewModel>>();
 
-    private TestableDeploymentListViewModel MakeVm() =>
-        new(_kubeService, _logger);
+    private TestableDeploymentListViewModel MakeVm()
+    {
+        var vm = new TestableDeploymentListViewModel(_logger);
+        // Inject service before tests call commands. IsConnected returns false (NSubstitute default),
+        // so InitializeAsync returns early without making real API calls.
+        vm.UpdateScopeAsync(_kubeService, "default").GetAwaiter().GetResult();
+        return vm;
+    }
 
     private static DeploymentViewModel MakeDeploymentVm(
         string name = "my-app",
@@ -237,9 +243,8 @@ public class DeploymentListViewModelTests
     // ── Test double ───────────────────────────────────────────────────────────
 
     private sealed class TestableDeploymentListViewModel(
-        IKubernetesService kubernetesService,
         ILogger<DeploymentListViewModel> logger)
-        : DeploymentListViewModel(kubernetesService, logger)
+        : DeploymentListViewModel(logger)
     {
         public bool TestDialogShouldConfirm { get; set; }
         public int TestDialogReplicas { get; set; }
