@@ -42,6 +42,7 @@ You MUST NOT keep your plans in internal context only.
 ## Coding Standards
 - Build must have **0 warnings, 0 errors** (`-warnaserror`).
 - Use `[LoggerMessage]` source-generated methods for structured logging.
+- **VM event subscription on Singletons**: Any ViewModel that subscribes to an event on a `Singleton` service (e.g., `IClusterConnectionManager.ClusterStatusChanged`) MUST implement `IDisposable` and unsubscribe in `Dispose()`. Parent VMs that re-create child VMs (e.g., `ClusterTreeViewModel.RebuildTree` rebuilding `ClusterNodeViewModel` instances) MUST dispose the outgoing children before clearing/replacing the collection — otherwise the Singleton retains references and old VMs keep firing phantom `PropertyChanged` events on a dead UI tree.
 
 ## Testing
 - Test project: `src/KubeTools4Dev.Core.Tests` (xUnit + NSubstitute, net10.0).
