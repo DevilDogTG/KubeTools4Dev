@@ -27,10 +27,7 @@ You MUST NOT keep your plans in internal context only.
 
 ## Workspace Rules
 <!-- begin:framework -->
-- At the start of every new session, I must scan and briefly summarize the active rules and profiles from all loaded context levels (Global, Profile, and Workspace).
-- I must explicitly confirm that I am aligned with the "Filesystem-First Planning" mandate if it is present in the workspace.
-- Follow the framework mechanics defined in `~\.agent-brains\GLOBAL_AGENT.md`.
-- Maintain operational state strictly in .\.agent-brains\.
+<!-- Global and profile rules are active automatically. Add project-specific overrides here. -->
 <!-- end:framework -->
 
 ## Git Workflow
@@ -55,3 +52,4 @@ You MUST NOT keep your plans in internal context only.
 ## PR Comment Contracts
 - `finish-feature` skill posts `<!-- finish-feature-update -->` + `<!-- head-sha: SHA -->` on PRs.
 - `pr-review` skill detects these markers → reviews diff → posts `<!-- pr-review-findings -->` + `<!-- review-status: approved|needs-work -->` + `<!-- review-sha: SHA -->`.
+
