@@ -209,7 +209,7 @@ public partial class ClusterNodeViewModel : ObservableObject, IDisposable
             catch (Exception ex)
             {
                 if (cancellationToken.IsCancellationRequested || _disposed) break;
-                _logger?.LogWarning(ex, "Namespace watch for cluster {ClusterId} failed; retrying.", Id);
+                if (_logger is not null) LogNamespaceWatchFailed(_logger, Id, ex);
                 await Task.Delay(_namespaceWatchRetryDelayMs, cancellationToken).ConfigureAwait(false);
             }
         }

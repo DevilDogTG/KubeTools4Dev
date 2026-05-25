@@ -81,7 +81,7 @@ public partial class PortForwardService
     private partial void LogPortForwardStarting(string serviceName, string podName, int localPort, int remotePort);
 
     /// <summary>
-    /// Logs when port forwarding is starting.
+    /// Logs when cancelling a port forward fails.
     /// </summary>
     [LoggerMessage(
         Level = LogLevel.Warning,
