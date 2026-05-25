@@ -27,6 +27,11 @@ public interface ISettingsService
     /// Gets the cluster registry settings.
     /// </summary>
     ClustersSettings Clusters { get; }
+
+    /// <summary>
+    /// Gets the namespaces settings.
+    /// </summary>
+    NamespacesSettings Namespaces { get; }
     /// <summary>
     /// Saves the current settings to persistent storage.
     /// </summary>

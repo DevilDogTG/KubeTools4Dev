@@ -79,4 +79,50 @@ public class NamespaceNodeViewModelTests
         Assert.Equal("staging", captured.Namespace);
         Assert.Equal(ResourceKind.Deployments, captured.Kind);
     }
+
+    // ── T1: DisplayName + IsAllNamespaces ──────────────────────────────────────
+
+    [Fact]
+    public void DisplayName_DefaultsToName_WhenNotProvided()
+    {
+        var sut = new NamespaceNodeViewModel("default", "cluster-1");
+
+        Assert.Equal("default", sut.DisplayName);
+    }
+
+    [Fact]
+    public void DisplayName_UsesExplicitValue_WhenProvided()
+    {
+        var sut = new NamespaceNodeViewModel("", "cluster-1", displayName: "(all namespaces)");
+
+        Assert.Equal("(all namespaces)", sut.DisplayName);
+    }
+
+    [Fact]
+    public void IsAllNamespaces_IsTrue_WhenNameIsEmpty()
+    {
+        var sut = new NamespaceNodeViewModel("", "cluster-1");
+
+        Assert.True(sut.IsAllNamespaces);
+    }
+
+    [Fact]
+    public void IsAllNamespaces_IsFalse_WhenNameIsNotEmpty()
+    {
+        var sut = new NamespaceNodeViewModel("default", "cluster-1");
+
+        Assert.False(sut.IsAllNamespaces);
+    }
+
+    [Fact]
+    public void SelectCommand_AllNamespacesNode_PassesEmptyNamespaceInContext()
+    {
+        ContentScopeContext? captured = null;
+        var sut = new NamespaceNodeViewModel("", "cluster-1", ctx => captured = ctx);
+
+        sut.ResourceTypes[0].SelectCommand!.Execute(null);
+
+        Assert.NotNull(captured);
+        Assert.Equal("", captured.Namespace);
+    }
 }

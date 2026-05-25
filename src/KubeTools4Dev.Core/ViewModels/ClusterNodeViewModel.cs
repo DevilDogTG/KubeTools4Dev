@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using KubeTools4Dev.Core.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
 namespace KubeTools4Dev.Core.ViewModels;
@@ -10,9 +11,21 @@ namespace KubeTools4Dev.Core.ViewModels;
 /// </summary>
 public partial class ClusterNodeViewModel : ObservableObject, IDisposable
 {
+    /// <summary>
+    /// The namespace name used for the "all namespaces" virtual sentinel node.
+    /// An empty string routes to cluster-wide API calls in <see cref="IKubernetesService"/>.
+    /// </summary>
+    internal const string AllNamespacesKey = "";
+
+    /// <summary>The display label shown for the "all namespaces" sentinel entry.</summary>
+    internal const string AllNamespacesDisplayName = "(all namespaces)";
+
     private readonly IClusterConnectionManager _manager;
     private readonly Action<ContentScopeContext>? _resourceSelectedCallback;
     private readonly SynchronizationContext? _uiContext;
+    private readonly ILogger<ClusterNodeViewModel>? _logger;
+    private readonly int _namespaceWatchRetryDelayMs;
+    private CancellationTokenSource? _namespaceCts;
     private bool _disposed;
 
     /// <summary>Initializes a new cluster node.</summary>
@@ -23,16 +36,24 @@ public partial class ClusterNodeViewModel : ObservableObject, IDisposable
     /// Optional callback invoked when the user selects a resource type leaf node inside this cluster.
     /// Passed down to each <see cref="NamespaceNodeViewModel"/> created on connect.
     /// </param>
+    /// <param name="logger">Optional logger for namespace watch diagnostics.</param>
+    /// <param name="namespaceWatchRetryDelayMs">
+    /// Delay in milliseconds before retrying a failed namespace watch. Defaults to 5000 ms.
+    /// </param>
     public ClusterNodeViewModel(
         string id,
         string displayName,
         IClusterConnectionManager manager,
-        Action<ContentScopeContext>? resourceSelectedCallback = null)
+        Action<ContentScopeContext>? resourceSelectedCallback = null,
+        ILogger<ClusterNodeViewModel>? logger = null,
+        int namespaceWatchRetryDelayMs = 5000)
     {
         Id = id;
         DisplayName = displayName;
         _manager = manager;
         _resourceSelectedCallback = resourceSelectedCallback;
+        _logger = logger;
+        _namespaceWatchRetryDelayMs = namespaceWatchRetryDelayMs;
         _uiContext = SynchronizationContext.Current;
 
         _manager.ClusterStatusChanged += OnClusterStatusChanged;
@@ -85,6 +106,7 @@ public partial class ClusterNodeViewModel : ObservableObject, IDisposable
         if (_disposed) return;
         _disposed = true;
         _manager.ClusterStatusChanged -= OnClusterStatusChanged;
+        CancelNamespaceWatch();
         GC.SuppressFinalize(this);
     }
 
@@ -108,9 +130,14 @@ public partial class ClusterNodeViewModel : ObservableObject, IDisposable
         ErrorMessage = status == ClusterConnectionStatus.Error ? errorMsg : null;
 
         if (status == ClusterConnectionStatus.Connected)
+        {
             await LoadNamespacesAsync();
+        }
         else if (status is ClusterConnectionStatus.Disconnected or ClusterConnectionStatus.Error)
+        {
+            CancelNamespaceWatch();
             Namespaces.Clear();
+        }
     }
 
     private async Task LoadNamespacesAsync()
@@ -125,12 +152,94 @@ public partial class ClusterNodeViewModel : ObservableObject, IDisposable
             if (_disposed) return;
 
             Namespaces.Clear();
+
+            // Prepend the virtual "all namespaces" sentinel so users can view cross-namespace resources.
+            Namespaces.Add(new NamespaceNodeViewModel(
+                AllNamespacesKey, Id, _resourceSelectedCallback, AllNamespacesDisplayName));
+
             foreach (var name in names)
                 Namespaces.Add(new NamespaceNodeViewModel(name, Id, _resourceSelectedCallback));
+
+            // Start the live namespace watch so additions/removals are reflected without reconnect.
+            StartNamespaceWatch(svc);
         }
         catch (Exception ex)
         {
             ErrorMessage = $"Namespaces unavailable: {ex.Message}";
         }
+    }
+
+    // ── Namespace watch ─────────────────────────────────────────────────────
+
+    private void StartNamespaceWatch(IKubernetesService svc)
+    {
+        CancelNamespaceWatch();
+        _namespaceCts = new CancellationTokenSource();
+        var token = _namespaceCts.Token;
+
+        _ = Task.Run(async () => await WatchNamespacesLoopAsync(svc, token), token);
+    }
+
+    private void CancelNamespaceWatch()
+    {
+        if (_namespaceCts is null) return;
+        _namespaceCts.Cancel();
+        _namespaceCts.Dispose();
+        _namespaceCts = null;
+    }
+
+    private async Task WatchNamespacesLoopAsync(IKubernetesService svc, CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested && !_disposed)
+        {
+            try
+            {
+                await foreach (var (eventType, ns) in svc.WatchNamespacesAsync(cancellationToken))
+                {
+                    var namespaceName = ns.Metadata?.Name;
+                    if (string.IsNullOrEmpty(namespaceName)) continue;
+
+                    PostToUi(() => ApplyNamespaceWatchEvent(eventType, namespaceName));
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                if (cancellationToken.IsCancellationRequested || _disposed) break;
+                _logger?.LogWarning(ex, "Namespace watch for cluster {ClusterId} failed; retrying.", Id);
+                await Task.Delay(_namespaceWatchRetryDelayMs, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private void ApplyNamespaceWatchEvent(k8s.WatchEventType eventType, string namespaceName)
+    {
+        if (_disposed) return;
+
+        switch (eventType)
+        {
+            case k8s.WatchEventType.Added:
+                // Do not add a duplicate or overwrite the "all namespaces" sentinel.
+                if (Namespaces.Any(n => n.Name == namespaceName)) return;
+                Namespaces.Add(new NamespaceNodeViewModel(namespaceName, Id, _resourceSelectedCallback));
+                break;
+
+            case k8s.WatchEventType.Deleted:
+                var toRemove = Namespaces.FirstOrDefault(n => n.Name == namespaceName);
+                if (toRemove is not null)
+                    Namespaces.Remove(toRemove);
+                break;
+        }
+    }
+
+    private void PostToUi(Action action)
+    {
+        if (_uiContext is null || SynchronizationContext.Current == _uiContext)
+            action();
+        else
+            _uiContext.Post(_ => action(), null);
     }
 }

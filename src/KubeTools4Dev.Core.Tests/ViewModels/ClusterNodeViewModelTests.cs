@@ -1,5 +1,7 @@
+using KubeTools4Dev.Core.Services.Interfaces;
 using KubeTools4Dev.Core.Tests.Fakes;
 using KubeTools4Dev.Core.ViewModels;
+using NSubstitute;
 using System.Collections.Generic;
 
 namespace KubeTools4Dev.Core.Tests.ViewModels;
@@ -161,4 +163,105 @@ public class ClusterNodeViewModelTests
         Assert.False(connectingObserved);
         Assert.Equal(ClusterConnectionStatus.Connected, sut.Status);
     }
+
+    // ── T2: "all namespaces" sentinel node ────────────────────────────────────
+
+    [Fact]
+    public async Task Connect_PrependsSentinelNode_AsFirstNamespaceEntry()
+    {
+        _manager.SuccessfulClusterIds.Add("id-1");
+        var sut = new ClusterNodeViewModel("id-1", "my-cluster", _manager);
+
+        await sut.ConnectCommand.ExecuteAsync(null);
+
+        Assert.NotEmpty(sut.Namespaces);
+        var sentinel = sut.Namespaces[0];
+        Assert.Equal(ClusterNodeViewModel.AllNamespacesKey, sentinel.Name);
+        Assert.Equal(ClusterNodeViewModel.AllNamespacesDisplayName, sentinel.DisplayName);
+        Assert.True(sentinel.IsAllNamespaces);
+    }
+
+    // ── T3: namespace watch events ────────────────────────────────────────────
+
+    [Fact]
+    public async Task WatchNamespacesAsync_AddedEvent_AppendsNewNamespaceNode()
+    {
+        var svc = CreateConfiguredService();
+        svc.WatchNamespacesAsync(Arg.Any<CancellationToken>())
+           .Returns(WatchEvents((k8s.WatchEventType.Added, MakeNamespace("kube-system"))));
+
+        _manager.ServiceFactory = _ => svc;
+        _manager.SuccessfulClusterIds.Add("id-1");
+        var sut = new ClusterNodeViewModel("id-1", "my-cluster", _manager, namespaceWatchRetryDelayMs: 0);
+
+        await sut.ConnectCommand.ExecuteAsync(null);
+
+        await WaitForAsync(() => sut.Namespaces.Any(n => n.Name == "kube-system"), TimeSpan.FromSeconds(2));
+
+        Assert.Contains(sut.Namespaces, n => n.Name == "kube-system");
+    }
+
+    [Fact]
+    public async Task WatchNamespacesAsync_DeletedEvent_RemovesExistingNode()
+    {
+        var svc = CreateConfiguredService(initialNamespaces: ["default"]);
+        svc.WatchNamespacesAsync(Arg.Any<CancellationToken>())
+           .Returns(WatchEvents((k8s.WatchEventType.Deleted, MakeNamespace("default"))));
+
+        _manager.ServiceFactory = _ => svc;
+        _manager.SuccessfulClusterIds.Add("id-1");
+        var sut = new ClusterNodeViewModel("id-1", "my-cluster", _manager, namespaceWatchRetryDelayMs: 0);
+
+        await sut.ConnectCommand.ExecuteAsync(null);
+
+        await WaitForAsync(() => !sut.Namespaces.Any(n => n.Name == "default"), TimeSpan.FromSeconds(2));
+
+        Assert.DoesNotContain(sut.Namespaces, n => n.Name == "default");
+    }
+
+    [Fact]
+    public async Task WatchNamespacesAsync_AddedWithSentinelName_DoesNotDuplicateSentinel()
+    {
+        var svc = CreateConfiguredService();
+        svc.WatchNamespacesAsync(Arg.Any<CancellationToken>())
+           .Returns(WatchEvents((k8s.WatchEventType.Added, MakeNamespace(""))));
+
+        _manager.ServiceFactory = _ => svc;
+        _manager.SuccessfulClusterIds.Add("id-1");
+        var sut = new ClusterNodeViewModel("id-1", "my-cluster", _manager, namespaceWatchRetryDelayMs: 0);
+
+        await sut.ConnectCommand.ExecuteAsync(null);
+
+        // Allow watch Task.Run to complete
+        await Task.Delay(200);
+
+        Assert.Equal(1, sut.Namespaces.Count(n => n.Name == ""));
+    }
+
+    // ── Watch test helpers ────────────────────────────────────────────────────
+
+    private static IKubernetesService CreateConfiguredService(IReadOnlyList<string>? initialNamespaces = null)
+    {
+        var svc = Substitute.For<IKubernetesService>();
+        svc.IsConnected.Returns(true);
+        svc.GetNamespacesAsync().Returns(Task.FromResult<IReadOnlyList<string>>(initialNamespaces ?? []));
+        return svc;
+    }
+
+    private static async Task WaitForAsync(Func<bool> condition, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (!condition() && DateTime.UtcNow < deadline)
+            await Task.Delay(10);
+    }
+
+    private static async IAsyncEnumerable<(k8s.WatchEventType Type, k8s.Models.V1Namespace Item)> WatchEvents(
+        params (k8s.WatchEventType Type, k8s.Models.V1Namespace Item)[] events)
+    {
+        foreach (var e in events)
+            yield return e;
+    }
+
+    private static k8s.Models.V1Namespace MakeNamespace(string name)
+        => new() { Metadata = new k8s.Models.V1ObjectMeta { Name = name } };
 }

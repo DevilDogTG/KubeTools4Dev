@@ -30,6 +30,11 @@ internal class SettingsModel
     /// Gets or sets the cluster registry settings.
     /// </summary>
     public ClustersSettings Clusters { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the namespaces settings.
+    /// </summary>
+    public NamespacesSettings Namespaces { get; set; } = new();
 }
 
 /// <summary>
@@ -83,4 +88,16 @@ public class ServicesSettings
     /// Gets or sets the hidden service types.
     /// </summary>
     public List<string> HiddenServiceTypes { get; set; } = ["ExternalName"];
+}
+
+/// <summary>
+/// Represents the namespaces settings controlling how the namespace list is kept up to date.
+/// </summary>
+public class NamespacesSettings
+{
+    /// <summary>
+    /// Gets or sets the delay in milliseconds before retrying a failed namespace watch stream.
+    /// Defaults to 5000 ms (5 seconds).
+    /// </summary>
+    public int WatchRetryDelayMilliseconds { get; set; } = 5000;
 }
