@@ -1,7 +1,7 @@
 # Backlog
 
 ## Pending
-- `namespace-all-dynamic-pf-logging.md` — active 2026-05-25. (1) "all" virtual namespace node, (2) live namespace watch, (3) port-forward drop logging.
+_(none)_
 
 ## In Progress
 
@@ -9,6 +9,7 @@
 _(none)_
 
 ## Archived Plans
+- `archive/namespace-all-dynamic-pf-logging.md` — archived 2026-05-25. All-ns sentinel, live watch, pf logging. PR #40 ✅ approved, ready to merge.
 - `archive/deployments-page.md` — archived 2026-05-25 (all steps complete, PR #32 merged).
 - `archive/team-dispatch-poc.md` — archived 2026-05-25 (all steps complete, PRs #32/#34 merged).
 - `archive/team-profile-composition.md` — archived 2026-05-25 (all steps complete, PR #34 merged).

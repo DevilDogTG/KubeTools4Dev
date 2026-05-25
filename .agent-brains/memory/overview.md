@@ -19,7 +19,9 @@ Trunk-based development off `main`.
 - **AI encoding**: All scripts set UTF-8 encoding to prevent emoji corruption on Thai Windows (CP874 OEM codepage).
 
 ## Testing Patterns
-- **Subclass-and-Override**: Services using raw .NET socket/network primitives expose `protected internal virtual` methods (e.g., `AcceptSocketAsync`, `ConnectWebSocketAsync`). Tests subclass via `Fakes/TestablePortForwardService`. See ADR-001.
+- **`[LoggerMessage]` for nullable loggers**: ViewModels with `ILogger<T>?` (optional) cannot use instance `[LoggerMessage]` directly. Pattern: `private static partial void LogXxx(ILogger logger, ...)` — static form takes ILogger as first param. Call site: `if (_logger is not null) LogXxx(_logger, ...)`. See `ClusterNodeViewModel.LogMessages.cs`.
+- **NSubstitute + `IAsyncEnumerable` default** — NSubstitute returns `null` for `IAsyncEnumerable` — `await foreach` on null throws NRE. Tests must inject a configured enumerable via `ServiceFactory` on `FakeClusterConnectionManager`.
+- **`FakeClusterConnectionManager.ServiceFactory`**: `Func<string, IKubernetesService>?` — when set, used instead of a plain `Substitute.For<IKubernetesService>()`. Required for any test that needs to pre-configure mock watch streams or service behavior before `ConnectClusterAsync`.
 - **Shared-state isolation**: Test classes mutating `static` state implement `IDisposable` to restore original value.
 - **FakeClusterConnectionManager**: Do NOT use `async Task` with `Task.Yield()` in fake constructors — this causes `AsyncTestSyncContext` to defer the continuation to the thread pool, making tests flaky. Use synchronous initialization instead.
 - **xUnit `AsyncTestSyncContext` + captured `SynchronizationContext.Current`**: ViewModels in `Core` that capture `SynchronizationContext.Current` at construction time for UI dispatching will pick up xUnit's `AsyncTestSyncContext` inside `async Task` tests. `Post()` on that context defers work to the thread pool, causing tests to assert before the post runs. Mitigation: in the dispatcher (e.g., `OnClusterStatusChanged`), add a same-context shortcut — `if (_uiContext is null || SynchronizationContext.Current == _uiContext) applyInline(); else _uiContext.Post(...)`. This keeps tests synchronous while still dispatching properly in production. See `ClusterNodeViewModel.cs`.
@@ -28,6 +30,7 @@ Trunk-based development off `main`.
 - v1.2.7 (released 2026-05-21)
 
 ## Open PRs
+- PR #40 (`feature/namespace-all-dynamic-pf-logging`) — ✅ approved 2026-05-25. All-ns sentinel node, live namespace watch (WatchNamespacesAsync), port-forward lifecycle logging (connId, duration, heartbeat). 97 tests (58 Core + 39 UI), 0W/0E.
 - PR #38 (`feature/ui-style-consistency`) — draft, ✅ approved 2026-05-25. UI style consistency: `RocketLaunch` Deployment icon, compact input/button sizing across all pages, ±-stepper controls, sidebar header removed, namespace children collapse by default, `Math.Clamp` stepper unification. 86 tests (47 Core + 39 UI), 0W/0E.
 
 ## Recently Merged
