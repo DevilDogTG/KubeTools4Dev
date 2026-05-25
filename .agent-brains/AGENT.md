@@ -39,6 +39,7 @@ You MUST NOT keep your plans in internal context only.
 ## Coding Standards
 - Build must have **0 warnings, 0 errors** (`-warnaserror`).
 - Use `[LoggerMessage]` source-generated methods for structured logging.
+- **`[LoggerMessage]` with nullable `ILogger`**: When a class has an optional `ILogger<T>?` field, use a `static partial` method with the logger as the first parameter: `private static partial void LogXxx(ILogger logger, ...)`. Guard the call site: `if (_logger is not null) LogXxx(_logger, ...)`. See `ClusterNodeViewModel.LogMessages.cs` for the pattern.
 - **VM event subscription on Singletons**: Any ViewModel that subscribes to an event on a `Singleton` service (e.g., `IClusterConnectionManager.ClusterStatusChanged`) MUST implement `IDisposable` and unsubscribe in `Dispose()`. Parent VMs that re-create child VMs (e.g., `ClusterTreeViewModel.RebuildTree` rebuilding `ClusterNodeViewModel` instances) MUST dispose the outgoing children before clearing/replacing the collection — otherwise the Singleton retains references and old VMs keep firing phantom `PropertyChanged` events on a dead UI tree.
 
 ## Testing
@@ -47,6 +48,8 @@ You MUST NOT keep your plans in internal context only.
 - All tests must pass before finishing a feature.
 - **Socket/network seams**: When testing services that use raw .NET socket or network primitives, prefer **Subclass-and-Override** (`protected internal virtual` methods) over introducing new interfaces. Avoids interface proliferation for infrastructure concerns that are inherently hard to mock.
 - **Shared-state isolation**: xUnit test classes that mutate any `static` or shared state (e.g., `PortForwardService.ConnectionTimeout`) **must** implement `IDisposable` and restore the original value in `Dispose()` to be safe under parallel test execution.
+- **NSubstitute + `IAsyncEnumerable`**: NSubstitute returns `null` by default for `IAsyncEnumerable<T>` return types. `await foreach` on null throws `NullReferenceException`. Always inject a configured enumerable via `FakeClusterConnectionManager.ServiceFactory` or an explicit `.Returns(...)` before exercising code that calls `await foreach` on a mocked method.
+- **`FakeClusterConnectionManager.ServiceFactory`**: Set `_manager.ServiceFactory = (clusterId) => myMock` before calling `ConnectClusterAsync` to inject a pre-configured `IKubernetesService` substitute. Required for any test that configures `WatchNamespacesAsync` or other `IAsyncEnumerable`-returning members.
 - **Fakes folder**: Reusable test subclasses and fakes live in `src/KubeTools4Dev.Core.Tests/Fakes/`. Extend existing fakes (e.g., `TestablePortForwardService`) rather than re-implementing mocks inline.
 
 ## PR Comment Contracts
