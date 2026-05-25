@@ -135,38 +135,28 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     /// </summary>
     [RelayCommand]
     private void DecrementRefreshIntervalSeconds()
-    {
-        if (RefreshIntervalSeconds > 1)
-            RefreshIntervalSeconds--;
-    }
+        => RefreshIntervalSeconds = Math.Clamp(RefreshIntervalSeconds - 1, 1, 60);
 
     /// <summary>
     /// Increments the refresh interval by one second.
     /// </summary>
     [RelayCommand]
     private void IncrementRefreshIntervalSeconds()
-    {
-        if (RefreshIntervalSeconds < 60)
-            RefreshIntervalSeconds++;
-    }
+        => RefreshIntervalSeconds = Math.Clamp(RefreshIntervalSeconds + 1, 1, 60);
 
     /// <summary>
     /// Decrements the watch retry delay by 500 ms.
     /// </summary>
     [RelayCommand]
     private void DecrementWatchRetryDelay()
-    {
-        WatchRetryDelayMilliseconds = Math.Max(1000, WatchRetryDelayMilliseconds - 500);
-    }
+        => WatchRetryDelayMilliseconds = Math.Clamp(WatchRetryDelayMilliseconds - 500, 1000, 60000);
 
     /// <summary>
     /// Increments the watch retry delay by 500 ms.
     /// </summary>
     [RelayCommand]
     private void IncrementWatchRetryDelay()
-    {
-        WatchRetryDelayMilliseconds = Math.Min(60000, WatchRetryDelayMilliseconds + 500);
-    }
+        => WatchRetryDelayMilliseconds = Math.Clamp(WatchRetryDelayMilliseconds + 500, 1000, 60000);
 
     /// <summary>
     /// Opens the about dialog.
