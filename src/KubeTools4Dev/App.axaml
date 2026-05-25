@@ -11,6 +11,7 @@
     <Application.Resources>
         <converters:ClusterStatusToBrushConverter x:Key="ClusterStatusToBrushConverter"/>
         <converters:ResourceKindToIconConverter x:Key="ResourceKindToIconConverter"/>
+        <converters:BoolToItalicConverter x:Key="BoolToItalicConverter"/>
         <SolidColorBrush x:Key="SemiColorDanger" Color="#FFD32F2F"/>
     </Application.Resources>
 

@@ -140,4 +140,15 @@ public interface IKubernetesService
     /// </summary>
     /// <returns>A read-only list of namespace names.</returns>
     Task<IReadOnlyList<string>> GetNamespacesAsync();
+
+    /// <summary>
+    /// Watches all namespaces in the cluster for add, delete, and modify events.
+    /// </summary>
+    /// <param name="cancellationToken">Token used to stop the watch stream.</param>
+    /// <returns>
+    /// An async-enumerable stream of <see cref="k8s.WatchEventType"/> / <see cref="k8s.Models.V1Namespace"/> pairs.
+    /// Yields one item per namespace event until <paramref name="cancellationToken"/> is cancelled.
+    /// </returns>
+    IAsyncEnumerable<(k8s.WatchEventType Type, k8s.Models.V1Namespace Item)> WatchNamespacesAsync(
+        CancellationToken cancellationToken = default);
 }

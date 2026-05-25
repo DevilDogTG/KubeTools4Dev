@@ -406,6 +406,22 @@ public class KubernetesService(
     }
 
     /// <summary>
+    /// Watches all namespaces in the cluster for add, delete, and modify events.
+    /// </summary>
+    /// <param name="cancellationToken">Token used to stop the watch stream.</param>
+    /// <returns>An async-enumerable stream of namespace watch events.</returns>
+    public async IAsyncEnumerable<(WatchEventType Type, V1Namespace Item)> WatchNamespacesAsync(
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+        CancellationToken cancellationToken = default)
+    {
+        await foreach (var (type, item) in Client.CoreV1.WatchListNamespaceAsync(
+            cancellationToken: cancellationToken))
+        {
+            yield return (type, item);
+        }
+    }
+
+    /// <summary>
     /// Determines whether [is all namespaces] [the specified namespaceName].
     /// </summary>
     /// <param name="namespaceName">The namespaceName.</param>

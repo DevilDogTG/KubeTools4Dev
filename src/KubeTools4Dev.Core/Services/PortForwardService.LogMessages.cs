@@ -13,24 +13,40 @@ public partial class PortForwardService
     /// </summary>
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Connection accepted, forwarding to {PodName}:{RemotePort}")]
-    private partial void LogConnectionAccepted(string podName, int remotePort);
+        Message = "[{ConnId}] Connection accepted, forwarding to {PodName}:{RemotePort}")]
+    private partial void LogConnectionAccepted(string connId, string podName, int remotePort);
+
+    /// <summary>
+    /// Logs the total lifetime of a connection when it closes.
+    /// </summary>
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "[{ConnId}] Connection to {PodName}:{RemotePort} closed after {Duration:g}")]
+    private partial void LogConnectionLifetime(string connId, string podName, int remotePort, TimeSpan duration);
+
+    /// <summary>
+    /// Logs a periodic heartbeat for a long-running connection.
+    /// </summary>
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "[{ConnId}] Port-forward alive: {PodName}:{RemotePort}, running {Duration:g}")]
+    private partial void LogConnectionHeartbeat(string connId, string podName, int remotePort, TimeSpan duration);
 
     /// <summary>
     /// Logs connection errors.
     /// </summary>
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Connection error for pod {PodName}: {ErrorMessage}")]
-    private partial void LogConnectionError(string podName, string errorMessage);
+        Message = "[{ConnId}] Connection error for pod {PodName}: {ErrorMessage}")]
+    private partial void LogConnectionError(string connId, string podName, string errorMessage);
 
     /// <summary>
     /// Logs connection timeout errors.
     /// </summary>
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Timed out connecting to pod {podName}:{remotePort}")]
-    private partial void LogConnectionTimeout(string podName, int remotePort);
+        Message = "[{ConnId}] Timed out connecting to pod {PodName}:{RemotePort}")]
+    private partial void LogConnectionTimeout(string connId, string podName, int remotePort);
 
     /// <summary>
     /// Logs when no pod is found for a service.
@@ -85,14 +101,14 @@ public partial class PortForwardService
     /// </summary>
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Stream closed for pod {PodName} ({Direction}): {Message}")]
-    private partial void LogStreamClosed(string podName, string direction, string message);
+        Message = "[{ConnId}] Stream closed for pod {PodName} ({Direction}) [{ExceptionType}]: {Message}")]
+    private partial void LogStreamClosed(string connId, string podName, string direction, string exceptionType, string message);
 
     /// <summary>
     /// Logs WebSocket errors.
     /// </summary>
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "WebSocket error for pod {PodName}: {ErrorMessage}")]
-    private partial void LogWebSocketError(string podName, string errorMessage);
+        Message = "[{ConnId}] WebSocket error for pod {PodName}: {ErrorMessage}")]
+    private partial void LogWebSocketError(string connId, string podName, string errorMessage);
 }

@@ -166,4 +166,45 @@ public sealed class PortForwardServiceTests : IDisposable
         // It should catch the OperationCanceledException and exit gracefully
         Assert.Null(ex);
     }
+
+    // ── T4: port-forward enhanced logging ────────────────────────────────────
+
+    [Fact]
+    public void HeartbeatInterval_DefaultsToFiveMinutes()
+    {
+        Assert.Equal(TimeSpan.FromMinutes(5), PortForwardService.HeartbeatInterval);
+    }
+
+    [Fact]
+    public async Task HandleSingleConnectionAsync_LogsConnectionLifetime_AfterConnectionEnds()
+    {
+        var capturingLogger = new CapturingLogger();
+        using var handler = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
+
+        var testSut = new TestablePortForwardService(_kubernetesService, capturingLogger);
+        testSut.GetPodNameAsyncMock = (svc, ns, token) => Task.FromResult<string?>("pod1");
+        // Throw immediately so the connection exits via the catch path, then the finally logs lifetime
+        testSut.ConnectWebSocketAsyncMock = (pod, ns, port, token) =>
+            throw new InvalidOperationException("simulated error");
+
+        await testSut.HandleSingleConnectionAsync(handler, "svc", "ns", 8080, CancellationToken.None);
+
+        Assert.Contains(capturingLogger.Logs, l =>
+            l.Level == LogLevel.Information && l.Message.Contains("closed after"));
+    }
+
+    /// <summary>
+    /// Minimal logger implementation that records all log entries for assertion.
+    /// </summary>
+    private sealed class CapturingLogger : ILogger<PortForwardService>
+    {
+        public List<(LogLevel Level, string Message)> Logs { get; } = new();
+
+        public bool IsEnabled(LogLevel level) => true;
+
+        public void Log<TState>(LogLevel level, EventId id, TState state, Exception? ex, Func<TState, Exception?, string> fmt)
+            => Logs.Add((level, fmt(state, ex)));
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    }
 }

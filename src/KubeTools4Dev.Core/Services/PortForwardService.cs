@@ -25,6 +25,11 @@ public partial class PortForwardService(
     internal static TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>
+    /// Interval between connection heartbeat log entries for long-lived port-forwards.
+    /// </summary>
+    internal static TimeSpan HeartbeatInterval = TimeSpan.FromMinutes(5);
+
+    /// <summary>
     /// Retry delay when errors occur.
     /// </summary>
     private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(3);
@@ -277,6 +282,8 @@ public partial class PortForwardService(
         int remotePort,
         CancellationToken cancellationToken)
     {
+        var connId = Guid.NewGuid().ToString("N")[..8];
+        var startTime = DateTime.UtcNow;
         WebSocket? webSocket = null;
         StreamDemuxer? demuxer = null;
         string? podName = null;
@@ -291,7 +298,7 @@ public partial class PortForwardService(
                 return;
             }
 
-            LogConnectionAccepted(podName, remotePort);
+            LogConnectionAccepted(connId, podName, remotePort);
 
             // Create WebSocket connection for this specific connection
             using var timeoutCts = new CancellationTokenSource(ConnectionTimeout);
@@ -312,14 +319,14 @@ public partial class PortForwardService(
             }
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
             {
-                LogConnectionTimeout(podName, remotePort);
+                LogConnectionTimeout(connId, podName, remotePort);
                 return;
             }
             catch (Exception ex)
             {
                 // If we fail to connect to the pod, invalidate the cache to force a re-resolve next time
                 InvalidatePodCache(serviceName, namespaceName);
-                LogConnectionError(podName, ex.Message);
+                LogConnectionError(connId, podName, ex.Message);
                 return;
             }
 
@@ -332,35 +339,45 @@ public partial class PortForwardService(
             // Get the stream for the port (channel 0 is data)
             var podStream = demuxer.GetStream((byte?)0, (byte?)0);
 
+            // Per-connection CTS so we can cancel the heartbeat when the connection ends
+            using var connCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
             // Create tasks for bidirectional copy (like the official example)
             var socketToPod = Task.Run(() =>
                 CopySocketToStream(
                     socket: handler,
                     stream: podStream,
                     podName: podName,
-                    cancellationToken: cancellationToken),
+                    connId: connId,
+                    cancellationToken: connCts.Token),
                 cancellationToken);
             var podToSocket = Task.Run(() =>
                 CopyStreamToSocket(
                     stream: podStream,
                     socket: handler,
                     podName: podName,
-                    cancellationToken: cancellationToken),
+                    connId: connId,
+                    cancellationToken: connCts.Token),
                 cancellationToken);
+            var heartbeatTask = RunHeartbeatAsync(connId, podName, remotePort, startTime, connCts.Token);
 
             // Wait for either direction to complete (connection closed)
-            await Task.WhenAny(socketToPod, podToSocket);
+            await Task.WhenAny(socketToPod, podToSocket, heartbeatTask);
+
+            // Stop heartbeat now that the connection is ending
+            await connCts.CancelAsync();
         }
         catch (WebSocketException ex)
         {
-            LogWebSocketError(podName ?? serviceName, ex.Message);
+            LogWebSocketError(connId, podName ?? serviceName, ex.Message);
         }
         catch (Exception ex)
         {
-            LogConnectionError(podName ?? serviceName, ex.Message);
+            LogConnectionError(connId, podName ?? serviceName, ex.Message);
         }
         finally
         {
+            LogConnectionLifetime(connId, podName ?? serviceName, remotePort, DateTime.UtcNow - startTime);
             try { handler.Close(); } catch { }
             try { demuxer?.Dispose(); } catch { }
             try { webSocket?.Dispose(); } catch { }
@@ -381,12 +398,37 @@ public partial class PortForwardService(
     }
 
     /// <summary>
+    /// Logs a heartbeat for a long-running connection at regular <see cref="HeartbeatInterval"/> intervals.
+    /// </summary>
+    private async Task RunHeartbeatAsync(
+        string connId,
+        string podName,
+        int remotePort,
+        DateTime startTime,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(HeartbeatInterval, cancellationToken);
+                LogConnectionHeartbeat(connId, podName, remotePort, DateTime.UtcNow - startTime);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal shutdown — heartbeat ends with the connection
+        }
+    }
+
+    /// <summary>
     /// Copies data from socket to stream (local -> pod).
     /// </summary>
     private void CopySocketToStream(
         Socket socket,
         Stream stream,
         string podName,
+        string connId,
         CancellationToken cancellationToken)
     {
         const string Direction = "local->pod";
@@ -406,16 +448,16 @@ public partial class PortForwardService(
         }
         catch (SocketException ex)
         {
-            LogStreamClosed(podName, Direction, ex.Message);
+            LogStreamClosed(connId, podName, Direction, ex.GetType().Name, ex.Message);
         }
         catch (IOException ex)
         {
-            LogStreamClosed(podName, Direction, ex.Message);
+            LogStreamClosed(connId, podName, Direction, ex.GetType().Name, ex.Message);
         }
         catch (ObjectDisposedException ex)
         {
             // Socket or stream disposed - normal during shutdown
-            LogStreamClosed(podName, Direction, ex.Message);
+            LogStreamClosed(connId, podName, Direction, ex.GetType().Name, ex.Message);
         }
     }
 
@@ -426,6 +468,7 @@ public partial class PortForwardService(
         Stream stream,
         Socket socket,
         string podName,
+        string connId,
         CancellationToken cancellationToken)
     {
         const string Direction = "pod->local";
@@ -444,16 +487,16 @@ public partial class PortForwardService(
         }
         catch (SocketException ex)
         {
-            LogStreamClosed(podName, Direction, ex.Message);
+            LogStreamClosed(connId, podName, Direction, ex.GetType().Name, ex.Message);
         }
         catch (IOException ex)
         {
-            LogStreamClosed(podName, Direction, ex.Message);
+            LogStreamClosed(connId, podName, Direction, ex.GetType().Name, ex.Message);
         }
         catch (ObjectDisposedException ex)
         {
             // Socket or stream disposed - normal during shutdown
-            LogStreamClosed(podName, Direction, ex.Message);
+            LogStreamClosed(connId, podName, Direction, ex.GetType().Name, ex.Message);
         }
     }
 

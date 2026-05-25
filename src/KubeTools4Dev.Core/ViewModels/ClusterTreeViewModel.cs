@@ -4,7 +4,6 @@ using KubeTools4Dev.Core.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
-
 namespace KubeTools4Dev.Core.ViewModels;
 
 /// <summary>
@@ -102,7 +101,8 @@ public partial class ClusterTreeViewModel : ObservableObject
                     entry.Id.ToString(),
                     entry.DisplayName,
                     _manager,
-                    ctx => ResourceNodeSelected?.Invoke(ctx));
+                    ctx => ResourceNodeSelected?.Invoke(ctx),
+                    namespaceWatchRetryDelayMs: _settings.Namespaces.WatchRetryDelayMilliseconds);
 
                 sourceNode.Clusters.Add(clusterNode);
             }

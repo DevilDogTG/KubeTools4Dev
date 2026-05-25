@@ -99,6 +99,9 @@ public class SettingsService : ISettingsService
     public ClustersSettings Clusters => _settings.Clusters;
 
     /// <inheritdoc />
+    public NamespacesSettings Namespaces => _settings.Namespaces;
+
+    /// <inheritdoc />
     public event Action? SettingsChanged;
 
     /// <inheritdoc />

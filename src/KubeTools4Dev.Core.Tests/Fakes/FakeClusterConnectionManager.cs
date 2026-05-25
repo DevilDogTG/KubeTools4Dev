@@ -15,6 +15,12 @@ public class FakeClusterConnectionManager : IClusterConnectionManager
     /// <summary>Controls which cluster IDs ConnectClusterAsync will treat as succeeding.</summary>
     public HashSet<string> SuccessfulClusterIds { get; } = new();
 
+    /// <summary>
+    /// Optional factory for creating the <see cref="IKubernetesService"/> for a cluster.
+    /// When set, the returned service is used instead of a plain NSubstitute substitute.
+    /// </summary>
+    public Func<string, IKubernetesService>? ServiceFactory { get; set; }
+
     /// <inheritdoc/>
     public event Action<string, ClusterConnectionStatus, string?>? ClusterStatusChanged;
 
@@ -37,7 +43,7 @@ public class FakeClusterConnectionManager : IClusterConnectionManager
 
         if (SuccessfulClusterIds.Contains(clusterId))
         {
-            var svc = Substitute.For<IKubernetesService>();
+            var svc = ServiceFactory?.Invoke(clusterId) ?? Substitute.For<IKubernetesService>();
             svc.IsConnected.Returns(true);
             _services[clusterId] = svc;
             FireStatus(clusterId, ClusterConnectionStatus.Connected, null);
