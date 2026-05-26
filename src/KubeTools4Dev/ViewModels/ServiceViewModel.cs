@@ -59,10 +59,30 @@ public partial class ServiceViewModel : ObservableObject
     public Func<int, bool>? IsPortInUseCheck { get; set; }
 
     /// <summary>
+    /// Optional callback invoked when the user requests to add this service to the selected profile.
+    /// Set by <see cref="ServiceListViewModel"/>.
+    /// </summary>
+    public Action<ServiceViewModel>? AddToProfileCallback { get; set; }
+
+    /// <summary>
+    /// Optional callback invoked when the user requests to remove this service from the selected profile.
+    /// Set by <see cref="ServiceListViewModel"/>.
+    /// </summary>
+    public Action<ServiceViewModel>? RemoveFromProfileCallback { get; set; }
+
+    /// <summary>
     /// The duration text
     /// </summary>
     [ObservableProperty]
     private string _durationText = "";
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this service is part of the currently selected
+    /// port-forward profile.  Updated by <see cref="ServiceListViewModel"/> when the selection
+    /// changes or entries are added/removed.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isInSelectedProfile;
     /// <summary>
     /// The forwarding task
     /// </summary>
@@ -226,6 +246,18 @@ public partial class ServiceViewModel : ObservableObject
             }
         }
     }
+
+    /// <summary>
+    /// Adds this service to the currently selected profile via <see cref="AddToProfileCallback"/>.
+    /// </summary>
+    [RelayCommand]
+    private void AddToProfile() => AddToProfileCallback?.Invoke(this);
+
+    /// <summary>
+    /// Removes this service from the currently selected profile via <see cref="RemoveFromProfileCallback"/>.
+    /// </summary>
+    [RelayCommand]
+    private void RemoveFromProfile() => RemoveFromProfileCallback?.Invoke(this);
 
     /// <summary>
     /// Opens the browser.

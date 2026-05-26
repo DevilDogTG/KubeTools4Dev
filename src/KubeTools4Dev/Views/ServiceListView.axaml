@@ -40,45 +40,107 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto, *">
-        <StackPanel Orientation="Horizontal"
+    <Grid RowDefinitions="Auto, Auto, *">
+
+        <!-- Row 0: Filter + profile selector bar -->
+        <StackPanel Grid.Row="0"
+                    Orientation="Horizontal"
                     MinHeight="20"
-                    Spacing="10"
-                    Margin="10">
-            
+                    Spacing="6"
+                    Margin="10,10,10,4">
+
             <TextBox PlaceholderText="Filter services..."
                      Text="{Binding FilterText}"
-                     Width="200" 
+                     Width="160"
                      Height="20"
-                     Margin="0,0,5,0"/>
-            <Button Content="Forward All"
-                    Command="{Binding ForwardAllCommand}"
+                     Margin="0"/>
+
+            <!-- Profile selector -->
+            <ComboBox ItemsSource="{Binding Profiles}"
+                      SelectedItem="{Binding SelectedProfile}"
+                      PlaceholderText="— no profile —"
+                      DisplayMemberBinding="{Binding Name}"
+                      Width="160"
+                      Height="20"
+                      FontSize="10"
+                      Padding="4,0"
+                      ToolTip.Tip="Select a port-forward profile"/>
+
+            <!-- Start / Stop profile -->
+            <Button Content="▶ Start"
+                    Command="{Binding StartProfileCommand}"
                     Height="20"
-                    Padding="5"
+                    Padding="5,0"
                     FontSize="10"
-                    Classes="Primary"/>
-            <Button Content="Stop All"
-                    Command="{Binding StopAllCommand}"
+                    Classes="Primary"
+                    ToolTip.Tip="Start all forwards in the selected profile"/>
+            <Button Content="■ Stop"
+                    Command="{Binding StopProfileCommand}"
                     Height="20"
-                    Padding="5"
+                    Padding="5,0"
                     FontSize="10"
-                    Classes="Danger"/>
+                    Classes="Danger"
+                    ToolTip.Tip="Stop all forwards started by the selected profile"/>
+
+            <!-- Profile management -->
+            <Button Content="+"
+                    Command="{Binding ShowCreateProfileInputCommand}"
+                    Height="20"
+                    Width="22"
+                    Padding="2,0"
+                    FontSize="12"
+                    ToolTip.Tip="Create a new profile"/>
+            <Button Content="🗑"
+                    Command="{Binding DeleteProfileCommand}"
+                    Height="20"
+                    Width="22"
+                    Padding="2,0"
+                    FontSize="10"
+                    Classes="Danger"
+                    ToolTip.Tip="Delete the selected profile"/>
 
             <ProgressBar IsIndeterminate="True"
-                         IsVisible="{Binding IsLoading}" />
+                         IsVisible="{Binding IsLoading}"
+                         Width="60"/>
         </StackPanel>
 
-        <DataGrid Grid.Row="1"
-                  AutoGenerateColumns="False" 
+        <!-- Row 1: New profile name input (collapsed until + is clicked) -->
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    Spacing="4"
+                    Margin="10,0,10,4"
+                    IsVisible="{Binding IsProfileNameInputVisible}">
+            <TextBox PlaceholderText="Profile name…"
+                     Text="{Binding NewProfileName}"
+                     Width="200"
+                     Height="20"
+                     FontSize="10"/>
+            <Button Content="✓ Create"
+                    Command="{Binding CreateProfileCommand}"
+                    Height="20"
+                    Padding="5,0"
+                    FontSize="10"
+                    Classes="Primary"/>
+            <Button Content="✕"
+                    Command="{Binding CancelCreateProfileCommand}"
+                    Height="20"
+                    Width="22"
+                    Padding="2,0"
+                    FontSize="10"/>
+        </StackPanel>
+
+        <!-- Row 2: Service data grid -->
+        <DataGrid Grid.Row="2"
+                  AutoGenerateColumns="False"
                   CanUserResizeColumns="True"
-				  CanUserSortColumns="True"
+				      CanUserSortColumns="True"
                   ItemsSource="{Binding Services}"
                   FontSize="12"
                   GridLinesVisibility="Horizontal"
                   IsReadOnly="False"
-                  Margin="0,10,0,0"
+                  Margin="0,4,0,0"
                   RowHeight="20"
-				  VerticalScrollBarVisibility="Visible">
+				      VerticalScrollBarVisibility="Visible">
             <DataGrid.Columns>
                <DataGridTemplateColumn Header="Exclude"
                                        Width="60">
@@ -102,7 +164,39 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                
+
+                <!-- Profile membership column -->
+                <DataGridTemplateColumn Header="Profile"
+                                        Width="56">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate x:DataType="vm:ServiceViewModel">
+                            <Panel HorizontalAlignment="Center">
+                                <!-- Add button shown when not in profile -->
+                                <Button Content="＋"
+                                        Command="{Binding AddToProfileCommand}"
+                                        IsVisible="{Binding !IsInSelectedProfile}"
+                                        Height="16"
+                                        Width="18"
+                                        Padding="0"
+                                        FontSize="10"
+                                        HorizontalAlignment="Center"
+                                        ToolTip.Tip="Add to selected profile"/>
+                                <!-- Remove button shown when in profile -->
+                                <Button Content="✓"
+                                        Command="{Binding RemoveFromProfileCommand}"
+                                        IsVisible="{Binding IsInSelectedProfile}"
+                                        Height="16"
+                                        Width="18"
+                                        Padding="0"
+                                        FontSize="10"
+                                        Classes="Primary"
+                                        HorizontalAlignment="Center"
+                                        ToolTip.Tip="Remove from selected profile"/>
+                            </Panel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
                 <DataGridTextColumn Header="Namespace"
                                     Binding="{Binding Namespace}"
                                     IsReadOnly="True"
@@ -115,7 +209,7 @@
                                     Binding="{Binding TargetPortDisplay}"
                                     IsReadOnly="True"
                                     Width="80"/>
-                
+
                 <DataGridTemplateColumn Header="Local Port"
                                         Width="80">
                     <DataGridTemplateColumn.CellTemplate>

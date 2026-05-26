@@ -170,7 +170,7 @@ public partial class MainViewModel : ViewModelBase
                     _logger.LogWarning("Cluster {Id} has no port-forward service; skipping Services panel.", ctx.ClusterId);
                     return;
                 }
-                await ServiceList.UpdateScopeAsync(svc, pf, ctx.Namespace);
+                await ServiceList.UpdateScopeAsync(svc, pf, ctx.Namespace, ctx.ClusterId);
                 break;
             case ResourceKind.Deployments:
                 await DeploymentList.UpdateScopeAsync(svc, ctx.Namespace);

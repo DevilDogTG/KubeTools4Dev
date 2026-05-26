@@ -29,6 +29,9 @@ Trunk-based development off `main`.
 ## Current Version
 - v1.2.7 (released 2026-05-21)
 
+## In-Progress Feature
+- **Port-Forward Profiles** (`feature/port-forward-profiles`) — replaces "Forward All / Stop All" with a profile-based system. Users create named per-cluster profiles specifying which services to forward, then activate a full profile with one click. Implementation complete: 7 phases done, 129 tests passing (72 Core + 57 UI), build 0W/0E. Ready for `sk-finish-feature`.
+
 ## Open PRs
 - PR #40 (`feature/namespace-all-dynamic-pf-logging`) — ✅ approved 2026-05-25. All-ns sentinel node, live namespace watch (WatchNamespacesAsync), port-forward lifecycle logging (connId, duration, heartbeat). 97 tests (58 Core + 39 UI), 0W/0E.
 - PR #38 (`feature/ui-style-consistency`) — draft, ✅ approved 2026-05-25. UI style consistency: `RocketLaunch` Deployment icon, compact input/button sizing across all pages, ±-stepper controls, sidebar header removed, namespace children collapse by default, `Math.Clamp` stepper unification. 86 tests (47 Core + 39 UI), 0W/0E.

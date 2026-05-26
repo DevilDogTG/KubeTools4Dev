@@ -19,4 +19,9 @@ public class ClusterEntry
 
     /// <summary>When false, the cluster is hidden from the tree but not deleted.</summary>
     public bool IsEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the port-forward profiles saved for this cluster.
+    /// </summary>
+    public List<PortForwardProfile> PortForwardProfiles { get; set; } = [];
 }

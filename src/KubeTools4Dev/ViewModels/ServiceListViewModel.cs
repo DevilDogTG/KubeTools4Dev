@@ -3,7 +3,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DMNSN.Core;
 using k8s;
+using KubeTools4Dev.Core.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
+using KubeTools4Dev.Core.ViewModels;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -60,10 +62,17 @@ public partial class ServiceListViewModel : ViewModelBase
     /// The settings service
     /// </summary>
     private readonly ISettingsService _settingsService;
+
+    /// <summary>
+    /// The cluster identifier; set by <see cref="UpdateScopeAsync"/> and used to load/save profiles.
+    /// </summary>
+    private string _clusterId = string.Empty;
+
     /// <summary>
     /// The cancellation token source
     /// </summary>
     private CancellationTokenSource? _cancellationTokenSource;
+
     /// <summary>
     /// The filter text
     /// </summary>
@@ -71,7 +80,7 @@ public partial class ServiceListViewModel : ViewModelBase
     private string _filterText = string.Empty;
 
     /// <summary>
-    /// The is loading
+    /// Gets or sets a value indicating whether the service list is loading.
     /// </summary>
     [ObservableProperty]
     private bool _isLoading;
@@ -81,6 +90,42 @@ public partial class ServiceListViewModel : ViewModelBase
     /// </summary>
     [ObservableProperty]
     private ObservableCollection<ServiceViewModel> _services = [];
+
+    /// <summary>
+    /// Gets or sets the list of port-forward profiles for the current cluster.
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<PortForwardProfileViewModel> _profiles = [];
+
+    /// <summary>
+    /// Gets or sets the currently selected port-forward profile.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(StartProfileCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StopProfileCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteProfileCommand))]
+    private PortForwardProfileViewModel? _selectedProfile;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the active profile is currently forwarding.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(StartProfileCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StopProfileCommand))]
+    private bool _isProfileRunning;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the new-profile name input row is visible.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isProfileNameInputVisible;
+
+    /// <summary>
+    /// Gets or sets the name entered by the user when creating a new profile.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CreateProfileCommand))]
+    private string _newProfileName = string.Empty;
 
     /// <summary>
     /// The watch task
@@ -119,12 +164,17 @@ public partial class ServiceListViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Switches the view to a different cluster service, port-forward service, and namespace, then re-initializes.
+    /// Switches the view to a different cluster, port-forward service, and namespace, then re-initializes.
     /// </summary>
+    /// <param name="kubeService">The Kubernetes service for the cluster.</param>
+    /// <param name="portForwardService">The port-forward service for the cluster.</param>
+    /// <param name="namespaceName">The namespace to scope the view to (empty = all namespaces).</param>
+    /// <param name="clusterId">The cluster identifier used to load/save profiles.</param>
     public async Task UpdateScopeAsync(
         IKubernetesService kubeService,
         IPortForwardService portForwardService,
-        string namespaceName)
+        string namespaceName,
+        string clusterId)
     {
         _cancellationTokenSource?.Cancel();
         _cancellationTokenSource?.Dispose();
@@ -137,6 +187,13 @@ public partial class ServiceListViewModel : ViewModelBase
         _kubeService = kubeService;
         _portForwardService = portForwardService;
         _namespaceName = namespaceName;
+
+        if (_clusterId != clusterId)
+        {
+            _clusterId = clusterId;
+            IsProfileRunning = false;
+            LoadProfiles();
+        }
 
         await InitializeAsync();
     }
@@ -193,8 +250,11 @@ public partial class ServiceListViewModel : ViewModelBase
                         _portForwardService,
                         _settingsService)
                     {
-                        IsPortInUseCheck = _connectionManager.IsLocalPortInUse
+                        IsPortInUseCheck = _connectionManager.IsLocalPortInUse,
+                        AddToProfileCallback = OnServiceAddToProfile,
+                        RemoveFromProfileCallback = OnServiceRemoveFromProfile
                     };
+                    viewModel.IsInSelectedProfile = IsServiceInSelectedProfile(viewModel);
                     viewModel.PropertyChanged += OnServicePropertyChanged;
                     _allServices.Add(viewModel);
                 }
@@ -214,27 +274,256 @@ public partial class ServiceListViewModel : ViewModelBase
         }
     }
 
-    /// <summary>
-    /// Determines whether this instance [can stop all].
-    /// </summary>
-    /// <returns>
-    ///   <c>true</c> if this instance [can stop all]; otherwise, <c>false</c>.
-    /// </returns>
-    private bool CanStopAll() => _allServices.Any(s => s.IsForwarding);
+    // ── Profile commands ─────────────────────────────────────────────────────
 
     /// <summary>
-    /// Forwards all.
+    /// Shows the profile name input field so the user can type a name before confirming.
     /// </summary>
     [RelayCommand]
-    private async Task ForwardAll()
+    private void ShowCreateProfileInput()
     {
-        foreach (var svc in Services)
+        NewProfileName = string.Empty;
+        IsProfileNameInputVisible = true;
+    }
+
+    /// <summary>
+    /// Hides the profile name input without creating a profile.
+    /// </summary>
+    [RelayCommand]
+    private void CancelCreateProfile()
+    {
+        IsProfileNameInputVisible = false;
+        NewProfileName = string.Empty;
+    }
+
+    /// <summary>
+    /// Creates a new profile with <see cref="NewProfileName"/> and saves it.
+    /// </summary>
+    private bool CanCreateProfile() =>
+        !string.IsNullOrWhiteSpace(NewProfileName);
+
+    /// <summary>
+    /// Creates a new profile with the name provided in <see cref="NewProfileName"/> and saves it.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanCreateProfile))]
+    private void CreateProfile()
+    {
+        var profile = new PortForwardProfile
         {
-            if (!svc.IsForwarding && !svc.IsExcluded)
-            {
-                svc.IsForwarding = true;
-            }
+            Id = Guid.NewGuid(),
+            Name = NewProfileName.Trim()
+        };
+
+        var vm = new PortForwardProfileViewModel(profile);
+        Profiles.Add(vm);
+        SelectedProfile = vm;
+
+        SaveProfiles();
+
+        IsProfileNameInputVisible = false;
+        NewProfileName = string.Empty;
+    }
+
+    /// <summary>
+    /// Deletes the currently selected profile and saves.
+    /// </summary>
+    private bool CanDeleteProfile() => SelectedProfile is not null;
+
+    /// <summary>
+    /// Removes the currently selected profile from the list and saves.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanDeleteProfile))]
+    private void DeleteProfile()
+    {
+        if (SelectedProfile is null) return;
+
+        if (IsProfileRunning)
+        {
+            // Stop any active forwards belonging to this profile first.
+            StopProfileForwards();
         }
+
+        Profiles.Remove(SelectedProfile);
+        SelectedProfile = Profiles.FirstOrDefault();
+        SaveProfiles();
+    }
+
+    /// <summary>
+    /// Starts forwarding all services listed in the selected profile.
+    /// </summary>
+    private bool CanStartProfile() =>
+        SelectedProfile is not null &&
+        SelectedProfile.Entries.Count > 0 &&
+        !IsProfileRunning;
+
+    /// <summary>
+    /// Starts port-forwarding for every entry in the selected profile that has a matching
+    /// loaded service view model.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanStartProfile))]
+    private void StartProfile()
+    {
+        if (SelectedProfile is null) return;
+
+        foreach (var entry in SelectedProfile.Entries)
+        {
+            var match = FindServiceViewModel(entry.Namespace, entry.ServiceName, entry.TargetPort);
+            if (match is null || match.IsForwarding || match.IsExcluded) continue;
+
+            if (entry.LocalPort > 0)
+                match.LocalPort = entry.LocalPort;
+
+            match.IsForwarding = true;
+        }
+
+        IsProfileRunning = true;
+    }
+
+    /// <summary>
+    /// Stops port-forwarding for every entry in the selected profile.
+    /// </summary>
+    private bool CanStopProfile() => IsProfileRunning;
+
+    /// <summary>
+    /// Stops all port-forwards that were started by the selected profile.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanStopProfile))]
+    private void StopProfile()
+    {
+        StopProfileForwards();
+        IsProfileRunning = false;
+    }
+
+    // ── Profile helpers ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called when a <see cref="ServiceViewModel"/> requests to be added to the selected profile.
+    /// </summary>
+    private void OnServiceAddToProfile(ServiceViewModel svm)
+    {
+        if (SelectedProfile is null) return;
+        if (IsServiceInSelectedProfile(svm)) return;
+
+        var entry = new PortForwardProfileEntry
+        {
+            Namespace = svm.Namespace,
+            ServiceName = svm.Name,
+            TargetPort = svm.TargetPortDisplay,
+            LocalPort = svm.LocalPort
+        };
+
+        SelectedProfile.AddEntry(entry);
+        svm.IsInSelectedProfile = true;
+        SaveProfiles();
+    }
+
+    /// <summary>
+    /// Called when a <see cref="ServiceViewModel"/> requests to be removed from the selected profile.
+    /// </summary>
+    private void OnServiceRemoveFromProfile(ServiceViewModel svm)
+    {
+        if (SelectedProfile is null) return;
+
+        var entryVm = SelectedProfile.Entries.FirstOrDefault(e =>
+            e.Namespace == svm.Namespace &&
+            e.ServiceName == svm.Name &&
+            e.TargetPort == svm.TargetPortDisplay);
+
+        if (entryVm is null) return;
+
+        SelectedProfile.RemoveEntry(entryVm);
+        svm.IsInSelectedProfile = false;
+        SaveProfiles();
+    }
+
+    /// <summary>
+    /// Stops all active forwards that belong to the currently selected profile.
+    /// </summary>
+    private void StopProfileForwards()
+    {
+        if (SelectedProfile is null) return;
+
+        foreach (var entry in SelectedProfile.Entries)
+        {
+            var match = FindServiceViewModel(entry.Namespace, entry.ServiceName, entry.TargetPort);
+            if (match is not null && match.IsForwarding)
+                match.IsForwarding = false;
+        }
+    }
+
+    /// <summary>
+    /// Returns <see langword="true"/> when <paramref name="svm"/> matches an entry in the selected profile.
+    /// </summary>
+    private bool IsServiceInSelectedProfile(ServiceViewModel svm) =>
+        SelectedProfile?.Contains(svm.Namespace, svm.Name, svm.TargetPortDisplay) ?? false;
+
+    /// <summary>
+    /// Updates <see cref="ServiceViewModel.IsInSelectedProfile"/> on every loaded service VM.
+    /// </summary>
+    private void RefreshIsInSelectedProfile()
+    {
+        foreach (var svm in _allServices)
+            svm.IsInSelectedProfile = IsServiceInSelectedProfile(svm);
+    }
+
+    /// <summary>
+    /// Finds the first <see cref="ServiceViewModel"/> in <see cref="_allServices"/> that matches
+    /// the given namespace, service name, and target port string.
+    /// </summary>
+    private ServiceViewModel? FindServiceViewModel(string ns, string name, string targetPort) =>
+        _allServices.FirstOrDefault(s =>
+            s.Namespace == ns &&
+            s.Name == name &&
+            s.TargetPortDisplay == targetPort);
+
+    /// <summary>
+    /// Loads profiles for the current cluster from settings into <see cref="Profiles"/>.
+    /// </summary>
+    private void LoadProfiles()
+    {
+        Profiles.Clear();
+        SelectedProfile = null;
+
+        if (string.IsNullOrEmpty(_clusterId)) return;
+
+        var clusterEntry = FindClusterEntry();
+        if (clusterEntry is null) return;
+
+        foreach (var profile in clusterEntry.PortForwardProfiles)
+            Profiles.Add(new PortForwardProfileViewModel(profile));
+
+        SelectedProfile = Profiles.FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Persists all profiles for the current cluster back to settings.
+    /// </summary>
+    private void SaveProfiles()
+    {
+        if (string.IsNullOrEmpty(_clusterId)) return;
+
+        var clusterEntry = FindClusterEntry();
+        if (clusterEntry is null) return;
+
+        clusterEntry.PortForwardProfiles = [.. Profiles.Select(p => p.Model)];
+        _settingsService.Save();
+    }
+
+    /// <summary>
+    /// Finds the <see cref="ClusterEntry"/> for the current <see cref="_clusterId"/>.
+    /// </summary>
+    private ClusterEntry? FindClusterEntry() =>
+        _settingsService.Clusters.Clusters
+            .FirstOrDefault(c => c.Id.ToString() == _clusterId);
+
+    /// <summary>
+    /// Called when <see cref="SelectedProfile"/> changes: refreshes in-profile indicators and
+    /// resets running state.
+    /// </summary>
+    partial void OnSelectedProfileChanged(PortForwardProfileViewModel? value)
+    {
+        IsProfileRunning = false;
+        RefreshIsInSelectedProfile();
     }
 
     /// <summary>
@@ -255,10 +544,7 @@ public partial class ServiceListViewModel : ViewModelBase
         object? sender,
         PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ServiceViewModel.IsForwarding))
-        {
-            StopAllCommand.NotifyCanExecuteChanged();
-        }
+        // Nothing extra needed here for now; profile running state is managed explicitly.
     }
 
     /// <summary>
@@ -321,20 +607,6 @@ public partial class ServiceListViewModel : ViewModelBase
         }
     }
 
-    /// <summary>
-    /// Stops all.
-    /// </summary>
-    [RelayCommand(CanExecute = nameof(CanStopAll))]
-    private async Task StopAll()
-    {
-        foreach (var svc in Services)
-        {
-            if (svc.IsForwarding)
-            {
-                svc.IsForwarding = false;
-            }
-        }
-    }
     /// <summary>
     /// Updates the filtered list.
     /// </summary>
@@ -481,8 +753,11 @@ public partial class ServiceListViewModel : ViewModelBase
                                             _portForwardService!,
                                             _settingsService)
                                         {
-                                            IsPortInUseCheck = _connectionManager.IsLocalPortInUse
+                                            IsPortInUseCheck = _connectionManager.IsLocalPortInUse,
+                                            AddToProfileCallback = OnServiceAddToProfile,
+                                            RemoveFromProfileCallback = OnServiceRemoveFromProfile
                                         };
+                                        newVm.IsInSelectedProfile = IsServiceInSelectedProfile(newVm);
                                         newVm.PropertyChanged += OnServicePropertyChanged;
                                         _allServices.Add(newVm);
                                     }
