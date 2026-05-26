@@ -75,11 +75,6 @@ public class PodsSettings
 public class ServicesSettings
 {
     /// <summary>
-    /// Gets or sets the excluded services.
-    /// </summary>
-    public List<string> ExcludedServices { get; set; } = [];
-
-    /// <summary>
     /// Gets or sets the hidden service names.
     /// </summary>
     public List<string> HiddenServiceNames { get; set; } = ["kubernetes"];

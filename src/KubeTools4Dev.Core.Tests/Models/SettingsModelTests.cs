@@ -36,13 +36,6 @@ public class SettingsModelTests
     }
 
     [Fact]
-    public void ServicesSettings_Defaults_ExcludedServices_IsEmpty()
-    {
-        var settings = new ServicesSettings();
-        Assert.Empty(settings.ExcludedServices);
-    }
-
-    [Fact]
     public void ServicesSettings_Defaults_HiddenServiceNames_ContainsKubernetes()
     {
         var settings = new ServicesSettings();

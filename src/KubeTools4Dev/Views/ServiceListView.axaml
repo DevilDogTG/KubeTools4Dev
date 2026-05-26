@@ -38,6 +38,16 @@
             <Setter Property="OnContent" Value=""/>
             <Setter Property="OffContent" Value=""/>
         </Style>
+        <Style Selector="Button.Success">
+            <Setter Property="Background" Value="#2e7d32"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.Success:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#388e3c"/>
+        </Style>
+        <Style Selector="Button.Success:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1b5e20"/>
+        </Style>
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto, Auto, *">
@@ -142,16 +152,6 @@
                   RowHeight="20"
 				      VerticalScrollBarVisibility="Visible">
             <DataGrid.Columns>
-               <DataGridTemplateColumn Header="Exclude"
-                                       Width="60">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <CheckBox IsChecked="{Binding IsExcluded}"
-                                      Margin="4,0,0,0"
-                                      HorizontalAlignment="Center"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
 
                 <DataGridTemplateColumn Header="Active"
                                         Width="80">
@@ -189,7 +189,7 @@
                                         Width="18"
                                         Padding="0"
                                         FontSize="10"
-                                        Classes="Primary"
+                                        Classes="Success"
                                         HorizontalAlignment="Center"
                                         ToolTip.Tip="Remove from selected profile"/>
                             </Panel>

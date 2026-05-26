@@ -172,54 +172,6 @@
                                  FontSize="12"
                                  PlaceholderText="e.g. ExternalName, ClusterIP"/>
 
-                        <TextBlock Text="Excluded Services (Auto-Port-Forward):" />
-                        <Grid ColumnDefinitions="*, Auto"
-                              Margin="0,0,0,5">
-                            <TextBox Grid.Column="0"
-                                     Text="{Binding NewExcludedService}"
-                                     PlaceholderText="Add service (e.g. namespace/service:port)"
-                                     Height="28"
-                                     FontSize="12"
-                                     Margin="0,0,5,0"/>
-                            <Button Grid.Column="1"
-                                    Content="Add"
-                                    Height="28"
-                                    Padding="10,0"
-                                    FontSize="12"
-                                    VerticalContentAlignment="Center"
-                                    Command="{Binding AddExcludedServiceCommand}"/>
-                        </Grid>
-                        <DataGrid ItemsSource="{Binding ExcludedServices}"
-                                  AutoGenerateColumns="False"
-                                  MinHeight="100"
-                                  CanUserResizeColumns="True"
-                                  CanUserSortColumns="True"
-                                  FontSize="12"
-                                  GridLinesVisibility="Horizontal"
-                                  RowHeight="20"
-                                  VerticalScrollBarVisibility="Visible">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Service"
-                                                    Binding="{Binding Value}"
-                                                    Width="*"
-                                                    IsReadOnly="False"/>
-                                <DataGridTemplateColumn Header="Action"
-                                                        Width="Auto">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate x:CompileBindings="False">
-                                            <Button Content="Remove"
-                                                    Command="{Binding #Root.DataContext.RemoveExcludedServiceCommand}"
-                                                    CommandParameter="{Binding}"
-                                                    Classes="Danger"
-                                                    Padding="5,0"
-                                                    FontSize="10"
-                                                    MinHeight="18"
-                                                    VerticalAlignment="Center"/>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                            </DataGrid.Columns>
-                        </DataGrid>
                     </StackPanel>
                 </Border>
             </StackPanel>
