@@ -368,7 +368,7 @@ public partial class ServiceListViewModel : ViewModelBase
         foreach (var entry in SelectedProfile.Entries)
         {
             var match = FindServiceViewModel(entry.Namespace, entry.ServiceName, entry.TargetPort);
-            if (match is null || match.IsForwarding || match.IsExcluded) continue;
+            if (match is null || match.IsForwarding) continue;
 
             if (entry.LocalPort > 0)
                 match.LocalPort = entry.LocalPort;
@@ -415,6 +415,7 @@ public partial class ServiceListViewModel : ViewModelBase
         SelectedProfile.AddEntry(entry);
         svm.IsInSelectedProfile = true;
         SaveProfiles();
+        StartProfileCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
@@ -434,6 +435,7 @@ public partial class ServiceListViewModel : ViewModelBase
         SelectedProfile.RemoveEntry(entryVm);
         svm.IsInSelectedProfile = false;
         SaveProfiles();
+        StartProfileCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
@@ -555,16 +557,6 @@ public partial class ServiceListViewModel : ViewModelBase
         Dispatcher.UIThread.Invoke(() =>
         {
             UpdateFilteredList();
-            foreach (var svc in Services)
-            {
-                // Create key to check
-                var key = $"{svc.Namespace}/{svc.Name}:{svc.TargetPortDisplay}";
-                bool shouldBeExcluded = _settingsService.Services.ExcludedServices.Contains(key);
-                if (svc.IsExcluded != shouldBeExcluded)
-                {
-                    svc.IsExcluded = shouldBeExcluded;
-                }
-            }
         });
     }
     /// <summary>

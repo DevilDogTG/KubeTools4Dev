@@ -4,7 +4,6 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using KubeTools4Dev.Core.Services.Interfaces;
-using KubeTools4Dev.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -55,11 +54,6 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     private string _logPath = string.Empty;
 
     /// <summary>
-    /// The new excluded service
-    /// </summary>
-    [ObservableProperty]
-    private string _newExcludedService = string.Empty;
-    /// <summary>
     /// The refresh interval seconds
     /// </summary>
     [ObservableProperty]
@@ -91,10 +85,6 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         ? LogPath
         : _settingsService.GetDefaultLogPath();
 
-    /// <summary>
-    /// The excluded services
-    /// </summary>
-    public ObservableCollection<ExclusionItem> ExcludedServices { get; } = [];
     /// <summary>
     /// Gets the log levels.
     /// </summary>
@@ -198,31 +188,6 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Adds the excluded service.
-    /// </summary>
-    [RelayCommand]
-    private void AddExcludedService()
-    {
-        if (!string.IsNullOrWhiteSpace(NewExcludedService))
-        {
-            // Avoid duplicates
-            var trimmed = NewExcludedService.Trim();
-            bool exists = ExcludedServices.Any(item =>
-                item.Value.Equals(
-                    trimmed,
-                    StringComparison.OrdinalIgnoreCase));
-
-            if (!exists)
-            {
-                ExcludedServices.Add(new ExclusionItem(trimmed));
-                NewExcludedService = string.Empty;
-                SyncToSettingsService();
-                _settingsService.Save();
-            }
-        }
-    }
-
-    /// <summary>
     /// Loads the settings.
     /// </summary>
     private void LoadSettings()
@@ -236,25 +201,6 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         WatchRetryDelayMilliseconds = _settingsService.Pods.WatchRetryDelayMilliseconds;
 
         // Services
-        var sourceList = _settingsService.Services.ExcludedServices ?? [];
-
-        // Remove items not in service
-        for (int i = ExcludedServices.Count - 1; i >= 0; i--)
-        {
-            if (!sourceList.Contains(ExcludedServices[i].Value))
-            {
-                ExcludedServices.RemoveAt(i);
-            }
-        }
-
-        // Add items not in current list
-        foreach (var service in sourceList
-            .Where(service =>
-                !ExcludedServices.Any(x => x.Value == service)))
-        {
-            ExcludedServices.Add(new ExclusionItem(service));
-        }
-
         HiddenServiceNamesText = string.Join(", ", _settingsService.Services.HiddenServiceNames);
         HiddenServiceTypesText = string.Join(", ", _settingsService.Services.HiddenServiceTypes);
     }
@@ -264,20 +210,6 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void OnSettingsChanged() => Dispatcher.UIThread.Invoke(LoadSettings);
 
-    /// <summary>
-    /// Removes the excluded service.
-    /// </summary>
-    /// <param name="item">The item.</param>
-    [RelayCommand]
-    private void RemoveExcludedService(ExclusionItem item)
-    {
-        if (item != null)
-        {
-            ExcludedServices.Remove(item);
-            SyncToSettingsService();
-            _settingsService.Save();
-        }
-    }
     /// <summary>
     /// Saves this instance.
     /// </summary>
@@ -303,13 +235,6 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         _settingsService.Pods.WatchRetryDelayMilliseconds = WatchRetryDelayMilliseconds;
 
         // Services
-        var excludedList = new List<string>();
-        foreach (var item in ExcludedServices)
-        {
-            excludedList.Add(item.Value);
-        }
-        _settingsService.Services.ExcludedServices = excludedList;
-
         _settingsService.Services.HiddenServiceNames = ParseList(HiddenServiceNamesText);
         _settingsService.Services.HiddenServiceTypes = ParseList(HiddenServiceTypesText);
     }

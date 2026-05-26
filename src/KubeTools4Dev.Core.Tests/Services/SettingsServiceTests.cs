@@ -41,7 +41,6 @@ public class SettingsServiceTests : IDisposable
 
         Assert.Equal("Information", svc.General.LogLevel);
         Assert.Equal(5, svc.Pods.RefreshIntervalSeconds);
-        Assert.Empty(svc.Services.ExcludedServices);
     }
 
     [Fact]
@@ -71,14 +70,12 @@ public class SettingsServiceTests : IDisposable
         var svc = CreateService();
         svc.General.LogLevel = "Debug";
         svc.Pods.RefreshIntervalSeconds = 10;
-        svc.Services.ExcludedServices.Add("my-ns/my-svc:8080");
         svc.Save();
 
         var svc2 = CreateService();
 
         Assert.Equal("Debug", svc2.General.LogLevel);
         Assert.Equal(10, svc2.Pods.RefreshIntervalSeconds);
-        Assert.Contains("my-ns/my-svc:8080", svc2.Services.ExcludedServices);
     }
 
     [Fact]

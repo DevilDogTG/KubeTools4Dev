@@ -89,11 +89,6 @@ public partial class ServiceViewModel : ObservableObject
     private Task? _forwardingTask;
 
     /// <summary>
-    /// The is excluded
-    /// </summary>
-    private bool _isExcluded;
-
-    /// <summary>
     /// The is forwarding
     /// </summary>
     private bool _isForwarding;
@@ -175,8 +170,6 @@ public partial class ServiceViewModel : ObservableObject
         // Display 
         TargetPortDisplay = port.Port.ToString();
 
-        _isExcluded = _settingsService.Services.ExcludedServices.Contains(_settingsKey);
-
         _durationTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromSeconds(1)
@@ -197,36 +190,6 @@ public partial class ServiceViewModel : ObservableObject
     /// The identifier.
     /// </value>
     public string Id => $"{Namespace}/{Name}:{TargetPort}";
-
-    /// <summary>
-    /// Gets or sets a value indicating whether this instance is excluded.
-    /// </summary>
-    /// <value>
-    ///   <c>true</c> if this instance is excluded; otherwise, <c>false</c>.
-    /// </value>
-    public bool IsExcluded
-    {
-        get => _isExcluded;
-        set
-        {
-            if (SetProperty(ref _isExcluded, value))
-            {
-                if (value)
-                {
-                    if (!_settingsService.Services.ExcludedServices.Contains(_settingsKey))
-                    {
-                        _settingsService.Services.ExcludedServices.Add(_settingsKey);
-                        _settingsService.Save();
-                    }
-                }
-                else
-                {
-                    _settingsService.Services.ExcludedServices.Remove(_settingsKey);
-                    _settingsService.Save();
-                }
-            }
-        }
-    }
 
     /// <summary>
     /// Gets or sets a value indicating whether this instance is forwarding.
