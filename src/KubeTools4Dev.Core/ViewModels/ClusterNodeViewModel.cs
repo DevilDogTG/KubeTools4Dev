@@ -210,8 +210,15 @@ public partial class ClusterNodeViewModel : ObservableObject, IDisposable
             {
                 if (cancellationToken.IsCancellationRequested || _disposed) break;
                 if (_logger is not null) LogNamespaceWatchFailed(_logger, Id, ex);
-                await Task.Delay(_namespaceWatchRetryDelayMs, cancellationToken).ConfigureAwait(false);
             }
+
+            if (cancellationToken.IsCancellationRequested || _disposed) break;
+
+            // Prevent tight spinning when the watch stream exhausts (normal or error path).
+            if (_namespaceWatchRetryDelayMs > 0)
+                await Task.Delay(_namespaceWatchRetryDelayMs, cancellationToken).ConfigureAwait(false);
+            else
+                await Task.Yield();
         }
     }
 

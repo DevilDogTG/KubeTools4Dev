@@ -214,6 +214,12 @@ public class ClusterNodeViewModelTests
 
         await sut.ConnectCommand.ExecuteAsync(null);
 
+        // Wait for LoadNamespacesAsync to add the sentinel node before checking for removal.
+        // Without this, Namespaces may be empty when the condition is first evaluated;
+        // !Any(...) would return true on an empty collection, causing WaitForAsync to exit
+        // prematurely — before LoadNamespacesAsync runs and re-adds "default".
+        await WaitForAsync(() => sut.Namespaces.Any(n => n.IsAllNamespaces), TimeSpan.FromSeconds(2));
+
         await WaitForAsync(() => !sut.Namespaces.Any(n => n.Name == "default"), TimeSpan.FromSeconds(2));
 
         Assert.DoesNotContain(sut.Namespaces, n => n.Name == "default");
