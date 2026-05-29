@@ -83,6 +83,30 @@ public partial class ServiceViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private bool _isInSelectedProfile;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this service is currently being watched by the
+    /// profile supervisor. When <see langword="true"/>, the row's port-forward is managed by the
+    /// supervisor (started, monitored, restarted on drop) and the user toggling
+    /// <see cref="IsForwarding"/> off routes through <see cref="OnSupervisedStopRequested"/>.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSupervised;
+
+    /// <summary>
+    /// Callback invoked when the user toggles a supervised row off. Set by
+    /// <see cref="ServiceListViewModel"/> while the row is part of an active supervised profile;
+    /// cleared when the row leaves the supervised set.
+    /// </summary>
+    public Func<Task>? OnSupervisedStopRequested { get; set; }
+
+    /// <summary>
+    /// Callback invoked when the user toggles a previously-unsupervised row back on. Set by
+    /// <see cref="ServiceListViewModel"/> when this row enters the
+    /// <see cref="SupervisedForwardState.Unsupervised"/> state while the profile is still
+    /// running. Re-adds the entry to the supervised set.
+    /// </summary>
+    public Func<Task>? OnSupervisedResumeRequested { get; set; }
     /// <summary>
     /// The forwarding task
     /// </summary>
@@ -202,10 +226,35 @@ public partial class ServiceViewModel : ObservableObject
         get => _isForwarding;
         set
         {
-            if (SetProperty(ref _isForwarding, value))
+            if (!SetProperty(ref _isForwarding, value)) return;
+
+            if (value)
             {
-                if (value) StartForwarding();
-                else StopForwarding();
+                // Supervisor already owns this row's forward; do not start a manual one.
+                if (IsSupervised) return;
+
+                // The row was previously unsupervised but the profile is still running — route
+                // back through the supervisor instead of starting a manual one-off.
+                if (OnSupervisedResumeRequested is not null)
+                {
+                    _ = OnSupervisedResumeRequested.Invoke();
+                    return;
+                }
+
+                StartForwarding();
+            }
+            else
+            {
+                // Route the off-toggle through the supervisor when supervised so the supervisor's
+                // own runner cancels cleanly. Otherwise fall through to the manual stop path.
+                if (IsSupervised && OnSupervisedStopRequested is not null)
+                {
+                    _ = OnSupervisedStopRequested.Invoke();
+                }
+                else
+                {
+                    StopForwarding();
+                }
             }
         }
     }
@@ -356,4 +405,20 @@ public partial class ServiceViewModel : ObservableObject
         DurationText = "";
         _startTime = null;
     }
+
+    /// <summary>
+    /// Starts the duration timer if it is not already running. Used by the supervisor wiring so
+    /// rows brought up by ▶ Forward still show an elapsed time, even though the supervisor (not
+    /// this view model) drives the underlying port-forward task.
+    /// </summary>
+    public void StartDurationTimerIfStopped()
+    {
+        if (_durationTimer.IsEnabled) return;
+        _startTime = DateTime.Now;
+        DurationText = "00:00:00";
+        _durationTimer.Start();
+    }
+
+    /// <summary>Stops the duration timer and clears the elapsed text.</summary>
+    public void StopDurationTimer() => StopTimer();
 }
