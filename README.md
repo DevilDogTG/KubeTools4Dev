@@ -31,15 +31,42 @@
 - **Service Configuration**: Manage excluded services and hide specific services by name or type.
 - **Themes**: Modern UI with support for light/dark modes (system default).
 
-## Prerequisites
+## Download & Install
 
-Before running KubeTools4Dev, ensure you have the following installed:
+Pre-built installers are attached to each [GitHub Release](https://github.com/DevilDogTG/KubeTools4Dev/releases). Self-contained — no separate .NET runtime install needed.
+
+### Windows
+Download `KubeTools4Dev-Setup-X.Y.Z.exe` and run it. A portable `.zip` is also published if you prefer not to install.
+
+### Linux (Ubuntu / Debian)
+Download `KubeTools4Dev_X.Y.Z_amd64.deb` from the release page, then:
+
+```bash
+sudo apt install ./KubeTools4Dev_X.Y.Z_amd64.deb
+kubetools4dev   # or launch from your application menu
+```
+
+Uninstall with `sudo apt remove kubetools4dev`.
+
+Requires `libicu` (any of 66/70/72/74 — present on every supported Ubuntu and Debian). `kubectl` is **not** required at runtime; the app talks to your cluster directly through your `~/.kube/config`.
+
+### WSL2 (Ubuntu)
+The same `.deb` works inside WSL Ubuntu. On **Windows 11**, WSLg displays the Avalonia window automatically and the app appears in the Windows Start menu. On **Windows 10**, install an X server (VcXsrv / X410) and export `DISPLAY` before launching.
+
+Note: your Linux-side `~/.kube/config` is **separate** from the Windows-side one. If you already manage clusters from PowerShell, copy or symlink it once:
+
+```bash
+ln -s /mnt/c/Users/<your-name>/.kube/config ~/.kube/config
+```
+
+## Prerequisites (Building from Source)
+
+Only required if you intend to build the app yourself instead of installing a release:
 
 - **.NET 10.0 SDK**: The application targets .NET 10.0.
-- **kubectl**: Required for underlying cluster interactions.
-- **kubeconfig**: A valid Kubernetes configuration file (usually located at `~/.kube/config`).
+- **kubeconfig**: A valid Kubernetes configuration file (usually `~/.kube/config`).
 
-## Getting Started
+## Getting Started (Source Build)
 
 1.  **Clone the Repository**
     ```bash
