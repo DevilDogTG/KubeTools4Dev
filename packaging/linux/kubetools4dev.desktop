@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=KubeTools4Dev
+GenericName=Kubernetes Developer Tools
+Comment=Kubernetes tools for developers
+Exec=/usr/bin/kubetools4dev %U
+Icon=kubetools4dev
+Terminal=false
+Categories=Development;Network;
+StartupWMClass=KubeTools4Dev
+Keywords=kubernetes;k8s;kubectl;port-forward;

@@ -1,0 +1,6 @@
+* text=auto
+
+# Shell scripts and Linux packaging artifacts must keep LF endings.
+*.sh             text eol=lf
+packaging/linux/control.template  text eol=lf
+packaging/linux/*.desktop         text eol=lf
