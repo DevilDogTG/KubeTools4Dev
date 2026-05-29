@@ -251,14 +251,17 @@ public sealed partial class ProfilePortForwardSupervisor : IProfilePortForwardSu
     {
         var profileId = failed.ProfileId;
 
-        // Cancel every OTHER entry in the same profile.
-        foreach (var (_, sf) in _entries)
-        {
-            if (sf.ProfileId == profileId && sf.Key != failed.Key)
-            {
-                sf.Cts.Cancel();
-            }
-        }
+        // Snapshot siblings and cancel their runners.
+        var siblings = _entries.Values
+            .Where(e => e.ProfileId == profileId && e.Key != failed.Key)
+            .ToList();
+        foreach (var sf in siblings) sf.Cts.Cancel();
+
+        // Remove ALL profile entries (including the failed one) from _entries synchronously so
+        // a subsequent StartProfileAsync(pid, sameEntries) is not blocked by stale keys whose
+        // TryAdd would fail and silently skip starting a new runner.
+        var toCleanup = new List<SupervisedForward>(siblings) { failed };
+        foreach (var sf in toCleanup) _entries.TryRemove(sf.Key, out _);
 
         LogProfileStoppedDueToFailure(profileId, failed.Key);
 
@@ -269,6 +272,19 @@ public sealed partial class ProfilePortForwardSupervisor : IProfilePortForwardSu
             failed.AttemptCount,
             lastError);
         ProfileStoppedDueToFailure?.Invoke(reason);
+
+        // Dispose CTSs after the runners exit. Non-blocking so the failed runner — which is
+        // currently mid-call — can return; awaiting our own Runner here would deadlock.
+        _ = Task.Run(async () =>
+        {
+            foreach (var sf in toCleanup)
+            {
+                try { if (sf.Runner is not null) await sf.Runner.ConfigureAwait(false); }
+                catch { /* runners exit cleanly via cancellation; ignore */ }
+                try { sf.Cts.Dispose(); }
+                catch { /* already disposed elsewhere; ignore */ }
+            }
+        });
     }
 
     private void SetState(SupervisedForward sf, SupervisedForwardState newState, string? lastError)
