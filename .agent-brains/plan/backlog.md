@@ -4,7 +4,7 @@
 _(none)_
 
 ## In Progress
-_(none)_
+- [linux-installer](./linux-installer.md) — Full Linux install pipeline: `.deb` artifact on every `v*` tag (Phase A ✅ in working tree) **and** GPG-signed apt repo on GitHub Pages so users can `apt install kubetools4dev` + `apt upgrade` (Phase B — guide in `docs/maintainer/apt-repo-setup.md`, awaiting maintainer GPG/gh-pages bootstrap). Branch `feature/linux-deb-installer`.
 
 ## Atomic Plans
 _(none)_

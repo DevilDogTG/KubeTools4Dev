@@ -1,0 +1,62 @@
+# Plan: Linux Installer (.deb + apt repository)
+
+**Status:** active
+**Created:** 2026-05-29
+**Branch:** feature/linux-deb-installer
+
+## Goal
+Ship a complete Linux install story in a single PR:
+
+1. **Phase A — `.deb` artifact.** Each `v*` tag produces a self-contained `linux-x64` `.deb` attached to the GitHub Release (runnable on Ubuntu/Debian and WSL2+WSLg).
+2. **Phase B — Self-hosted apt repository.** That same `.deb` lands in a GitHub-Pages-hosted apt repo signed by a project-owned GPG key, so users can `apt install kubetools4dev` once and get every future release via `apt upgrade`.
+
+Phase A is fully implementable by automation. Phase B has manual maintainer steps (GPG key gen, gh-pages bootstrap, Pages enable, secret upload) that this branch **does not** perform automatically — they are documented in `docs/maintainer/apt-repo-setup.md` for the maintainer to execute, after which Phase B's CI job becomes functional.
+
+Full Phase A design: `~/.claude/plans/peppy-splashing-lovelace.md` (approved 2026-05-29).
+Full Phase B playbook: `docs/maintainer/apt-repo-setup.md` (delivered in this branch).
+
+## Decisions confirmed
+**Phase A (.deb):**
+- Format `.deb` only; runtime self-contained; arch `linux-x64`.
+- Hand-rolled `dpkg-deb` instead of Velopack's Linux path.
+- No code changes in `Program.cs` or `KubeTools4Dev.csproj` (cross-platform settings path + `WinExe` publishes correctly to linux-x64).
+
+**Phase B (apt repo):**
+- Hosted on GitHub Pages (`gh-pages` branch) — free, no third-party signing service.
+- Signed with a 4096-bit RSA GPG key, 2-year expiry, documented rotation procedure.
+- Public key shipped in the gh-pages root as `KubeTools4Dev.gpg` (no keyserver dependency).
+- End-user install via the modern `signed-by=/etc/apt/keyrings/...` form (not deprecated `apt-key`).
+- `pool/` retains every released version; cleanup deferred until repo bloat justifies it.
+
+## Phase A — `.deb` artifact
+- [x] **A1 Packaging assets** — `packaging/linux/control.template`, `packaging/linux/kubetools4dev.desktop`, `packaging/linux/build-deb.sh`. `.gitattributes` added to pin LF endings on `*.sh`/`*.desktop`/`control.template`; build-deb.sh staged with mode 100755.
+- [x] **A2 CI: publish-linux job** — added in `publish.yml`. `runs-on: ubuntu-latest`; reads `version.json` via `jq`; `dotnet publish -c Release -r linux-x64 --self-contained true /p:DebugType=embedded`; calls `build-deb.sh`; uploads `*.deb` via second `softprops/action-gh-release@v2` step on same `tag_name`.
+- [x] **A3 README** — "Download & Install" section added above "Getting Started"; covers Windows / Ubuntu+Debian / WSL2; notes WSLg on Win11 vs X server on Win10; documents Linux-side kubeconfig symlink.
+- [x] **A4 Local smoke test (WSL Debian 13)** — publish produced 131 MB self-contained ELF; `.deb` produced at 40 MB; `apt install ./KubeTools4Dev_1.3.3_amd64.deb` clean; binary executes, creates `~/.config/KubeTools4Dev/settings.json`, auto-discovers WSL-side kubeconfig (k3s); Velopack startup silent; `apt remove` removes all paths with no residue.
+
+## Phase B — apt repository
+- [ ] **B1 Maintainer guide** — `docs/maintainer/apt-repo-setup.md` covering one-time GPG setup, gh-pages bootstrap, CI workflow YAML, end-user install snippet, key-rotation procedure, disaster recovery. ✅ delivered in this branch (344 lines).
+- [ ] **B2 [MAINTAINER ACTION] GPG key + GitHub secrets** — follow Part 1 of the guide to generate the signing key locally, export private/public, set `APT_REPO_GPG_PRIVATE_KEY` / `APT_REPO_GPG_PASSPHRASE` / `APT_REPO_GPG_KEY_ID` repo secrets. **Not automatable.**
+- [ ] **B3 [MAINTAINER ACTION] Bootstrap gh-pages branch** — follow Part 1.4 of the guide: orphan branch with `KubeTools4Dev.gpg`, empty `pool/` + `dists/`, `.nojekyll`, stub `index.html`. **Not automatable** (requires write access + a one-time decision about what to seed it with).
+- [ ] **B4 [MAINTAINER ACTION] Enable GitHub Pages** — repo Settings → Pages → source `gh-pages` branch / root. Verify `…/KubeTools4Dev.gpg` returns the key. **Manual UI step.**
+- [x] **B5 publish-apt-repo CI job** — added to `.github/workflows/publish.yml`, `needs: publish-linux`, gated `if: ${{ vars.APT_REPO_ENABLED == 'true' }}`. Workflow YAML validates (`yaml.safe_load` green; three jobs parsed: `publish` / `publish-linux` / `publish-apt-repo`). Job is a hard no-op until the maintainer sets the repo variable in step 1.6 of the guide. `secrets.*` is not allowed in `if:` expressions per GitHub Actions docs, so the gate is a `vars.*` repo variable instead — also acts as a kill-switch during key rotation.
+- [ ] **B6 README — apt-source install block** — once B2-B5 are green and a real release has populated the repo, replace the manual-download instructions in the README with the `signed-by` snippet from Part 3 of the guide. Keep the manual `.deb` download as an air-gapped fallback.
+- [ ] **B7 End-to-end test** — throwaway `v0.0.0-apt-test` tag, confirm gh-pages updates, install on a fresh Ubuntu VM from the apt source, push a second test tag, confirm `apt upgrade` bumps the version. Clean up the test tag + `.deb` afterwards.
+
+## Phase C — wrap-up
+- [ ] **C1 PR via sk-finish-feature** — open draft PR; iterate on `sk-pr-review` findings; merge.
+
+## Risks / open items
+- ~~**libicu Depends string**~~ — RESOLVED A4. Widened to `libicu76 | libicu74 | libicu72 | libicu71 | libicu70 | libicu67 | libicu66` after Debian 13's `libicu76` failed against the original list. Covers Debian 11/12/13 and Ubuntu 20.04/22.04/24.04.
+- ~~**Velopack startup on Linux**~~ — RESOLVED A4. `VelopackApp.Build().Run()` is silent on Linux outside a Velopack-managed install; no code change needed.
+- **Pre-existing `LogPath` relative-path bug** (out of scope): default `LogPath` is `"../logs/kubetools4dev-.log"`; resolves relative to CWD. When launched from `.desktop` on Linux, CWD is typically `$HOME`, so logs land under `~/logs/`. File a follow-up to change the default to `Environment.SpecialFolder.LocalApplicationData`-rooted on Linux.
+- **WSLg + Avalonia 12**: no GUI rendering test possible from `wsl.exe -e bash`. Manual verification by maintainer before merge.
+- **Phase B CI job pre-secrets**: the `if: secrets.APT_REPO_GPG_KEY_ID != ''` gate means publishing this PR before B2-B4 are done is safe (job skips, no error). But the **README apt-source instructions** (B6) MUST land **after** B2-B4 or users will follow a broken install flow. Keep B6 in a follow-on commit, not the initial merge.
+- **Pages cache TTL** (Phase B): GitHub Pages CDN caches ~10 min — users won't see a new release the instant it's tagged. Acceptable.
+- **Pool bloat** (Phase B): ~40 MB per release. After 50 releases ≈ 2 GB. Cleanup job deferred until release count justifies it.
+
+## Progress Log
+- 2026-05-29: Plan approved, branch `feature/linux-deb-installer` created off `main` (clean tree at `68c861d`).
+- 2026-05-29: Phase A (A1–A4) landed in working tree. Smoke-tested end-to-end on WSL Debian 13. Required widening libicu alternatives. Velopack-on-Linux risk dismissed.
+- 2026-05-29: Phase B scope folded into this branch per maintainer's request. Maintainer guide (`docs/maintainer/apt-repo-setup.md`) and Phase-B checklist (B1–B7) added. B1 delivered; B2–B4 are maintainer-side manual steps blocking B5–B7.
+- 2026-05-29: B5 landed — `publish-apt-repo` job appended to `publish.yml`, gated on `vars.APT_REPO_ENABLED == 'true'`. Guide updated with step 1.6 (master switch) and Part 2 trimmed to a description of what the existing job does (no more inline YAML duplication).
