@@ -5,8 +5,8 @@ KubeTools4Dev is a cross-platform desktop application built with Avalonia UI and
 ## Project Structure
 - **KubeTools4Dev**: The primary Avalonia application, housing the ViewModels, Views, and UI logic.
 - **KubeTools4Dev.Core**: The core library containing models, configuration settings, and services (e.g., `KubernetesService`, `PortForwardService`, `SettingsService`).
-- **KubeTools4Dev.Core.Tests**: xUnit + NSubstitute test project (47 tests). `InternalsVisibleTo` in Core csproj. Fakes live in `Fakes/`.
-- **KubeTools4Dev.Tests**: xUnit + NSubstitute test project targeting the UI assembly (39 tests). `InternalsVisibleTo` in KubeTools4Dev csproj. Tests use `protected virtual DispatchToUIAsync` hook to bypass Avalonia dispatcher.
+- **KubeTools4Dev.Core.Tests**: xUnit + NSubstitute test project (71 tests across 7 files). `InternalsVisibleTo` in Core csproj. Fakes live in `Fakes/`.
+- **KubeTools4Dev.Tests**: xUnit + NSubstitute test project targeting the UI assembly (57 tests across 5 files). `InternalsVisibleTo` in KubeTools4Dev csproj. Tests use `protected virtual DispatchToUIAsync` hook to bypass Avalonia dispatcher.
 
 ## Developer Workflow (Modern Release Flow)
 Trunk-based development off `main`.
@@ -27,20 +27,22 @@ Trunk-based development off `main`.
 - **xUnit `AsyncTestSyncContext` + captured `SynchronizationContext.Current`**: ViewModels in `Core` that capture `SynchronizationContext.Current` at construction time for UI dispatching will pick up xUnit's `AsyncTestSyncContext` inside `async Task` tests. `Post()` on that context defers work to the thread pool, causing tests to assert before the post runs. Mitigation: in the dispatcher (e.g., `OnClusterStatusChanged`), add a same-context shortcut — `if (_uiContext is null || SynchronizationContext.Current == _uiContext) applyInline(); else _uiContext.Post(...)`. This keeps tests synchronous while still dispatching properly in production. See `ClusterNodeViewModel.cs`.
 
 ## Current Version
-- v1.2.7 (released 2026-05-21)
-
-## In-Progress Feature
-- **Port-Forward Profiles** (`feature/port-forward-profiles`) — replaces "Forward All / Stop All" with a profile-based system. Users create named per-cluster profiles specifying which services to forward, then activate a full profile with one click. Implementation complete: 7 phases done, 129 tests passing (72 Core + 57 UI), build 0W/0E. Ready for `sk-finish-feature`.
+- v1.3.2 (released 2026-05-27)
 
 ## Open PRs
-- PR #40 (`feature/namespace-all-dynamic-pf-logging`) — ✅ approved 2026-05-25. All-ns sentinel node, live namespace watch (WatchNamespacesAsync), port-forward lifecycle logging (connId, duration, heartbeat). 97 tests (58 Core + 39 UI), 0W/0E.
-- PR #38 (`feature/ui-style-consistency`) — draft, ✅ approved 2026-05-25. UI style consistency: `RocketLaunch` Deployment icon, compact input/button sizing across all pages, ±-stepper controls, sidebar header removed, namespace children collapse by default, `Math.Clamp` stepper unification. 86 tests (47 Core + 39 UI), 0W/0E.
+_(none — tree is clean on `main`)_
 
 ## Recently Merged
-- PR #36 (`feature/multi-cluster-tree-nav`) — merged 2026-05-22. Multi-cluster support: per-cluster `ClusterConnectionManager`, VS Code-style nested-`ItemsControl` sidebar (replaces TreeView), `IDisposable` cascade from `ClusterTreeViewModel`, captured-`SynchronizationContext` UI dispatch, Material `ShadowAssist.ShadowDepth=Depth0` elevation removal. 78 tests passing.
+- PR #45 (`release/v1.3.2`) — merged 2026-05-27. Bump version to 1.3.2.
+- PR #44 (`feature/port-forward-profiles`) — merged 2026-05-27. Port-forward profile system: replaces "Forward All / Stop All" with named per-cluster profiles. Users create profiles specifying which services to forward and activate a full profile with one click. Includes UX fixes and removes deprecated Exclude feature. 128 tests (71 Core + 57 UI), 0W/0E.
+- PR #43 (`release/v1.3.1`) — merged 2026-05-26. Bump version to 1.3.1.
+- PR #42 (`bugfix/fix-ci-delete-namespace-watch-test`) — merged 2026-05-26. Resolves CI flaky test `WatchNamespacesAsync_DeletedEvent_RemovesExistingNode`.
+- PR #41 (`release/v1.3.0`) — merged 2026-05-25. Bump version to 1.3.0.
+- PR #40 (`feature/namespace-all-dynamic-pf-logging`) — merged 2026-05-25. All-ns sentinel node, live namespace watch (WatchNamespacesAsync), port-forward lifecycle logging (connId, duration, heartbeat).
+- PR #38 (`feature/ui-style-consistency`) — merged 2026-05-25. UI style consistency: `RocketLaunch` Deployment icon, compact input/button sizing across all pages, ±-stepper controls, sidebar header removed, namespace children collapse by default, `Math.Clamp` stepper unification.
+- PR #36 (`feature/multi-cluster-tree-nav`) — merged 2026-05-22. Multi-cluster support: per-cluster `ClusterConnectionManager`, VS Code-style nested-`ItemsControl` sidebar (replaces TreeView), `IDisposable` cascade from `ClusterTreeViewModel`, captured-`SynchronizationContext` UI dispatch.
 - PR #34 (`chore/archive-profile-composition`) — merged 2026-05-21. Agent-brains state files for profile-composition pipeline.
-- PR #33 (`release/v1.2.7`) — merged 2026-05-21. Bump version to 1.2.7.
-- PR #32 (`feature/deployments-page`) — merged 2026-05-21. Deployments page: list view, Rollout Restart, Edit (replica count + image tag). 66 tests.
+- PR #32 (`feature/deployments-page`) — merged 2026-05-21. Deployments page: list view, Rollout Restart, Edit (replica count + image tag).
 - PR #31 (`bugfix/fix-port-forward-drops`) — merged 2026-05-20. Resilient listener loop, ReuseAddress, no idle timeout.
 
 ## Agent Team Framework (`.agent-brains/`)
