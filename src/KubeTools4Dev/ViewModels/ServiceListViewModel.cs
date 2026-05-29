@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using DMNSN.Core;
 using k8s;
 using KubeTools4Dev.Core.Models;
+using KubeTools4Dev.Core.Services;
 using KubeTools4Dev.Core.Services.Interfaces;
 using KubeTools4Dev.Core.ViewModels;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,19 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace KubeTools4Dev.ViewModels;
+
+/// <summary>Severity of a banner shown at the top of the service list.</summary>
+public enum BannerSeverity
+{
+    /// <summary>Informational notice (default tint).</summary>
+    Info,
+
+    /// <summary>Warning notice.</summary>
+    Warning,
+
+    /// <summary>Error notice.</summary>
+    Error,
+}
 
 /// <summary>
 /// View model for the list of services.
@@ -57,6 +71,11 @@ public partial class ServiceListViewModel : ViewModelBase
     /// The port forward service; set by <see cref="UpdateScopeAsync"/> before first use.
     /// </summary>
     private IPortForwardService? _portForwardService;
+
+    /// <summary>
+    /// Profile supervisor for the current cluster; set by <see cref="UpdateScopeAsync"/>.
+    /// </summary>
+    private IProfilePortForwardSupervisor? _supervisor;
 
     /// <summary>
     /// The settings service
@@ -101,8 +120,7 @@ public partial class ServiceListViewModel : ViewModelBase
     /// Gets or sets the currently selected port-forward profile.
     /// </summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(StartProfileCommand))]
-    [NotifyCanExecuteChangedFor(nameof(StopProfileCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ToggleProfileCommand))]
     [NotifyCanExecuteChangedFor(nameof(DeleteProfileCommand))]
     private PortForwardProfileViewModel? _selectedProfile;
 
@@ -110,8 +128,8 @@ public partial class ServiceListViewModel : ViewModelBase
     /// Gets or sets a value indicating whether the active profile is currently forwarding.
     /// </summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(StartProfileCommand))]
-    [NotifyCanExecuteChangedFor(nameof(StopProfileCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ToggleProfileCommand))]
+    [NotifyPropertyChangedFor(nameof(ProfileToggleLabel))]
     private bool _isProfileRunning;
 
     /// <summary>
@@ -126,6 +144,35 @@ public partial class ServiceListViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CreateProfileCommand))]
     private string _newProfileName = string.Empty;
+
+    /// <summary>
+    /// Banner notice text shown above the service list. <c>null</c> means no banner.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DismissBannerCommand))]
+    [NotifyPropertyChangedFor(nameof(HasBannerMessage))]
+    private string? _bannerMessage;
+
+    /// <summary>
+    /// Severity of <see cref="BannerMessage"/>, controls the banner color.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBannerInfo))]
+    [NotifyPropertyChangedFor(nameof(IsBannerWarning))]
+    [NotifyPropertyChangedFor(nameof(IsBannerError))]
+    private BannerSeverity _bannerSeverity = BannerSeverity.Info;
+
+    /// <summary>True when <see cref="BannerMessage"/> is non-empty; bound by the banner's IsVisible.</summary>
+    public bool HasBannerMessage => !string.IsNullOrEmpty(BannerMessage);
+
+    /// <summary>True when the current banner severity is <see cref="BannerSeverity.Info"/>.</summary>
+    public bool IsBannerInfo => BannerSeverity == BannerSeverity.Info;
+
+    /// <summary>True when the current banner severity is <see cref="BannerSeverity.Warning"/>.</summary>
+    public bool IsBannerWarning => BannerSeverity == BannerSeverity.Warning;
+
+    /// <summary>True when the current banner severity is <see cref="BannerSeverity.Error"/>.</summary>
+    public bool IsBannerError => BannerSeverity == BannerSeverity.Error;
 
     /// <summary>
     /// The watch task
@@ -158,6 +205,7 @@ public partial class ServiceListViewModel : ViewModelBase
     public void Cleanup()
     {
         _settingsService.SettingsChanged -= OnSettingsChanged;
+        DetachSupervisor();
         _cancellationTokenSource?.Cancel();
         _cancellationTokenSource?.Dispose();
         _portForwardService?.StopAll();
@@ -180,6 +228,7 @@ public partial class ServiceListViewModel : ViewModelBase
         _cancellationTokenSource?.Dispose();
         _cancellationTokenSource = null;
         _portForwardService?.StopAll();
+        DetachSupervisor();
 
         _allServices.Clear();
         UpdateFilteredList();
@@ -187,6 +236,7 @@ public partial class ServiceListViewModel : ViewModelBase
         _kubeService = kubeService;
         _portForwardService = portForwardService;
         _namespaceName = namespaceName;
+        AttachSupervisor(_connectionManager.GetProfileSupervisor(clusterId));
 
         if (_clusterId != clusterId)
         {
@@ -196,6 +246,28 @@ public partial class ServiceListViewModel : ViewModelBase
         }
 
         await InitializeAsync();
+    }
+
+    /// <summary>
+    /// Subscribes to events on the given supervisor for the current cluster.
+    /// </summary>
+    private void AttachSupervisor(IProfilePortForwardSupervisor? supervisor)
+    {
+        _supervisor = supervisor;
+        if (_supervisor is null) return;
+        _supervisor.EntryStateChanged += OnSupervisorEntryStateChanged;
+        _supervisor.ProfileStoppedDueToFailure += OnSupervisorProfileStoppedDueToFailure;
+    }
+
+    /// <summary>
+    /// Unsubscribes from the current supervisor's events. Idempotent.
+    /// </summary>
+    private void DetachSupervisor()
+    {
+        if (_supervisor is null) return;
+        _supervisor.EntryStateChanged -= OnSupervisorEntryStateChanged;
+        _supervisor.ProfileStoppedDueToFailure -= OnSupervisorProfileStoppedDueToFailure;
+        _supervisor = null;
     }
 
     /// <summary>
@@ -333,14 +405,13 @@ public partial class ServiceListViewModel : ViewModelBase
     /// Removes the currently selected profile from the list and saves.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanDeleteProfile))]
-    private void DeleteProfile()
+    private async Task DeleteProfileAsync()
     {
         if (SelectedProfile is null) return;
 
         if (IsProfileRunning)
         {
-            // Stop any active forwards belonging to this profile first.
-            StopProfileForwards();
+            await StopProfileForwardsAsync();
         }
 
         Profiles.Remove(SelectedProfile);
@@ -349,49 +420,74 @@ public partial class ServiceListViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Starts forwarding all services listed in the selected profile.
+    /// Label shown on the profile toggle button. Reflects the action available in the current
+    /// state, not the current state itself.
     /// </summary>
-    private bool CanStartProfile() =>
-        SelectedProfile is not null &&
-        SelectedProfile.Entries.Count > 0 &&
-        !IsProfileRunning;
+    public string ProfileToggleLabel => IsProfileRunning ? "■ Stop" : "▶ Forward";
 
     /// <summary>
-    /// Starts port-forwarding for every entry in the selected profile that has a matching
-    /// loaded service view model.
+    /// Can-execute for <see cref="ToggleProfileCommand"/>: a profile must be selected with at
+    /// least one entry. The same gate applies in both directions — stopping a running profile
+    /// also requires the profile to still exist.
     /// </summary>
-    [RelayCommand(CanExecute = nameof(CanStartProfile))]
-    private void StartProfile()
+    private bool CanToggleProfile() =>
+        SelectedProfile is not null && SelectedProfile.Entries.Count > 0;
+
+    /// <summary>
+    /// Single command that toggles the selected profile between supervised and stopped.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanToggleProfile))]
+    private async Task ToggleProfileAsync()
     {
-        if (SelectedProfile is null) return;
-
-        foreach (var entry in SelectedProfile.Entries)
-        {
-            var match = FindServiceViewModel(entry.Namespace, entry.ServiceName, entry.TargetPort);
-            if (match is null || match.IsForwarding) continue;
-
-            if (entry.LocalPort > 0)
-                match.LocalPort = entry.LocalPort;
-
-            match.IsForwarding = true;
-        }
-
-        IsProfileRunning = true;
+        if (IsProfileRunning) await StopProfileInternalAsync();
+        else await StartProfileInternalAsync();
     }
 
     /// <summary>
-    /// Stops port-forwarding for every entry in the selected profile.
+    /// Starts every entry in the selected profile under supervision.
     /// </summary>
-    private bool CanStopProfile() => IsProfileRunning;
+    private async Task StartProfileInternalAsync()
+    {
+        if (SelectedProfile is null || _supervisor is null) return;
+
+        BannerMessage = null;
+
+        // Sync LocalPort overrides into the matching ServiceViewModels so the row reflects what's
+        // actually being forwarded.
+        foreach (var entry in SelectedProfile.Entries)
+        {
+            var match = FindServiceViewModel(entry.Namespace, entry.ServiceName, entry.TargetPort);
+            if (match is not null && entry.LocalPort > 0)
+                match.LocalPort = entry.LocalPort;
+        }
+
+        IsProfileRunning = true;
+        await _supervisor.StartProfileAsync(
+            SelectedProfile.Id,
+            [.. SelectedProfile.Entries.Select(e => e.Model)]);
+    }
 
     /// <summary>
     /// Stops all port-forwards that were started by the selected profile.
     /// </summary>
-    [RelayCommand(CanExecute = nameof(CanStopProfile))]
-    private void StopProfile()
+    private async Task StopProfileInternalAsync()
     {
-        StopProfileForwards();
+        if (SelectedProfile is null) return;
         IsProfileRunning = false;
+        if (_supervisor is not null)
+            await _supervisor.StopProfileAsync(SelectedProfile.Id);
+    }
+
+    /// <summary>
+    /// Clears the banner notice (bound to the dismiss button in <c>ServiceListView.axaml</c>).
+    /// </summary>
+    private bool CanDismissBanner() => !string.IsNullOrEmpty(BannerMessage);
+
+    /// <summary>Clears the banner notice.</summary>
+    [RelayCommand(CanExecute = nameof(CanDismissBanner))]
+    private void DismissBanner()
+    {
+        BannerMessage = null;
     }
 
     // ── Profile helpers ───────────────────────────────────────────────────────
@@ -415,7 +511,7 @@ public partial class ServiceListViewModel : ViewModelBase
         SelectedProfile.AddEntry(entry);
         svm.IsInSelectedProfile = true;
         SaveProfiles();
-        StartProfileCommand.NotifyCanExecuteChanged();
+        ToggleProfileCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
@@ -435,22 +531,166 @@ public partial class ServiceListViewModel : ViewModelBase
         SelectedProfile.RemoveEntry(entryVm);
         svm.IsInSelectedProfile = false;
         SaveProfiles();
-        StartProfileCommand.NotifyCanExecuteChanged();
+        ToggleProfileCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
-    /// Stops all active forwards that belong to the currently selected profile.
+    /// Stops all active supervised forwards that belong to the currently selected profile.
+    /// Used by <see cref="DeleteProfileAsync"/> before removing the profile from the list.
     /// </summary>
-    private void StopProfileForwards()
+    private async Task StopProfileForwardsAsync()
     {
-        if (SelectedProfile is null) return;
+        if (SelectedProfile is null || _supervisor is null) return;
+        await _supervisor.StopProfileAsync(SelectedProfile.Id);
+    }
 
-        foreach (var entry in SelectedProfile.Entries)
+    /// <summary>
+    /// Dispatches an action onto the UI thread. Virtual so unit tests can override and run
+    /// inline without an Avalonia dispatcher.
+    /// </summary>
+    protected virtual void DispatchToUI(Action action) => Dispatcher.UIThread.Post(action);
+
+    /// <summary>
+    /// Handles a supervised-entry state change by mirroring it onto the matching row's Status
+    /// text and surfacing per-entry "Unsupervised" notices to the banner.
+    /// </summary>
+    private void OnSupervisorEntryStateChanged(SupervisedForwardSnapshot snapshot)
+    {
+        DispatchToUI(() => ApplyEntrySnapshot(snapshot));
+    }
+
+    /// <summary>
+    /// Applies a supervisor snapshot to the matching <see cref="ServiceViewModel"/> (if loaded)
+    /// and updates profile-level state on the UI thread.
+    /// </summary>
+    private void ApplyEntrySnapshot(SupervisedForwardSnapshot snapshot)
+    {
+        var live = snapshot.State
+            is SupervisedForwardState.Starting
+            or SupervisedForwardState.Forwarding
+            or SupervisedForwardState.Retrying;
+
+        // Profile-level state — updated regardless of whether a row VM exists for this entry
+        // (rows may not yet be loaded, e.g., on cluster reconnect).
+        if (live)
         {
-            var match = FindServiceViewModel(entry.Namespace, entry.ServiceName, entry.TargetPort);
-            if (match is not null && match.IsForwarding)
-                match.IsForwarding = false;
+            IsProfileRunning = true;
         }
+        else if (SelectedProfile is not null && _supervisor is not null
+                 && !_supervisor.IsProfileRunning(SelectedProfile.Id))
+        {
+            IsProfileRunning = false;
+        }
+
+        if (snapshot.State == SupervisedForwardState.Unsupervised)
+        {
+            BannerSeverity = BannerSeverity.Info;
+            BannerMessage = $"{snapshot.ServiceName} is no longer supervised. "
+                + "Use ▶ Start to resume monitoring the whole profile.";
+        }
+
+        // Row-level state — only if the matching ServiceViewModel is loaded.
+        var match = FindServiceViewModel(snapshot.Namespace, snapshot.ServiceName, snapshot.TargetPort);
+        if (match is null) return;
+
+        // Set IsSupervised BEFORE IsForwarding so the IsForwarding setter sees the supervised flag
+        // and skips the manual Start/Stop path.
+        match.IsSupervised = live;
+        match.OnSupervisedStopRequested = live
+            ? () => UnsuperviseServiceAsync(snapshot.Namespace, snapshot.ServiceName, snapshot.TargetPort)
+            : null;
+
+        // When the row is unsupervised but the profile is still running, allow the user to
+        // toggle it back on and re-enter the supervised set without restarting the whole profile.
+        match.OnSupervisedResumeRequested = snapshot.State == SupervisedForwardState.Unsupervised
+            ? () => ResumeSupervisedEntryAsync(snapshot)
+            : null;
+
+        match.Status = snapshot.State switch
+        {
+            SupervisedForwardState.Starting    => "Starting",
+            SupervisedForwardState.Forwarding  => "Forwarding",
+            SupervisedForwardState.Retrying    => $"Retrying ({snapshot.AttemptCount}/{snapshot.MaxAttempts})",
+            SupervisedForwardState.Failed      => $"Failed ({snapshot.AttemptCount}/{snapshot.MaxAttempts})",
+            SupervisedForwardState.Unsupervised => "Unsupervised",
+            SupervisedForwardState.Stopped     => "Stopped",
+            _ => match.Status,
+        };
+
+        // Sync the row's ToggleSwitch to the supervisor's view. Because IsSupervised was set above,
+        // setting IsForwarding=true will not trigger a duplicate manual StartForwarding().
+        if (live)
+        {
+            match.IsForwarding = true;
+            // Drive the duration timer here — the supervisor owns the port-forward task,
+            // so the row's StartForwarding (which usually starts the timer) is skipped.
+            if (snapshot.State == SupervisedForwardState.Forwarding)
+                match.StartDurationTimerIfStopped();
+        }
+        else if (snapshot.State is SupervisedForwardState.Stopped
+                                or SupervisedForwardState.Failed
+                                or SupervisedForwardState.Unsupervised)
+        {
+            match.IsForwarding = false;
+            match.StopDurationTimer();
+        }
+    }
+
+    /// <summary>
+    /// Routes a supervised row's toggle-off through the supervisor.
+    /// </summary>
+    private async Task UnsuperviseServiceAsync(string ns, string serviceName, string targetPort)
+    {
+        if (_supervisor is null) return;
+        await _supervisor.UnsuperviseAsync(ns, serviceName, targetPort);
+    }
+
+    /// <summary>
+    /// Re-adds a previously-unsupervised entry to its profile's supervised set, provided the
+    /// profile is still running. Otherwise no-ops (the row stays off — user can press
+    /// ▶ Forward to relaunch the whole profile).
+    /// </summary>
+    private async Task ResumeSupervisedEntryAsync(SupervisedForwardSnapshot snapshot)
+    {
+        if (_supervisor is null) return;
+        if (!_supervisor.IsProfileRunning(snapshot.ProfileId))
+        {
+            // Profile already fully stopped — the user-toggled-on row stays off.
+            DispatchToUI(() =>
+            {
+                var match = FindServiceViewModel(snapshot.Namespace, snapshot.ServiceName, snapshot.TargetPort);
+                if (match is not null && match.IsForwarding) match.IsForwarding = false;
+            });
+            return;
+        }
+
+        var entry = new PortForwardProfileEntry
+        {
+            Namespace = snapshot.Namespace,
+            ServiceName = snapshot.ServiceName,
+            TargetPort = snapshot.TargetPort,
+            LocalPort = snapshot.LocalPort,
+        };
+        await _supervisor.StartProfileAsync(snapshot.ProfileId, [entry]);
+
+        // Clear the now-stale "no longer supervised" banner.
+        DispatchToUI(() => BannerMessage = null);
+    }
+
+    /// <summary>
+    /// Handles the supervisor's "profile stopped because an entry failed" notification: shows
+    /// an error banner and turns off the running flag.
+    /// </summary>
+    private void OnSupervisorProfileStoppedDueToFailure(ProfileFailureReason reason)
+    {
+        DispatchToUI(() =>
+        {
+            IsProfileRunning = false;
+            BannerSeverity = BannerSeverity.Error;
+            BannerMessage = $"Profile stopped — {reason.FailedServiceName} failed permanently "
+                + $"after {reason.AttemptCount} attempts."
+                + (string.IsNullOrEmpty(reason.LastError) ? string.Empty : $" Last error: {reason.LastError}");
+        });
     }
 
     /// <summary>

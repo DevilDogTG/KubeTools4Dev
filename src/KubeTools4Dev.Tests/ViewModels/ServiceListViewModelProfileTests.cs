@@ -334,32 +334,21 @@ public class ServiceListViewModelProfileTests
         #endregion
     }
 
-    // ── Start / Stop profile CanExecute ──────────────────────────────────────
+    // ── Toggle profile CanExecute ────────────────────────────────────────────
 
     [Fact]
-    public void StartProfileCommand_CannotExecute_WhenNoProfileSelected()
+    public void ToggleProfileCommand_CannotExecute_WhenNoProfileSelected()
     {
         var vm = MakeVm();
-        Assert.False(vm.StartProfileCommand.CanExecute(null));
+        Assert.False(vm.ToggleProfileCommand.CanExecute(null));
     }
 
     [Fact]
-    public void StartProfileCommand_CannotExecute_WhenProfileHasNoEntries()
+    public void ToggleProfileCommand_CannotExecute_WhenProfileHasNoEntries()
     {
-        #region PHASE 1: Arrange
         var vm = MakeVm();
         vm.NewProfileName = "Empty"; vm.CreateProfileCommand.Execute(null);
-        #endregion
 
-        #region PHASE 2: Act / Assert
-        Assert.False(vm.StartProfileCommand.CanExecute(null));
-        #endregion
-    }
-
-    [Fact]
-    public void StopProfileCommand_CannotExecute_WhenNotRunning()
-    {
-        var vm = MakeVm();
-        Assert.False(vm.StopProfileCommand.CanExecute(null));
+        Assert.False(vm.ToggleProfileCommand.CanExecute(null));
     }
 }
