@@ -4,9 +4,13 @@
 _(none)_
 
 ## In Progress
+- [profile-supervisor](./profile-supervisor.md) — ▶ Start on a profile enters supervised mode (auto-retry dropped forwards); manual forwards stay manual. Branch `feature/profile-supervisor`.
 
 ## Atomic Plans
 _(none)_
+
+## Completed (this session)
+- [refresh-memory-2026-05-29](./refresh-memory-2026-05-29.md) — Aligned `memory/overview.md` and backlog with `main` at v1.3.2.
 
 ## Archived Plans
 - `archive/namespace-all-dynamic-pf-logging.md` — archived 2026-05-25. All-ns sentinel, live watch, pf logging. PR #40 ✅ approved, ready to merge.
