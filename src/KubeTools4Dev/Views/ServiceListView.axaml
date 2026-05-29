@@ -48,9 +48,54 @@
         <Style Selector="Button.Success:pressed /template/ ContentPresenter">
             <Setter Property="Background" Value="#1b5e20"/>
         </Style>
+
+        <!-- Profile toggle: green when stopped (action: Forward), red when running (action: Stop) -->
+        <Style Selector="ToggleButton.profile-toggle">
+            <Setter Property="Background" Value="#2e7d32"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="MinHeight" Value="20"/>
+            <Setter Property="Height" Value="20"/>
+        </Style>
+        <Style Selector="ToggleButton.profile-toggle:checked /template/ ContentPresenter">
+            <Setter Property="Background" Value="#c62828"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="ToggleButton.profile-toggle:checked:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#d32f2f"/>
+        </Style>
+        <Style Selector="ToggleButton.profile-toggle:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#388e3c"/>
+        </Style>
+
+        <!-- Banner styles: theme-aware via semi-transparent fills + solid severity borders. -->
+        <!-- Background uses ~25% opacity of the severity color so the theme background shows -->
+        <!-- through and the inherited Foreground brush stays readable in light and dark themes. -->
+        <Style Selector="Border.banner">
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="10,0,10,4"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Border.banner.info">
+            <Setter Property="Background" Value="#402196F3"/>
+            <Setter Property="BorderBrush" Value="#2196F3"/>
+        </Style>
+        <Style Selector="Border.banner.warning">
+            <Setter Property="Background" Value="#40FF9800"/>
+            <Setter Property="BorderBrush" Value="#FF9800"/>
+        </Style>
+        <Style Selector="Border.banner.error">
+            <Setter Property="Background" Value="#40F44336"/>
+            <Setter Property="BorderBrush" Value="#F44336"/>
+        </Style>
+        <Style Selector="TextBlock.banner-text">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto, Auto, *">
+    <Grid RowDefinitions="Auto, Auto, Auto, *">
 
         <!-- Row 0: Filter + profile selector bar -->
         <StackPanel Grid.Row="0"
@@ -76,21 +121,16 @@
                       Padding="4,0"
                       ToolTip.Tip="Select a port-forward profile"/>
 
-            <!-- Start / Stop profile -->
-            <Button Content="▶ Start"
-                    Command="{Binding StartProfileCommand}"
-                    Height="20"
-                    Padding="5,0"
-                    FontSize="10"
-                    Classes="Primary"
-                    ToolTip.Tip="Start all forwards in the selected profile"/>
-            <Button Content="■ Stop"
-                    Command="{Binding StopProfileCommand}"
-                    Height="20"
-                    Padding="5,0"
-                    FontSize="10"
-                    Classes="Danger"
-                    ToolTip.Tip="Stop all forwards started by the selected profile"/>
+            <!-- Profile run toggle (Forward ↔ Stop) — single button reflecting one-of-two state -->
+            <ToggleButton IsChecked="{Binding IsProfileRunning, Mode=OneWay}"
+                          Command="{Binding ToggleProfileCommand}"
+                          Content="{Binding ProfileToggleLabel}"
+                          Classes="profile-toggle"
+                          Height="20"
+                          MinWidth="80"
+                          Padding="6,0"
+                          FontSize="10"
+                          ToolTip.Tip="Toggle supervised port-forwarding for the selected profile"/>
 
             <!-- Profile management -->
             <Button Content="+"
@@ -139,8 +179,31 @@
                     FontSize="10"/>
         </StackPanel>
 
-        <!-- Row 2: Service data grid -->
-        <DataGrid Grid.Row="2"
+        <!-- Row 2: Supervisor banner (visible only when BannerMessage is set) -->
+        <Border Grid.Row="2"
+                Classes="banner"
+                Classes.info="{Binding IsBannerInfo}"
+                Classes.warning="{Binding IsBannerWarning}"
+                Classes.error="{Binding IsBannerError}"
+                IsVisible="{Binding HasBannerMessage}">
+            <Grid ColumnDefinitions="*, Auto">
+                <TextBlock Grid.Column="0"
+                           Classes="banner-text"
+                           Text="{Binding BannerMessage}"/>
+                <Button Grid.Column="1"
+                        Content="✕"
+                        Command="{Binding DismissBannerCommand}"
+                        Height="20"
+                        Width="20"
+                        Padding="0"
+                        FontSize="10"
+                        Margin="6,0,0,0"
+                        ToolTip.Tip="Dismiss"/>
+            </Grid>
+        </Border>
+
+        <!-- Row 3: Service data grid -->
+        <DataGrid Grid.Row="3"
                   AutoGenerateColumns="False"
                   CanUserResizeColumns="True"
 				      CanUserSortColumns="True"
