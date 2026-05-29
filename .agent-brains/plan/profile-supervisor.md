@@ -1,6 +1,6 @@
 # Plan: Profile Port-Forward Supervisor
 
-**Status:** active
+**Status:** completed
 **Created:** 2026-05-29
 **Branch:** feature/profile-supervisor
 
@@ -28,3 +28,11 @@ Make ▶ Start on a profile enter supervised mode (auto-retry dropped forwards);
 - 2026-05-29: P4 — Banner XAML added: Border with severity classes, dismiss button; HasBannerMessage/IsBanner{Info,Warning,Error} computed bindings on VM.
 - 2026-05-29: P5 — Status strings come from `ApplyEntrySnapshot` switch.
 - 2026-05-29: P6 — Full build 0W/0E on `-warnaserror`; Core 84, UI 66, total 150 tests passing. Awaiting user smoke test against a live cluster.
+- 2026-05-29: User feedback — banner unreadable on dark theme; want re-supervise path; single Forward↔Stop toggle; duration timer for supervised rows; atomic commits. Addressed via theme-aware fills, `OnSupervisedResumeRequested`, single `ToggleProfileCommand`, `StartDurationTimerIfStopped`. 153 tests passing.
+- 2026-05-29: Tri-state toggle landed (`▶ Forward` / `■ Stop` / `▶ Resume`); orange tint when has-unsupervised; banner message updated. After-Resume color bug fixed by replacing `ToggleButton` with `Button` (class-driven styling, no `IsChecked` race).
+- 2026-05-29: PR #46 opened as draft via `sk-finish-feature`. https://github.com/DevilDogTG/KubeTools4Dev/pull/46
+- 2026-05-29: `sk-pr-review` posted findings — needs-work. 🔴 critical: `OnEntryExhausted` leaves stale entries in `_entries` blocking subsequent profile restart. https://github.com/DevilDogTG/KubeTools4Dev/pull/46#issuecomment-4570843087
+- 2026-05-29: Review fixes landed in 3 atomic commits — exhaustion cleanup + regression test (`da3feb8`), primary constructor + StopAll disposal (`c933e6b`), resume-fallback banner + UI-thread doc (`02e5a35`). 85 Core + 69 UI tests passing.
+- 2026-05-29: `sk-pr-review` re-run → **approved** at 02e5a35. https://github.com/DevilDogTG/KubeTools4Dev/pull/46#issuecomment-4571419703
+- 2026-05-29: Session closed via `sk-session-end`. PR #46 awaiting manual smoke + merge; no remaining blockers.
+- 2026-05-29: **PR #46 merged into `main`.** Remote branch deleted; main at `1a8c791`. Plan archived.
