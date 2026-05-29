@@ -6,7 +6,10 @@ using System.Collections.Concurrent;
 namespace KubeTools4Dev.Core.Services;
 
 /// <inheritdoc cref="IProfilePortForwardSupervisor"/>
-public sealed partial class ProfilePortForwardSupervisor : IProfilePortForwardSupervisor
+public sealed partial class ProfilePortForwardSupervisor(
+    IPortForwardService portForwardService,
+    ILogger<ProfilePortForwardSupervisor> logger
+) : IProfilePortForwardSupervisor
 {
     /// <summary>
     /// Backoff schedule applied between retry attempts. Indexed by attempt number minus
@@ -26,9 +29,6 @@ public sealed partial class ProfilePortForwardSupervisor : IProfilePortForwardSu
     /// <summary>Maximum number of attempts before an entry is marked <see cref="SupervisedForwardState.Failed"/>.</summary>
     internal static int MaxAttempts { get; set; } = 10;
 
-    private readonly IPortForwardService _portForwardService;
-    private readonly ILogger<ProfilePortForwardSupervisor> _logger;
-
     /// <summary>Keyed by <c>"{ns}/{svc}:{targetPort}"</c> — identity of a service-to-forward.</summary>
     private readonly ConcurrentDictionary<string, SupervisedForward> _entries = new();
 
@@ -39,17 +39,6 @@ public sealed partial class ProfilePortForwardSupervisor : IProfilePortForwardSu
 
     /// <inheritdoc/>
     public event Action<ProfileFailureReason>? ProfileStoppedDueToFailure;
-
-    /// <summary>Initializes a new instance of <see cref="ProfilePortForwardSupervisor"/>.</summary>
-    /// <param name="portForwardService">The transport that performs the actual TCP listener + WebSocket work.</param>
-    /// <param name="logger">Logger.</param>
-    public ProfilePortForwardSupervisor(
-        IPortForwardService portForwardService,
-        ILogger<ProfilePortForwardSupervisor> logger)
-    {
-        _portForwardService = portForwardService;
-        _logger = logger;
-    }
 
     /// <inheritdoc/>
     public Task StartProfileAsync(Guid profileId, IReadOnlyList<PortForwardProfileEntry> entries)
@@ -150,11 +139,23 @@ public sealed partial class ProfilePortForwardSupervisor : IProfilePortForwardSu
     /// <inheritdoc/>
     public void StopAll()
     {
-        foreach (var sf in _entries.Values)
-        {
-            sf.Cts.Cancel();
-        }
+        // Snapshot, cancel, and clear synchronously so callers cannot observe stale entries.
+        var allEntries = _entries.Values.ToList();
+        foreach (var sf in allEntries) sf.Cts.Cancel();
         _entries.Clear();
+
+        // Dispose CTSs after runners exit. Non-blocking to keep StopAll synchronous for callers
+        // like cluster-disconnect that should return immediately.
+        _ = Task.Run(async () =>
+        {
+            foreach (var sf in allEntries)
+            {
+                try { if (sf.Runner is not null) await sf.Runner.ConfigureAwait(false); }
+                catch { /* canceled */ }
+                try { sf.Cts.Dispose(); }
+                catch { /* already disposed elsewhere */ }
+            }
+        });
     }
 
     private static bool IsLiveState(SupervisedForwardState s)
@@ -182,7 +183,7 @@ public sealed partial class ProfilePortForwardSupervisor : IProfilePortForwardSu
             try
             {
                 SetState(sf, SupervisedForwardState.Forwarding, null);
-                await _portForwardService.StartServicePortForwardAsync(
+                await portForwardService.StartServicePortForwardAsync(
                     sf.ServiceName,
                     sf.Namespace,
                     sf.TargetPort,
