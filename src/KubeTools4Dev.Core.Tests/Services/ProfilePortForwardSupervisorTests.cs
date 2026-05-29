@@ -281,6 +281,51 @@ public sealed class ProfilePortForwardSupervisorTests : IDisposable
     }
 
     [Fact]
+    public async Task AfterExhaustion_NextStartProfileAsync_StartsFreshRunners()
+    {
+        // Perpetual drop until MaxAttempts → Failed + profile stopped.
+        var callCount = 0;
+        _fakePf.StartHandler = (_, _) =>
+        {
+            Interlocked.Increment(ref callCount);
+            return Task.CompletedTask;
+        };
+
+        var pid = Guid.NewGuid();
+        await _sut.StartProfileAsync(pid, [Entry("svc", "ns", "80", 8081)]);
+        await WaitForAsync(s => s.State == SupervisedForwardState.Failed);
+        await WaitForFailureAsync();
+
+        var callsAfterExhaustion = callCount;
+        Assert.True(callsAfterExhaustion >= ProfilePortForwardSupervisor.MaxAttempts);
+
+        // Allow the background cleanup to remove the stale entry.
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (_sut.IsSupervised("ns", "svc", "80") && sw.ElapsedMilliseconds < 2000)
+            await Task.Delay(10);
+        Assert.False(_sut.IsSupervised("ns", "svc", "80"));
+
+        // Restarting the same profile must start a NEW runner — not silently skip.
+        _fakePf.StartHandler = async (_, ct) =>
+        {
+            Interlocked.Increment(ref callCount);
+            try { await Task.Delay(Timeout.InfiniteTimeSpan, ct); }
+            catch (OperationCanceledException) { }
+        };
+        await _sut.StartProfileAsync(pid, [Entry("svc", "ns", "80", 8081)]);
+
+        // Wait for callCount to advance — a snapshot-based wait would match stale Forwarding
+        // events from the first run that are still in the accumulator list.
+        var sw2 = System.Diagnostics.Stopwatch.StartNew();
+        while (callCount == callsAfterExhaustion && sw2.ElapsedMilliseconds < 2000)
+            await Task.Delay(10);
+
+        Assert.True(callCount > callsAfterExhaustion,
+            $"Expected a new StartServicePortForwardAsync call after exhaustion+restart; got {callCount} (was {callsAfterExhaustion}).");
+        Assert.True(_sut.IsSupervised("ns", "svc", "80"));
+    }
+
+    [Fact]
     public async Task BackoffSchedule_AppliesIncreasingDelays()
     {
         ProfilePortForwardSupervisor.BackoffSchedule =
