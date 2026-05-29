@@ -182,7 +182,10 @@ public partial class ServiceListViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(ProfileToggleLabel))]
     private bool _hasUnsupervisedEntries;
 
-    /// <summary>Keys (ns/svc:targetPort) of entries currently in the Unsupervised state.</summary>
+    /// <summary>
+    /// Keys (ns/svc:targetPort) of entries currently in the Unsupervised state.
+    /// Mutated only on the UI thread via <see cref="ApplyEntrySnapshot"/>.
+    /// </summary>
     private readonly HashSet<string> _unsupervisedKeys = new();
 
     /// <summary>
@@ -702,19 +705,22 @@ public partial class ServiceListViewModel : ViewModelBase
 
     /// <summary>
     /// Re-adds a previously-unsupervised entry to its profile's supervised set, provided the
-    /// profile is still running. Otherwise no-ops (the row stays off — user can press
-    /// ▶ Forward to relaunch the whole profile).
+    /// profile is still running. If the profile is already stopped, the toggle bounces back
+    /// off and an info banner explains the next step.
     /// </summary>
     private async Task ResumeSupervisedEntryAsync(SupervisedForwardSnapshot snapshot)
     {
         if (_supervisor is null) return;
         if (!_supervisor.IsProfileRunning(snapshot.ProfileId))
         {
-            // Profile already fully stopped — the user-toggled-on row stays off.
+            // Profile already fully stopped — the user-toggled-on row reverts; explain why.
             DispatchToUI(() =>
             {
                 var match = FindServiceViewModel(snapshot.Namespace, snapshot.ServiceName, snapshot.TargetPort);
                 if (match is not null && match.IsForwarding) match.IsForwarding = false;
+                BannerSeverity = BannerSeverity.Info;
+                BannerMessage = $"The profile is no longer running. "
+                    + "Press ▶ Forward to start the whole profile under supervision.";
             });
             return;
         }
