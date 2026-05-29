@@ -103,8 +103,8 @@ public partial class ServiceViewModel : ObservableObject
     /// <summary>
     /// Callback invoked when the user toggles a previously-unsupervised row back on. Set by
     /// <see cref="ServiceListViewModel"/> when this row enters the
-    /// <see cref="SupervisedForwardState.Unsupervised"/> state while the profile is still
-    /// running. Re-adds the entry to the supervised set.
+    /// <see cref="KubeTools4Dev.Core.Services.SupervisedForwardState.Unsupervised"/>
+    /// state while the profile is still running. Re-adds the entry to the supervised set.
     /// </summary>
     public Func<Task>? OnSupervisedResumeRequested { get; set; }
     /// <summary>

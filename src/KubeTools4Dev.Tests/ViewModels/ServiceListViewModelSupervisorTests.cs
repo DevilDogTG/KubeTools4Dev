@@ -103,6 +103,69 @@ public class ServiceListViewModelSupervisorTests
     }
 
     [Fact]
+    public async Task ProfileToggleLabel_BecomesResume_WhenEntryUnsupervised()
+    {
+        var vm = await MakeVmAsync();
+        var pid = Guid.NewGuid();
+
+        // Simulate the row going Forwarding then Unsupervised.
+        _supervisor.RaiseEntryStateChanged(new SupervisedForwardSnapshot(
+            pid, "ns", "svc-x", "80", 8080,
+            SupervisedForwardState.Forwarding, 1, 10, null));
+        Assert.True(vm.IsProfileRunning);
+        Assert.Equal("■ Stop", vm.ProfileToggleLabel);
+
+        _supervisor.RaiseEntryStateChanged(new SupervisedForwardSnapshot(
+            pid, "ns", "svc-x", "80", 8080,
+            SupervisedForwardState.Unsupervised, 1, 10, null));
+
+        Assert.True(vm.HasUnsupervisedEntries);
+        Assert.Equal("▶ Resume", vm.ProfileToggleLabel);
+    }
+
+    [Fact]
+    public async Task ToggleProfileCommand_WhenRunningWithUnsupervised_ResumesProfile()
+    {
+        var pid = Guid.NewGuid();
+        var profile = MakeProfile(pid,
+            new PortForwardProfileEntry { Namespace = "ns", ServiceName = "svc", TargetPort = "80", LocalPort = 8080 });
+        var vm = await MakeVmAsync(profile);
+
+        // Start the profile.
+        await ((CommunityToolkit.Mvvm.Input.IAsyncRelayCommand)vm.ToggleProfileCommand).ExecuteAsync(null);
+        Assert.Equal(1, _supervisor.StartCallCount);
+
+        // Drive an Unsupervised snapshot for an entry in this profile.
+        _supervisor.RaiseEntryStateChanged(new SupervisedForwardSnapshot(
+            pid, "ns", "svc", "80", 8080,
+            SupervisedForwardState.Unsupervised, 1, 10, null));
+        Assert.Equal("▶ Resume", vm.ProfileToggleLabel);
+
+        // Toggle again: should call StartProfileAsync (resume), not StopProfileAsync.
+        await ((CommunityToolkit.Mvvm.Input.IAsyncRelayCommand)vm.ToggleProfileCommand).ExecuteAsync(null);
+        Assert.Null(_supervisor.StoppedProfileId);
+        Assert.Equal(2, _supervisor.StartCallCount);
+    }
+
+    [Fact]
+    public async Task EntryStateChanged_Forwarding_ClearsHasUnsupervisedEntries()
+    {
+        var vm = await MakeVmAsync();
+        var pid = Guid.NewGuid();
+
+        _supervisor.RaiseEntryStateChanged(new SupervisedForwardSnapshot(
+            pid, "ns", "svc", "80", 8080,
+            SupervisedForwardState.Unsupervised, 1, 10, null));
+        Assert.True(vm.HasUnsupervisedEntries);
+
+        _supervisor.RaiseEntryStateChanged(new SupervisedForwardSnapshot(
+            pid, "ns", "svc", "80", 8080,
+            SupervisedForwardState.Forwarding, 1, 10, null));
+
+        Assert.False(vm.HasUnsupervisedEntries);
+    }
+
+    [Fact]
     public async Task OnEntryStateChanged_Forwarding_SetsIsProfileRunning()
     {
         var vm = await MakeVmAsync();
@@ -215,11 +278,14 @@ public class ServiceListViewModelSupervisorTests
     /// </summary>
     private sealed class RecordingSupervisor : IProfilePortForwardSupervisor
     {
-        public Guid? StartedProfileId { get; private set; }
+        public Guid? StartedProfileId { get; set; }
         public IReadOnlyList<PortForwardProfileEntry>? StartedEntries { get; private set; }
-        public Guid? StoppedProfileId { get; private set; }
+        public Guid? StoppedProfileId { get; set; }
         public (string ns, string svc, string port)? UnsupervisedKey { get; private set; }
         public bool StoppedAll { get; private set; }
+        public int StartCallCount { get; private set; }
+
+        private readonly HashSet<Guid> _running = new();
 
         public event Action<SupervisedForwardSnapshot>? EntryStateChanged;
         public event Action<ProfileFailureReason>? ProfileStoppedDueToFailure;
@@ -234,12 +300,15 @@ public class ServiceListViewModelSupervisorTests
         {
             StartedProfileId = profileId;
             StartedEntries = entries;
+            StartCallCount++;
+            _running.Add(profileId);
             return Task.CompletedTask;
         }
 
         public Task StopProfileAsync(Guid profileId)
         {
             StoppedProfileId = profileId;
+            _running.Remove(profileId);
             return Task.CompletedTask;
         }
 
@@ -251,8 +320,12 @@ public class ServiceListViewModelSupervisorTests
 
         public bool IsSupervised(string namespaceName, string serviceName, string targetPort) => false;
 
-        public bool IsProfileRunning(Guid profileId) => false;
+        public bool IsProfileRunning(Guid profileId) => _running.Contains(profileId);
 
-        public void StopAll() => StoppedAll = true;
+        public void StopAll()
+        {
+            StoppedAll = true;
+            _running.Clear();
+        }
     }
 }
