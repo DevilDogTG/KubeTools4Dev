@@ -40,6 +40,12 @@ public interface IClusterConnectionManager
     IPortForwardService? GetPortForwardService(string clusterId);
 
     /// <summary>
+    /// Returns the <see cref="IProfilePortForwardSupervisor"/> for a connected cluster, or
+    /// <c>null</c> if the cluster is not currently connected.
+    /// </summary>
+    IProfilePortForwardSupervisor? GetProfileSupervisor(string clusterId);
+
+    /// <summary>
     /// Returns <c>true</c> if the given local port is already in use by any active port-forward across all clusters.
     /// </summary>
     bool IsLocalPortInUse(int localPort);

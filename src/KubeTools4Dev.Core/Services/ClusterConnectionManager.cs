@@ -19,7 +19,8 @@ public class ClusterConnectionManager : IClusterConnectionManager, IDisposable
 
     private record Session(
         IKubernetesService KubeService,
-        IPortForwardService PortForwardService);
+        IPortForwardService PortForwardService,
+        IProfilePortForwardSupervisor ProfileSupervisor);
 
     private readonly ConcurrentDictionary<string, Session> _sessions = new();
     private bool _disposed;
@@ -88,6 +89,7 @@ public class ClusterConnectionManager : IClusterConnectionManager, IDisposable
 
         var kubeService = _kubeFactory.Create();
         var portForwardService = _portForwardFactory.Create(kubeService);
+        var profileSupervisor = _portForwardFactory.CreateSupervisor(portForwardService);
 
         try
         {
@@ -99,7 +101,7 @@ public class ClusterConnectionManager : IClusterConnectionManager, IDisposable
                 return;
             }
 
-            _sessions[clusterId] = new Session(kubeService, portForwardService);
+            _sessions[clusterId] = new Session(kubeService, portForwardService, profileSupervisor);
             FireStatus(clusterId, ClusterConnectionStatus.Connected, null);
         }
         catch (Exception ex)
@@ -114,6 +116,7 @@ public class ClusterConnectionManager : IClusterConnectionManager, IDisposable
     {
         if (_sessions.TryRemove(clusterId, out var session))
         {
+            session.ProfileSupervisor.StopAll();
             session.PortForwardService.StopAll();
         }
         FireStatus(clusterId, ClusterConnectionStatus.Disconnected, null);
@@ -129,6 +132,10 @@ public class ClusterConnectionManager : IClusterConnectionManager, IDisposable
         => _sessions.TryGetValue(clusterId, out var s) ? s.PortForwardService : null;
 
     /// <inheritdoc />
+    public IProfilePortForwardSupervisor? GetProfileSupervisor(string clusterId)
+        => _sessions.TryGetValue(clusterId, out var s) ? s.ProfileSupervisor : null;
+
+    /// <inheritdoc />
     public bool IsLocalPortInUse(int localPort)
         => _sessions.Values.Any(s => s.PortForwardService.GetActiveLocalPorts().Contains(localPort));
 
@@ -140,6 +147,9 @@ public class ClusterConnectionManager : IClusterConnectionManager, IDisposable
 
         foreach (var session in _sessions.Values)
         {
+            try { session.ProfileSupervisor.StopAll(); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Error stopping profile supervisor on shutdown."); }
+
             try { session.PortForwardService.StopAll(); }
             catch (Exception ex) { _logger.LogWarning(ex, "Error stopping port-forwards on shutdown."); }
         }

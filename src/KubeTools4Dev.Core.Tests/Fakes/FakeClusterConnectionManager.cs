@@ -73,6 +73,10 @@ public class FakeClusterConnectionManager : IClusterConnectionManager
         => _services.ContainsKey(clusterId) ? Substitute.For<IPortForwardService>() : null;
 
     /// <inheritdoc/>
+    public IProfilePortForwardSupervisor? GetProfileSupervisor(string clusterId)
+        => _services.ContainsKey(clusterId) ? Substitute.For<IProfilePortForwardSupervisor>() : null;
+
+    /// <inheritdoc/>
     public bool IsLocalPortInUse(int localPort) => false;
 
     private void FireStatus(string id, ClusterConnectionStatus status, string? msg)
