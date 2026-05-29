@@ -1,5 +1,6 @@
 # Triggered when a vX.Y.Z tag is pushed to main (by tag.yml after a release PR merge).
-# Builds a self-contained Windows installer with Velopack and creates a GitHub Release.
+# Builds a self-contained Windows installer with Velopack and a self-contained
+# linux-x64 .deb, and attaches both to the same GitHub Release.
 name: Publish
 
 on:
@@ -8,7 +9,7 @@ on:
 
 jobs:
   publish:
-    name: Build & Publish Installer
+    name: Build & Publish Installer (Windows)
     runs-on: windows-2022
     permissions:
       contents: write
@@ -134,3 +135,169 @@ jobs:
             installer/out/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-linux:
+    name: Build & Publish Installer (Linux .deb)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Read version
+        id: version
+        run: |
+          v=$(jq -r .version version.json)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "tag=v$v"    >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish (self-contained linux-x64)
+        run: >
+          dotnet publish src/KubeTools4Dev/KubeTools4Dev.csproj
+          --configuration Release
+          --runtime linux-x64
+          --self-contained true
+          --output publish-linux/
+          /p:DebugType=embedded
+
+      - name: Build .deb
+        run: |
+          bash packaging/linux/build-deb.sh \
+            --publish-dir publish-linux \
+            --version     "${{ steps.version.outputs.version }}" \
+            --out-dir     installer/out-linux
+
+      - name: Upload .deb to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: KubeTools4Dev ${{ steps.version.outputs.tag }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: installer/out-linux/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-apt-repo:
+    # Gated on the maintainer flipping APT_REPO_ENABLED=true after completing
+    # the one-time setup documented in docs/maintainer/apt-repo-setup.md
+    # (GPG key gen, gh-pages bootstrap, repo secrets, enable Pages).
+    name: Publish to apt repository
+    runs-on: ubuntu-latest
+    needs: publish-linux
+    if: ${{ vars.APT_REPO_ENABLED == 'true' }}
+    permissions:
+      contents: write
+
+    env:
+      GPG_KEY_ID:     ${{ secrets.APT_REPO_GPG_KEY_ID }}
+      GPG_PASSPHRASE: ${{ secrets.APT_REPO_GPG_PASSPHRASE }}
+
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref:  gh-pages
+          path: site
+
+      - name: Read version
+        id: version
+        run: |
+          v=$(gh api repos/${{ github.repository }}/contents/version.json \
+                --jq '.content' | base64 -d | jq -r .version)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "tag=v$v"    >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download .deb from the GitHub Release
+        run: |
+          mkdir -p dl
+          gh release download "${{ steps.version.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern '*.deb' \
+            --dir dl
+          ls -la dl/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Stage .deb into pool
+        run: |
+          install -d site/pool/main/k/kubetools4dev
+          cp dl/*.deb site/pool/main/k/kubetools4dev/
+
+      - name: Install apt-utils + gpg
+        run: sudo apt-get update && sudo apt-get install -y apt-utils gnupg
+
+      - name: Import signing key
+        run: |
+          echo "$APT_REPO_GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "$GPG_KEY_ID:6:" | gpg --import-ownertrust
+        env:
+          APT_REPO_GPG_PRIVATE_KEY: ${{ secrets.APT_REPO_GPG_PRIVATE_KEY }}
+
+      - name: Regenerate Packages indexes
+        working-directory: site
+        run: |
+          apt-ftparchive packages pool/main \
+            > dists/stable/main/binary-amd64/Packages
+          gzip -9c dists/stable/main/binary-amd64/Packages \
+            > dists/stable/main/binary-amd64/Packages.gz
+          xz   -9c dists/stable/main/binary-amd64/Packages \
+            > dists/stable/main/binary-amd64/Packages.xz
+
+      - name: Regenerate Release file
+        working-directory: site
+        run: |
+          cat > /tmp/apt-ftparchive.conf <<'EOF'
+          APT::FTPArchive::Release::Origin "DevDogs";
+          APT::FTPArchive::Release::Label "KubeTools4Dev";
+          APT::FTPArchive::Release::Suite "stable";
+          APT::FTPArchive::Release::Codename "stable";
+          APT::FTPArchive::Release::Architectures "amd64";
+          APT::FTPArchive::Release::Components "main";
+          APT::FTPArchive::Release::Description "KubeTools4Dev apt repository";
+          EOF
+          apt-ftparchive -c /tmp/apt-ftparchive.conf release dists/stable \
+            > dists/stable/Release
+
+      - name: Sign Release (detached + clearsigned)
+        working-directory: site
+        run: |
+          gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "$GPG_PASSPHRASE" \
+              --default-key "$GPG_KEY_ID" \
+              --detach-sign --armor \
+              -o dists/stable/Release.gpg \
+              dists/stable/Release
+
+          gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "$GPG_PASSPHRASE" \
+              --default-key "$GPG_KEY_ID" \
+              --clearsign \
+              -o dists/stable/InRelease \
+              dists/stable/Release
+
+      - name: Commit + push to gh-pages
+        working-directory: site
+        run: |
+          git config user.name  "kubetools4dev-bot"
+          git config user.email "noreply@devildogtg.dmnsn.com"
+          git add pool dists
+          if git diff --cached --quiet; then
+            echo "::notice::Nothing to commit — pool and dists unchanged."
+          else
+            git commit -m "release: ${{ steps.version.outputs.tag }} into apt stable"
+            git push origin gh-pages
+          fi
