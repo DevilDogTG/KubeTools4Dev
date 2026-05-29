@@ -175,6 +175,17 @@ public partial class ServiceListViewModel : ViewModelBase
     public bool IsBannerError => BannerSeverity == BannerSeverity.Error;
 
     /// <summary>
+    /// True when the running profile has at least one entry the user has unsupervised. Drives
+    /// the tri-state behavior of the profile toggle button ("▶ Resume" instead of "■ Stop").
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ProfileToggleLabel))]
+    private bool _hasUnsupervisedEntries;
+
+    /// <summary>Keys (ns/svc:targetPort) of entries currently in the Unsupervised state.</summary>
+    private readonly HashSet<string> _unsupervisedKeys = new();
+
+    /// <summary>
     /// The watch task
     /// </summary>
     private Task? _watchTask;
@@ -268,6 +279,8 @@ public partial class ServiceListViewModel : ViewModelBase
         _supervisor.EntryStateChanged -= OnSupervisorEntryStateChanged;
         _supervisor.ProfileStoppedDueToFailure -= OnSupervisorProfileStoppedDueToFailure;
         _supervisor = null;
+        _unsupervisedKeys.Clear();
+        HasUnsupervisedEntries = false;
     }
 
     /// <summary>
@@ -421,9 +434,21 @@ public partial class ServiceListViewModel : ViewModelBase
 
     /// <summary>
     /// Label shown on the profile toggle button. Reflects the action available in the current
-    /// state, not the current state itself.
+    /// state, not the current state itself. Tri-state:
+    /// <list type="bullet">
+    ///   <item>Not running → "▶ Forward" (start).</item>
+    ///   <item>Running with at least one Unsupervised entry → "▶ Resume" (re-add to supervised set).</item>
+    ///   <item>Running, all entries supervised → "■ Stop".</item>
+    /// </list>
     /// </summary>
-    public string ProfileToggleLabel => IsProfileRunning ? "■ Stop" : "▶ Forward";
+    public string ProfileToggleLabel
+    {
+        get
+        {
+            if (!IsProfileRunning) return "▶ Forward";
+            return HasUnsupervisedEntries ? "▶ Resume" : "■ Stop";
+        }
+    }
 
     /// <summary>
     /// Can-execute for <see cref="ToggleProfileCommand"/>: a profile must be selected with at
@@ -434,13 +459,15 @@ public partial class ServiceListViewModel : ViewModelBase
         SelectedProfile is not null && SelectedProfile.Entries.Count > 0;
 
     /// <summary>
-    /// Single command that toggles the selected profile between supervised and stopped.
+    /// Tri-state command that drives the profile toggle button:
+    /// not running → start; running with unsupervised entries → resume; running otherwise → stop.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanToggleProfile))]
     private async Task ToggleProfileAsync()
     {
-        if (IsProfileRunning) await StopProfileInternalAsync();
-        else await StartProfileInternalAsync();
+        if (!IsProfileRunning) await StartProfileInternalAsync();
+        else if (HasUnsupervisedEntries) await ResumeProfileInternalAsync();
+        else await StopProfileInternalAsync();
     }
 
     /// <summary>
@@ -451,6 +478,8 @@ public partial class ServiceListViewModel : ViewModelBase
         if (SelectedProfile is null || _supervisor is null) return;
 
         BannerMessage = null;
+        _unsupervisedKeys.Clear();
+        HasUnsupervisedEntries = false;
 
         // Sync LocalPort overrides into the matching ServiceViewModels so the row reflects what's
         // actually being forwarded.
@@ -468,12 +497,29 @@ public partial class ServiceListViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Re-adds every previously-unsupervised entry back to the supervised set without
+    /// touching entries that are still being supervised. Relies on
+    /// <see cref="IProfilePortForwardSupervisor.StartProfileAsync"/> being idempotent for
+    /// already-supervised keys.
+    /// </summary>
+    private async Task ResumeProfileInternalAsync()
+    {
+        if (SelectedProfile is null || _supervisor is null) return;
+        BannerMessage = null;
+        await _supervisor.StartProfileAsync(
+            SelectedProfile.Id,
+            [.. SelectedProfile.Entries.Select(e => e.Model)]);
+    }
+
+    /// <summary>
     /// Stops all port-forwards that were started by the selected profile.
     /// </summary>
     private async Task StopProfileInternalAsync()
     {
         if (SelectedProfile is null) return;
         IsProfileRunning = false;
+        _unsupervisedKeys.Clear();
+        HasUnsupervisedEntries = false;
         if (_supervisor is not null)
             await _supervisor.StopProfileAsync(SelectedProfile.Id);
     }
@@ -570,6 +616,14 @@ public partial class ServiceListViewModel : ViewModelBase
             or SupervisedForwardState.Forwarding
             or SupervisedForwardState.Retrying;
 
+        // Track per-profile "has unsupervised entries" so the toggle button can offer Resume.
+        var entryKey = $"{snapshot.Namespace}/{snapshot.ServiceName}:{snapshot.TargetPort}";
+        if (snapshot.State == SupervisedForwardState.Unsupervised)
+            _unsupervisedKeys.Add(entryKey);
+        else
+            _unsupervisedKeys.Remove(entryKey);
+        HasUnsupervisedEntries = _unsupervisedKeys.Count > 0;
+
         // Profile-level state — updated regardless of whether a row VM exists for this entry
         // (rows may not yet be loaded, e.g., on cluster reconnect).
         if (live)
@@ -586,7 +640,8 @@ public partial class ServiceListViewModel : ViewModelBase
         {
             BannerSeverity = BannerSeverity.Info;
             BannerMessage = $"{snapshot.ServiceName} is no longer supervised. "
-                + "Use ▶ Start to resume monitoring the whole profile.";
+                + "Press ▶ Resume to re-supervise the unsupervised entries, "
+                + "or toggle the row back on to re-supervise just that one.";
         }
 
         // Row-level state — only if the matching ServiceViewModel is loaded.
