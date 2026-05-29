@@ -5,8 +5,8 @@ KubeTools4Dev is a cross-platform desktop application built with Avalonia UI and
 ## Project Structure
 - **KubeTools4Dev**: The primary Avalonia application, housing the ViewModels, Views, and UI logic.
 - **KubeTools4Dev.Core**: The core library containing models, configuration settings, and services (e.g., `KubernetesService`, `PortForwardService`, `SettingsService`).
-- **KubeTools4Dev.Core.Tests**: xUnit + NSubstitute test project (71 tests across 7 files). `InternalsVisibleTo` in Core csproj. Fakes live in `Fakes/`.
-- **KubeTools4Dev.Tests**: xUnit + NSubstitute test project targeting the UI assembly (57 tests across 5 files). `InternalsVisibleTo` in KubeTools4Dev csproj. Tests use `protected virtual DispatchToUIAsync` hook to bypass Avalonia dispatcher.
+- **KubeTools4Dev.Core.Tests**: xUnit + NSubstitute test project (85 tests across 8 files). `InternalsVisibleTo` in Core csproj. Fakes live in `Fakes/`.
+- **KubeTools4Dev.Tests**: xUnit + NSubstitute test project targeting the UI assembly (69 tests across 6 files). `InternalsVisibleTo` in KubeTools4Dev csproj. Tests use `protected virtual DispatchToUIAsync` (or `DispatchToUI`) hook to bypass Avalonia dispatcher.
 
 ## Developer Workflow (Modern Release Flow)
 Trunk-based development off `main`.
@@ -33,6 +33,7 @@ Trunk-based development off `main`.
 _(none — tree is clean on `main`)_
 
 ## Recently Merged
+- PR #46 (`feature/profile-supervisor`) — merged 2026-05-29. Profile port-forward supervisor: ▶ Forward on a profile enters supervised mode (auto-retry dropped forwards with bounded exponential backoff, max 10 attempts). Tri-state Forward/Stop/Resume toggle. Banner notifications with theme-aware colors. Exhaustion stops the whole profile + error banner. Manual one-off port-forwards stay unsupervised. 154 tests (85 Core + 69 UI), 0W/0E.
 - PR #45 (`release/v1.3.2`) — merged 2026-05-27. Bump version to 1.3.2.
 - PR #44 (`feature/port-forward-profiles`) — merged 2026-05-27. Port-forward profile system: replaces "Forward All / Stop All" with named per-cluster profiles. Users create profiles specifying which services to forward and activate a full profile with one click. Includes UX fixes and removes deprecated Exclude feature. 128 tests (71 Core + 57 UI), 0W/0E.
 - PR #43 (`release/v1.3.1`) — merged 2026-05-26. Bump version to 1.3.1.
