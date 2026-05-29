@@ -49,31 +49,31 @@
             <Setter Property="Background" Value="#1b5e20"/>
         </Style>
 
-        <!-- Profile toggle: tri-state coloring -->
-        <!--   green  = stopped, action is ▶ Forward -->
-        <!--   red    = running with all entries supervised, action is ■ Stop -->
-        <!--   orange = running with at least one unsupervised entry, action is ▶ Resume -->
-        <Style Selector="ToggleButton.profile-toggle">
+        <!-- Profile button tri-state coloring driven by class bindings: -->
+        <!--   default (no .running)         = green,  action is ▶ Forward -->
+        <!--   .running                      = red,    action is ■ Stop -->
+        <!--   .running.has-unsupervised     = orange, action is ▶ Resume -->
+        <Style Selector="Button.profile-toggle">
             <Setter Property="Background" Value="#2e7d32"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="MinHeight" Value="20"/>
             <Setter Property="Height" Value="20"/>
         </Style>
-        <Style Selector="ToggleButton.profile-toggle:checked /template/ ContentPresenter">
+        <Style Selector="Button.profile-toggle:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#388e3c"/>
+        </Style>
+        <Style Selector="Button.profile-toggle.running /template/ ContentPresenter">
             <Setter Property="Background" Value="#c62828"/>
             <Setter Property="Foreground" Value="White"/>
         </Style>
-        <Style Selector="ToggleButton.profile-toggle:checked:pointerover /template/ ContentPresenter">
+        <Style Selector="Button.profile-toggle.running:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="#d32f2f"/>
         </Style>
-        <Style Selector="ToggleButton.profile-toggle:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#388e3c"/>
-        </Style>
-        <Style Selector="ToggleButton.profile-toggle.has-unsupervised:checked /template/ ContentPresenter">
+        <Style Selector="Button.profile-toggle.running.has-unsupervised /template/ ContentPresenter">
             <Setter Property="Background" Value="#ef6c00"/>
             <Setter Property="Foreground" Value="White"/>
         </Style>
-        <Style Selector="ToggleButton.profile-toggle.has-unsupervised:checked:pointerover /template/ ContentPresenter">
+        <Style Selector="Button.profile-toggle.running.has-unsupervised:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="#f57c00"/>
         </Style>
 
@@ -131,17 +131,19 @@
                       Padding="4,0"
                       ToolTip.Tip="Select a port-forward profile"/>
 
-            <!-- Profile run toggle (Forward → Stop or Resume) — tri-state button -->
-            <ToggleButton IsChecked="{Binding IsProfileRunning, Mode=OneWay}"
-                          Classes.has-unsupervised="{Binding HasUnsupervisedEntries}"
-                          Command="{Binding ToggleProfileCommand}"
-                          Content="{Binding ProfileToggleLabel}"
-                          Classes="profile-toggle"
-                          Height="20"
-                          MinWidth="80"
-                          Padding="6,0"
-                          FontSize="10"
-                          ToolTip.Tip="Toggle supervised port-forwarding for the selected profile"/>
+            <!-- Profile run button (tri-state: Forward / Stop / Resume) — plain Button so its -->
+            <!-- visual state comes purely from class bindings; ToggleButton's IsChecked auto-flip -->
+            <!-- on click caused the color to desync after Resume. -->
+            <Button Classes="profile-toggle"
+                    Classes.running="{Binding IsProfileRunning}"
+                    Classes.has-unsupervised="{Binding HasUnsupervisedEntries}"
+                    Command="{Binding ToggleProfileCommand}"
+                    Content="{Binding ProfileToggleLabel}"
+                    Height="20"
+                    MinWidth="80"
+                    Padding="6,0"
+                    FontSize="10"
+                    ToolTip.Tip="Toggle supervised port-forwarding for the selected profile"/>
 
             <!-- Profile management -->
             <Button Content="+"
