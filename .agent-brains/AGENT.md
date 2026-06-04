@@ -38,7 +38,9 @@ You MUST NOT keep your plans in internal context only.
 - Always create a new branch (`feature/` or `bugfix/` prefix) before making any code changes.
 - Use the `finish-feature` skill to run preflights and create/update PRs.
 - Use the `pr-review` skill to run an AI code review and post findings on a PR.
-- Never commit directly to `main`.
+- **Never commit directly to `main`, and never `git push origin main`** — `main` is branch-protected with a "PR required" rule. This applies to *every* change including session handover memos and chore commits. Route them via a `chore/` branch and a PR (e.g., PR #50, #54 — handover-memo PRs).
+- **Use rebase-merge** when merging PRs (`gh pr merge --rebase`). Squash-merge is disabled in repo settings; `--squash` returns `GraphQL: Squash merges are not allowed`. Release PRs also need rebase for `tag.yml` to find the bump commit.
+- **After merging a release PR**, `git pull --ff-only` on local main before branching again — the bump commit lands on `origin/main` from the GH-Actions runner, so local main drifts behind by one commit.
 
 ## Coding Standards
 - Build must have **0 warnings, 0 errors** (`-warnaserror`).
