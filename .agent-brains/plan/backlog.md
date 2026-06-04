@@ -4,7 +4,7 @@
 _(none)_
 
 ## In Progress
-- [linux-installer](./linux-installer.md) — Phase A `.deb` + Phase B apt-repo scaffolding **merged via PR #49 on 2026-06-04** (`41f8fb4` on main). Phase B Part 1 (GPG / gh-pages / Pages / `APT_REPO_ENABLED=true`) verified end-to-end same day. **Remaining**: B7 (`v1.3.4-rc1` tag to exercise the apt-repo CI job end-to-end) and B6 (README apt-source install block after B7 succeeds).
+- [linux-installer](./linux-installer.md) — Phase A + Phase B + B7 end-to-end test all complete as of 2026-06-04 (v1.3.5 seeded the apt repo successfully). Only **B6** remains: replace the manual `.deb` download instructions in the README with the apt-source `signed-by` snippet from Part 3 of `docs/maintainer/apt-repo-setup.md`.
 
 ## Atomic Plans
 _(none)_
