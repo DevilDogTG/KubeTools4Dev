@@ -1,0 +1,47 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Architectures: amd64
+Codename: stable
+Components: main
+Date: Thu, 04 Jun 2026 09:46:06 +0000
+Description: KubeTools4Dev apt repository
+Label: KubeTools4Dev
+Origin: DevDogs
+Suite: stable
+MD5Sum:
+ b88a9c4d8b0a7220e53837745ccd29da              186 Release
+ 494d31dec9c1c945cf87a303d21b30d6              906 main/binary-amd64/Packages
+ c1d2428d7870aa2f8af811933d6123a5              614 main/binary-amd64/Packages.gz
+ c9d350d0193143c92998da1672ae55ed              688 main/binary-amd64/Packages.xz
+SHA1:
+ 8871093fd05aff2695f1dc204487938b422e0dc8              186 Release
+ bee8e95a11741b1a05cf1f3744dd2bbbf8bf6d5d              906 main/binary-amd64/Packages
+ a369974e4a2499fc844a25ec5342d636a523b75d              614 main/binary-amd64/Packages.gz
+ 7fb6aee192db1fefb92093d8029d84929ecd6191              688 main/binary-amd64/Packages.xz
+SHA256:
+ 6bb87ff2c85e4c6756db10f065a5d62bc44c3d710851751c9d30785e68195764              186 Release
+ 13ff2a1e9d72d2eda45dd2f5612b467f06e8df09c174bdb3bcd2e6133c4a4165              906 main/binary-amd64/Packages
+ a46381f6fe99ea04fa72a01555a9ab21f61eb5610bd068d8a846d3c1fbdc26c2              614 main/binary-amd64/Packages.gz
+ 81be03c09e00f1a67b6cbfeecc846c84b6cef7fbd18dadf6888598c90ed853cb              688 main/binary-amd64/Packages.xz
+SHA512:
+ 3dfd556f5ae73d358f35fac786b64a5cc00153e34602171bd8f23cb89fd9abe0aebccee62abf480533069442d9332a9b823d66635030db851889f1a90954a05e              186 Release
+ 7d4ba499e103089184298a6c9f45ebddd647d79aebbff9993f856f1b330c064af4a119e2638a963dc210beeeaa6218e40472067f4092c0b2d1c24f13ae7c494a              906 main/binary-amd64/Packages
+ 0a51dc57ce88b09291cd6c896e28cdc64a89ece9db94bcf761a6842b663f1afbfb11529d238102b33ca18d08a3a8fff9b0416c707b69c6fd9ed3be09827cf22b              614 main/binary-amd64/Packages.gz
+ bc1c432797f76009f5df54f83a78a328ff3bb6947b3e8a2f55c88ee053ae58213b4f5ec7140bea53e0319cadf8589aa09f03800bb9c0440997615782f6adc50b              688 main/binary-amd64/Packages.xz
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEEM+WnyKUme92SIhN9iNCLixsH1RIFAmohSV8ACgkQiNCLixsH
+1RLR+w/+NSR3p0D7eRaLxb1+CqDiX1v92OOqIDmAkX1QspfmEIK44F9Ksjdz83Lr
+czxgPvJHIsOFOs7Bjz7A65PYxP9uioUds2lV+lmPquwQID/sufiNYb9bSrYmi3sn
+NE1K5o5zYimK/PdlJdFZAibaIoPOpLDPcIDbr55mOZ2GWpx3/NPw1qHh11Uz/Ujh
+Go3PksRmX3ytojhKcIHsjso1/wvCRif1hPuyVGi5aRYEc7TrCKxhYKSyXurhtIl+
+yh0ZMEGu5VFKYo27rOVhvSDJE5NRz3FMHnq6WSEMT4cAOFAaQILOncpBLjHAYGFf
+Jfmqlee9SmYuIa4AIrDAiUVRUvuKEHfbb5A0nbM6Vy+wt0qRkGMS44MbxOwp10+v
+lvUgHA40Rr84+By4iPz3Fge0zJKrXUv4ctxkJMJA4IhJORDWHyoE5OtnbVLjvsF6
+1ceyvcsE2bboan8fM6iQN8M3AW2OSVKmRHFOzpxfNH+KYPN3UsSNsPty7aiZNmGe
+sc3D3w+noAKKtsnlvPQZqHHadaGnVXJFvFxBiKyc/o9grUJo5DsVsUxvdA4UJuJ0
+fUGRS5Ah1f20F464xGiWXCskF8pzhQpe8ute3WP622EYICjEieitAKQK60AKwujy
+6quo2NthszbXdopmw3A/JYaU8ZAYTs/oEgdSvpg5N5hw8WMH3x0=
+=7B6C
+-----END PGP SIGNATURE-----
