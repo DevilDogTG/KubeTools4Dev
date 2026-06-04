@@ -42,7 +42,18 @@ install -d "$STAGE/usr/share/icons/hicolor/256x256/apps"
 
 # 2. Copy publish output into /opt/kubetools4dev (preserve modes)
 cp -a "$PUBLISH_DIR"/. "$STAGE/opt/$PKG_NAME/"
-chmod 0755 "$STAGE/opt/$PKG_NAME/KubeTools4Dev"
+
+# The published ELF binary's name is locked to the .csproj AssemblyName
+# (defaults to the project name "KubeTools4Dev"). Fail loudly with a
+# pointer instead of letting chmod surface a cryptic stat error if that
+# ever drifts.
+APP_BIN="$STAGE/opt/$PKG_NAME/KubeTools4Dev"
+if [[ ! -f "$APP_BIN" ]]; then
+  echo "ERROR: expected published binary not found at $APP_BIN" >&2
+  echo "       Has AssemblyName changed in src/KubeTools4Dev/KubeTools4Dev.csproj?" >&2
+  exit 70
+fi
+chmod 0755 "$APP_BIN"
 
 # 3. /usr/bin launcher (not a symlink: keeps argv[0] sane and lets us set cwd if needed)
 cat > "$STAGE/usr/bin/$PKG_NAME" <<'LAUNCHER'

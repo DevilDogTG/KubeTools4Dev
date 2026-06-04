@@ -103,6 +103,10 @@ it in step 1.6.
 
 ### 1.4 Bootstrap the `gh-pages` branch
 
+From a clean checkout of `main` (`git switch main && git status` shows nothing
+to commit — the orphan branch inherits the current tree before we wipe it,
+so starting from anywhere else means you'll inherit junk):
+
 ```bash
 git checkout --orphan gh-pages
 git rm -rf .                                 # wipe working tree
@@ -176,11 +180,12 @@ What the job does, in order:
 8. Commits + pushes additively to `gh-pages`. Skips the push if nothing
    changed (e.g. a manual re-run of an already-published tag).
 
-> **Operational note:** the gpg signing step passes the passphrase via
-> `--passphrase` on the command line — visible to any process that lists
-> `/proc/<pid>/cmdline`. GitHub Actions runners are single-tenant per job,
-> so the only practical leak path is workflow logs. The job already passes
-> it through env var only; **do not** add `set -x` or `-v` to those steps.
+> **Operational note:** the gpg signing step reads the passphrase from
+> file descriptor 0 via a bash here-string (`<<<"$GPG_PASSPHRASE"`),
+> keeping it out of `/proc/<pid>/cmdline` and `ps aux` entirely. The
+> passphrase env var is still in-process — **do not** add `set -x` or
+> `-v` to those steps, which would print expanded variables to the
+> workflow log.
 
 ### Verifying CI
 
