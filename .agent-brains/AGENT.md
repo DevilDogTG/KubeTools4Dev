@@ -30,6 +30,10 @@ You MUST NOT keep your plans in internal context only.
 <!-- Global and profile rules are active automatically. Add project-specific overrides here. -->
 <!-- end:framework -->
 
+<!-- [MAINTAINER ACTION] planning convention promoted to GLOBAL_AGENT.md §4.5.1 (2026-06-04) -->
+<!-- vars.<NAME> gate for not-yet-ready GHA jobs documented in github-scm profile -->
+
+
 ## Git Workflow
 - Always create a new branch (`feature/` or `bugfix/` prefix) before making any code changes.
 - Use the `finish-feature` skill to run preflights and create/update PRs.

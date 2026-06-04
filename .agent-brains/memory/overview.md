@@ -27,10 +27,17 @@ Trunk-based development off `main`.
 - **xUnit `AsyncTestSyncContext` + captured `SynchronizationContext.Current`**: ViewModels in `Core` that capture `SynchronizationContext.Current` at construction time for UI dispatching will pick up xUnit's `AsyncTestSyncContext` inside `async Task` tests. `Post()` on that context defers work to the thread pool, causing tests to assert before the post runs. Mitigation: in the dispatcher (e.g., `OnClusterStatusChanged`), add a same-context shortcut — `if (_uiContext is null || SynchronizationContext.Current == _uiContext) applyInline(); else _uiContext.Post(...)`. This keeps tests synchronous while still dispatching properly in production. See `ClusterNodeViewModel.cs`.
 
 ## Current Version
-- v1.3.2 (released 2026-05-27)
+- v1.3.3 (released 2026-05-29)
 
 ## Open PRs
-_(none — tree is clean on `main`)_
+- PR #49 (`feature/linux-deb-installer`) — Draft. Linux `.deb` installer + apt-repo CI scaffolding. Phase A complete (smoke-tested on WSL Debian 13); Phase B (apt repo) gated on `vars.APT_REPO_ENABLED` — maintainer must complete the one-time GPG + gh-pages bootstrap before flipping the variable. `sk-pr-review` approved at `53d93dd`. Awaiting manual WSLg GUI smoke before marking ready-for-review. https://github.com/DevilDogTG/KubeTools4Dev/pull/49
+
+## Linux / WSL Packaging Notes
+- **Cross-platform settings path**: `Environment.SpecialFolder.ApplicationData` already resolves correctly on Linux to `$XDG_CONFIG_HOME` (`~/.config`). No OS detection needed in `Program.cs` for the user settings location.
+- **`OutputType=WinExe` is portable**: `dotnet publish -r linux-x64 --self-contained` on a `WinExe` csproj produces a valid Linux ELF binary. The `WinExe` subsystem flag is honored only by the Windows PE linker; on other targets it's ignored.
+- **Velopack on Linux**: `Velopack.VelopackApp.Build().Run()` is a silent no-op when the app is not launched via a Velopack-managed install. Safe to leave in `Main()` for cross-platform builds — no `OperatingSystem.IsWindows()` gate needed.
+- **`libicu` Depends string for self-contained .NET .deb**: must list every major version across supported distros. Current working alternative: `libicu76 | libicu74 | libicu72 | libicu71 | libicu70 | libicu67 | libicu66`. Mapping: Ubuntu 20.04→66, Debian 11→67, Ubuntu 22.04→70, Debian 12→72, Ubuntu 24.04→74, Debian 13→76. `apt install` fails with "unmet dependencies" if the running distro's version isn't in the list — caught in WSL Debian 13 smoke test when the original narrow list omitted 76.
+- **Hand-rolled `dpkg-deb`** chosen over Velopack-Linux: keeps the Windows Velopack flow untouched and avoids coupling to Velopack's still-evolving Linux CLI. Layout: `/opt/kubetools4dev/` (publish output), `/usr/bin/kubetools4dev` (shell launcher, NOT a symlink, so `argv[0]` stays sane under WSLg), `/usr/share/applications/*.desktop`, `/usr/share/icons/hicolor/256x256/apps/*.png`. Script at `packaging/linux/build-deb.sh` with `dpkg-deb --root-owner-group`.
 
 ## Recently Merged
 - PR #46 (`feature/profile-supervisor`) — merged 2026-05-29. Profile port-forward supervisor: ▶ Forward on a profile enters supervised mode (auto-retry dropped forwards with bounded exponential backoff, max 10 attempts). Tri-state Forward/Stop/Resume toggle. Banner notifications with theme-aware colors. Exhaustion stops the whole profile + error banner. Manual one-off port-forwards stay unsupervised. 154 tests (85 Core + 69 UI), 0W/0E.
