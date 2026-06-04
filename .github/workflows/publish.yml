@@ -254,6 +254,9 @@ jobs:
       - name: Regenerate Packages indexes
         working-directory: site
         run: |
+          # git doesn't track empty dirs, so the gh-pages bootstrap's
+          # mkdir doesn't survive into a checkout. Recreate on demand.
+          mkdir -p dists/stable/main/binary-amd64
           apt-ftparchive packages pool/main \
             > dists/stable/main/binary-amd64/Packages
           gzip -9c dists/stable/main/binary-amd64/Packages \

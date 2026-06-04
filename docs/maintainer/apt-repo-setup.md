@@ -110,8 +110,6 @@ so starting from anywhere else means you'll inherit junk):
 ```bash
 git checkout --orphan gh-pages
 git rm -rf .                                 # wipe working tree
-mkdir -p dists/stable/main/binary-amd64
-mkdir -p pool/main/k/kubetools4dev
 
 cp /path/to/KubeTools4Dev.gpg ./KubeTools4Dev.gpg
 touch .nojekyll                              # tells Pages not to run Jekyll
