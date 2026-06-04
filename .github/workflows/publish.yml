@@ -213,6 +213,10 @@ jobs:
 
       - name: Read version
         id: version
+        # NOTE: this job checks out the `gh-pages` branch (not `main`), so
+        # version.json isn't on disk. Pulling it through the GitHub Contents
+        # API and base64-decoding is the simplest way to read it without
+        # adding a second checkout step.
         run: |
           v=$(gh api repos/${{ github.repository }}/contents/version.json \
                 --jq '.content' | base64 -d | jq -r .version)
@@ -274,20 +278,22 @@ jobs:
 
       - name: Sign Release (detached + clearsigned)
         working-directory: site
+        # Passphrase is read from fd 0 (heredoc) instead of being passed as a
+        # CLI argument — keeps it out of /proc/<pid>/cmdline and `ps aux`.
         run: |
           gpg --batch --yes --pinentry-mode loopback \
-              --passphrase "$GPG_PASSPHRASE" \
+              --passphrase-fd 0 \
               --default-key "$GPG_KEY_ID" \
               --detach-sign --armor \
               -o dists/stable/Release.gpg \
-              dists/stable/Release
+              dists/stable/Release <<<"$GPG_PASSPHRASE"
 
           gpg --batch --yes --pinentry-mode loopback \
-              --passphrase "$GPG_PASSPHRASE" \
+              --passphrase-fd 0 \
               --default-key "$GPG_KEY_ID" \
               --clearsign \
               -o dists/stable/InRelease \
-              dists/stable/Release
+              dists/stable/Release <<<"$GPG_PASSPHRASE"
 
       - name: Commit + push to gh-pages
         working-directory: site
