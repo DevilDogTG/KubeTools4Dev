@@ -245,9 +245,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y apt-utils gnupg
 
       - name: Import signing key
+        # `gpg --import-ownertrust` requires the full 40-char fingerprint;
+        # the long key ID we store in APT_REPO_GPG_KEY_ID is rejected with
+        # "invalid fingerprint". Derive the fingerprint from the imported key.
         run: |
           echo "$APT_REPO_GPG_PRIVATE_KEY" | gpg --batch --import
-          echo "$GPG_KEY_ID:6:" | gpg --import-ownertrust
+          FPR=$(gpg --with-colons --fingerprint "$GPG_KEY_ID" \
+                  | awk -F: '/^fpr:/ {print $10; exit}')
+          if [ -z "$FPR" ]; then
+            echo "::error::Could not derive fingerprint for key id $GPG_KEY_ID after import."
+            exit 1
+          fi
+          echo "$FPR:6:" | gpg --import-ownertrust
         env:
           APT_REPO_GPG_PRIVATE_KEY: ${{ secrets.APT_REPO_GPG_PRIVATE_KEY }}
 
