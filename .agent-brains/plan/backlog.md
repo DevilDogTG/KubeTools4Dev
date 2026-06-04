@@ -4,7 +4,7 @@
 _(none)_
 
 ## In Progress
-- [linux-installer](./linux-installer.md) — Full Linux install pipeline: `.deb` artifact on every `v*` tag (Phase A ✅ in working tree) **and** GPG-signed apt repo on GitHub Pages so users can `apt install kubetools4dev` + `apt upgrade` (Phase B — guide in `docs/maintainer/apt-repo-setup.md`, awaiting maintainer GPG/gh-pages bootstrap). Branch `feature/linux-deb-installer`.
+- [linux-installer](./linux-installer.md) — Phase A `.deb` + Phase B apt-repo scaffolding **merged via PR #49 on 2026-06-04** (`41f8fb4` on main). Phase B Part 1 (GPG / gh-pages / Pages / `APT_REPO_ENABLED=true`) verified end-to-end same day. **Remaining**: B7 (`v1.3.4-rc1` tag to exercise the apt-repo CI job end-to-end) and B6 (README apt-source install block after B7 succeeds).
 
 ## Atomic Plans
 _(none)_
