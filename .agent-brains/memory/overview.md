@@ -30,7 +30,7 @@ Trunk-based development off `main`.
 - v1.3.3 (released 2026-05-29)
 
 ## Open PRs
-- PR #49 (`feature/linux-deb-installer`) — Draft. Linux `.deb` installer + apt-repo CI scaffolding. Phase A complete (smoke-tested on WSL Debian 13); Phase B (apt repo) gated on `vars.APT_REPO_ENABLED` — maintainer must complete the one-time GPG + gh-pages bootstrap before flipping the variable. `sk-pr-review` approved at `53d93dd`. Awaiting manual WSLg GUI smoke before marking ready-for-review. https://github.com/DevilDogTG/KubeTools4Dev/pull/49
+_(none — PR #49 merged 2026-06-04)_
 
 ## Linux / WSL Packaging Notes
 - **Cross-platform settings path**: `Environment.SpecialFolder.ApplicationData` already resolves correctly on Linux to `$XDG_CONFIG_HOME` (`~/.config`). No OS detection needed in `Program.cs` for the user settings location.
@@ -38,8 +38,10 @@ Trunk-based development off `main`.
 - **Velopack on Linux**: `Velopack.VelopackApp.Build().Run()` is a silent no-op when the app is not launched via a Velopack-managed install. Safe to leave in `Main()` for cross-platform builds — no `OperatingSystem.IsWindows()` gate needed.
 - **`libicu` Depends string for self-contained .NET .deb**: must list every major version across supported distros. Current working alternative: `libicu76 | libicu74 | libicu72 | libicu71 | libicu70 | libicu67 | libicu66`. Mapping: Ubuntu 20.04→66, Debian 11→67, Ubuntu 22.04→70, Debian 12→72, Ubuntu 24.04→74, Debian 13→76. `apt install` fails with "unmet dependencies" if the running distro's version isn't in the list — caught in WSL Debian 13 smoke test when the original narrow list omitted 76.
 - **Hand-rolled `dpkg-deb`** chosen over Velopack-Linux: keeps the Windows Velopack flow untouched and avoids coupling to Velopack's still-evolving Linux CLI. Layout: `/opt/kubetools4dev/` (publish output), `/usr/bin/kubetools4dev` (shell launcher, NOT a symlink, so `argv[0]` stays sane under WSLg), `/usr/share/applications/*.desktop`, `/usr/share/icons/hicolor/256x256/apps/*.png`. Script at `packaging/linux/build-deb.sh` with `dpkg-deb --root-owner-group`.
+- **gh-pages empty-dir gotcha**: `git checkout --orphan gh-pages && git rm -rf . && mkdir -p dists/...` does NOT result in `dists/` being tracked — git ignores empty directories on commit. Workflows that write to nested paths on `gh-pages` must `mkdir -p` before redirecting, or seed `.gitkeep` files. Caught in PR #49 verification on 2026-06-04 before the first apt-repo CI run.
 
 ## Recently Merged
+- PR #49 (`feature/linux-deb-installer`) — rebase-merged 2026-06-04 (merge commit `41f8fb4`). Linux `.deb` installer + GPG-signed apt repo on GitHub Pages: Phase A (publish-linux job + dpkg-deb assembler) + Phase B scaffolding (publish-apt-repo job gated on `vars.APT_REPO_ENABLED`, maintainer guide). Maintainer completed Part 1 of the guide same day; dists-mkdir CI fix landed in the same PR. Next: tag `v1.3.4-rc1` to exercise the apt-repo pipeline end-to-end (B7).
 - PR #46 (`feature/profile-supervisor`) — merged 2026-05-29. Profile port-forward supervisor: ▶ Forward on a profile enters supervised mode (auto-retry dropped forwards with bounded exponential backoff, max 10 attempts). Tri-state Forward/Stop/Resume toggle. Banner notifications with theme-aware colors. Exhaustion stops the whole profile + error banner. Manual one-off port-forwards stay unsupervised. 154 tests (85 Core + 69 UI), 0W/0E.
 - PR #45 (`release/v1.3.2`) — merged 2026-05-27. Bump version to 1.3.2.
 - PR #44 (`feature/port-forward-profiles`) — merged 2026-05-27. Port-forward profile system: replaces "Forward All / Stop All" with named per-cluster profiles. Users create profiles specifying which services to forward and activate a full profile with one click. Includes UX fixes and removes deprecated Exclude feature. 128 tests (71 Core + 57 UI), 0W/0E.
