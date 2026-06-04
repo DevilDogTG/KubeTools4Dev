@@ -35,7 +35,7 @@ Full Phase B playbook: `docs/maintainer/apt-repo-setup.md` (delivered in this br
 - [x] **A4 Local smoke test (WSL Debian 13)** — publish produced 131 MB self-contained ELF; `.deb` produced at 40 MB; `apt install ./KubeTools4Dev_1.3.3_amd64.deb` clean; binary executes, creates `~/.config/KubeTools4Dev/settings.json`, auto-discovers WSL-side kubeconfig (k3s); Velopack startup silent; `apt remove` removes all paths with no residue.
 
 ## Phase B — apt repository
-- [ ] **B1 Maintainer guide** — `docs/maintainer/apt-repo-setup.md` covering one-time GPG setup, gh-pages bootstrap, CI workflow YAML, end-user install snippet, key-rotation procedure, disaster recovery. ✅ delivered in this branch (344 lines).
+- [x] **B1 Maintainer guide** — `docs/maintainer/apt-repo-setup.md` covering one-time GPG setup, gh-pages bootstrap, CI workflow YAML, end-user install snippet, key-rotation procedure, disaster recovery. Delivered + revised post-review.
 - [ ] **B2 [MAINTAINER ACTION] GPG key + GitHub secrets** — follow Part 1 of the guide to generate the signing key locally, export private/public, set `APT_REPO_GPG_PRIVATE_KEY` / `APT_REPO_GPG_PASSPHRASE` / `APT_REPO_GPG_KEY_ID` repo secrets. **Not automatable.**
 - [ ] **B3 [MAINTAINER ACTION] Bootstrap gh-pages branch** — follow Part 1.4 of the guide: orphan branch with `KubeTools4Dev.gpg`, empty `pool/` + `dists/`, `.nojekyll`, stub `index.html`. **Not automatable** (requires write access + a one-time decision about what to seed it with).
 - [ ] **B4 [MAINTAINER ACTION] Enable GitHub Pages** — repo Settings → Pages → source `gh-pages` branch / root. Verify `…/KubeTools4Dev.gpg` returns the key. **Manual UI step.**
