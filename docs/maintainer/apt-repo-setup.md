@@ -42,7 +42,7 @@ Key-Type: RSA
 Key-Length: 4096
 Key-Usage: sign
 Name-Real: KubeTools4Dev Release Signing
-Name-Email: noreply@devildogtg.dmnsn.com
+Name-Email: noreply@dmnsn.com
 Expire-Date: 2y
 Passphrase: REPLACE_WITH_LONG_PASSPHRASE
 %commit
@@ -53,10 +53,10 @@ EOF
 Find the key fingerprint:
 
 ```bash
-gpg --list-secret-keys --keyid-format LONG noreply@devildogtg.dmnsn.com
+gpg --list-secret-keys --keyid-format LONG noreply@dmnsn.com
 # sec   rsa4096/ABCD1234EF567890 2026-05-29 [S] [expires: 2028-05-29]
 #       FULL-40-CHAR-FINGERPRINT-GOES-HERE
-# uid                 [ultimate] KubeTools4Dev Release Signing <noreply@devildogtg.dmnsn.com>
+# uid                 [ultimate] KubeTools4Dev Release Signing <noreply@dmnsn.com>
 ```
 
 Copy the 40-character fingerprint — you will need it in step 1.3.
