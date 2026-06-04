@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <Version>1.3.4</Version>
+    <Version>1.3.5</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Title>KubeTools4Dev</Title>
     <Authors>DevilDogTG</Authors>
