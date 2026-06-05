@@ -333,25 +333,33 @@ public partial class ServiceViewModel : ObservableObject
             {
                 try
                 {
-                    Dispatcher.UIThread.Post(() => Status = "Forwarding");
+                    DispatchToUI(() => Status = "Forwarding");
                     // Start Timer
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        _startTime = DateTime.Now;
-                        DurationText = "00:00:00";
-                        _durationTimer.Start();
-                    });
+                    DispatchToUI(StartTimer);
 
                     await _pfService.StartServicePortForwardAsync(Name, Namespace, TargetPort, LocalPort, token);
+
+                    // The forward returned without the user stopping it (e.g. the listener died
+                    // because the port was taken). Reflect reality instead of leaving a zombie
+                    // "Forwarding" row; the IsForwarding setter routes through StopForwarding.
+                    if (!token.IsCancellationRequested)
+                    {
+                        DispatchToUI(() => IsForwarding = false);
+                    }
+                }
+                catch (Exception) when (!token.IsCancellationRequested)
+                {
+                    DispatchToUI(() =>
+                    {
+                        // Reset the toggle first — its setter routes through StopForwarding,
+                        // which writes Status = "Stopped"; "Failed" must land afterwards to stick.
+                        IsForwarding = false;
+                        Status = "Failed";
+                    });
                 }
                 catch (Exception)
                 {
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        Status = "Failed";
-                        IsForwarding = false; // Reset toggle
-                        StopTimer();
-                    });
+                    // Cancelled by the user — StopForwarding already updated the UI.
                 }
             });
         }
@@ -397,9 +405,25 @@ public partial class ServiceViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Stops the timer.
+    /// Dispatches an action to the UI thread. Virtual so tests can run it inline without an
+    /// Avalonia dispatcher loop (same seam pattern as <c>DispatchToUI</c> on the list view models).
     /// </summary>
-    private void StopTimer()
+    protected virtual void DispatchToUI(Action action) => Dispatcher.UIThread.Post(action);
+
+    /// <summary>
+    /// Starts the duration timer. Virtual so tests can bypass the Avalonia <see cref="DispatcherTimer"/>.
+    /// </summary>
+    protected virtual void StartTimer()
+    {
+        _startTime = DateTime.Now;
+        DurationText = "00:00:00";
+        _durationTimer.Start();
+    }
+
+    /// <summary>
+    /// Stops the timer. Virtual so tests can bypass the Avalonia <see cref="DispatcherTimer"/>.
+    /// </summary>
+    protected virtual void StopTimer()
     {
         _durationTimer.Stop();
         DurationText = "";
