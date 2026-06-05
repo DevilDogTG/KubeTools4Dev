@@ -24,13 +24,18 @@ public partial class ProfilePortForwardSupervisor
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Supervised forward {Key} dropped after attempt {Attempt}")]
-    private partial void LogForwardDropped(string key, int attempt);
+        Message = "Supervised forward {Key} dropped after attempt {Attempt} (ran {RunSeconds:F1} s)")]
+    private partial void LogForwardDropped(string key, int attempt, double runSeconds);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Supervised forward {Key} threw on attempt {Attempt}: {ErrorMessage}")]
-    private partial void LogForwardCrashed(string key, int attempt, string errorMessage);
+        Message = "Supervised forward {Key} threw on attempt {Attempt} after {RunSeconds:F1} s: {ErrorMessage}")]
+    private partial void LogForwardCrashed(string key, int attempt, double runSeconds, string errorMessage);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Supervised forward {Key} ran stably for {RunMinutes:F1} min — retry window reset (was attempt {Attempt})")]
+    private partial void LogForwardRetryWindowReset(string key, double runMinutes, int attempt);
 
     [LoggerMessage(
         Level = LogLevel.Information,

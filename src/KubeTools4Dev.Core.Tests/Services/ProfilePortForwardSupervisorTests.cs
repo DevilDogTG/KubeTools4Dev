@@ -13,6 +13,7 @@ public sealed class ProfilePortForwardSupervisorTests : IDisposable
 {
     private readonly IReadOnlyList<TimeSpan> _origBackoff;
     private readonly int _origMaxAttempts;
+    private readonly TimeSpan _origStableRunThreshold;
     private readonly FakePortForwardService _fakePf = new();
     private readonly ILogger<ProfilePortForwardSupervisor> _logger
         = Substitute.For<ILogger<ProfilePortForwardSupervisor>>();
@@ -24,10 +25,13 @@ public sealed class ProfilePortForwardSupervisorTests : IDisposable
     {
         _origBackoff = ProfilePortForwardSupervisor.BackoffSchedule;
         _origMaxAttempts = ProfilePortForwardSupervisor.MaxAttempts;
+        _origStableRunThreshold = ProfilePortForwardSupervisor.StableRunThreshold;
 
-        // Fast defaults; tests can override further.
+        // Fast defaults; tests can override further. The stable-run threshold is set high so
+        // the immediate drops used by most tests never reset the retry window by accident.
         ProfilePortForwardSupervisor.BackoffSchedule = [TimeSpan.FromMilliseconds(10)];
         ProfilePortForwardSupervisor.MaxAttempts = 3;
+        ProfilePortForwardSupervisor.StableRunThreshold = TimeSpan.FromSeconds(30);
 
         _sut = new ProfilePortForwardSupervisor(_fakePf, _logger);
         _sut.EntryStateChanged += s => { lock (_snapshots) _snapshots.Add(s); };
@@ -39,6 +43,7 @@ public sealed class ProfilePortForwardSupervisorTests : IDisposable
         _sut.StopAll();
         ProfilePortForwardSupervisor.BackoffSchedule = _origBackoff;
         ProfilePortForwardSupervisor.MaxAttempts = _origMaxAttempts;
+        ProfilePortForwardSupervisor.StableRunThreshold = _origStableRunThreshold;
     }
 
     private static PortForwardProfileEntry Entry(
@@ -323,6 +328,73 @@ public sealed class ProfilePortForwardSupervisorTests : IDisposable
         Assert.True(callCount > callsAfterExhaustion,
             $"Expected a new StartServicePortForwardAsync call after exhaustion+restart; got {callCount} (was {callsAfterExhaustion}).");
         Assert.True(_sut.IsSupervised("ns", "svc", "80"));
+    }
+
+    [Fact]
+    public async Task StableRun_DoesNotConsumeRetryBudget()
+    {
+        // Every run is "stable" (longer than the threshold) before dropping — the retry
+        // window must reset each time and the entry must never reach Failed, no matter
+        // how many drops accumulate (this models rare drops over a long app run).
+        ProfilePortForwardSupervisor.StableRunThreshold = TimeSpan.FromMilliseconds(50);
+
+        var callCount = 0;
+        _fakePf.StartHandler = async (_, ct) =>
+        {
+            Interlocked.Increment(ref callCount);
+            try { await Task.Delay(80, ct); }
+            catch (OperationCanceledException) { }
+        };
+
+        var pid = Guid.NewGuid();
+        await _sut.StartProfileAsync(pid, [Entry()]);
+
+        // Let it drop well past MaxAttempts (3) times.
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (Volatile.Read(ref callCount) < ProfilePortForwardSupervisor.MaxAttempts + 2
+               && sw.ElapsedMilliseconds < 5000)
+            await Task.Delay(10);
+
+        Assert.True(callCount >= ProfilePortForwardSupervisor.MaxAttempts + 2,
+            $"Expected at least {ProfilePortForwardSupervisor.MaxAttempts + 2} starts; got {callCount}.");
+
+        lock (_snapshots)
+        {
+            Assert.DoesNotContain(_snapshots, s => s.State == SupervisedForwardState.Failed);
+        }
+        lock (_failures)
+        {
+            Assert.Empty(_failures);
+        }
+        Assert.True(_sut.IsProfileRunning(pid));
+    }
+
+    [Fact]
+    public async Task StableRunBetweenRapidFailures_ResetsAttemptWindow()
+    {
+        // 2 rapid failures, then one stable run (resets the window), then 3 more rapid
+        // failures exhaust MaxAttempts = 3. Total = 6 starts; without the reset the
+        // exhaustion would have hit at start 3.
+        ProfilePortForwardSupervisor.StableRunThreshold = TimeSpan.FromMilliseconds(50);
+
+        var callCount = 0;
+        _fakePf.StartHandler = async (_, ct) =>
+        {
+            var n = Interlocked.Increment(ref callCount);
+            if (n == 3)
+            {
+                try { await Task.Delay(100, ct); }
+                catch (OperationCanceledException) { }
+            }
+            // All other calls return immediately = rapid drop.
+        };
+
+        var pid = Guid.NewGuid();
+        await _sut.StartProfileAsync(pid, [Entry("svc-r", "ns-r", "80", 8081)]);
+
+        var failure = await WaitForFailureAsync();
+        Assert.Equal(ProfilePortForwardSupervisor.MaxAttempts, failure.AttemptCount);
+        Assert.Equal(6, Volatile.Read(ref callCount));
     }
 
     [Fact]
