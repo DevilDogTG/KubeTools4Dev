@@ -85,7 +85,7 @@ public partial class App : Application
             var logger = sp.GetRequiredService<ILogger<PodDetailViewModel>>();
             var vm = new PodDetailViewModel(logger, svc);
             vm.Pod = pod;
-            vm.IsLogsView = tab == 0;
+            vm.SelectedViewIndex = tab;
             return vm;
         });
 

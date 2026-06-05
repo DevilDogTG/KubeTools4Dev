@@ -118,7 +118,7 @@
 										Header="Age"
 										Width="60"/>
 					
-					<DataGridTemplateColumn Header="Actions" Width="140">
+					<DataGridTemplateColumn Header="Actions" Width="200">
 						<DataGridTemplateColumn.CellTemplate>
 							<DataTemplate>
 								<StackPanel Orientation="Horizontal" Spacing="5" Margin="5,0" VerticalAlignment="Center">
@@ -129,6 +129,11 @@
 											Height="20"/>
 									<Button Content="Describe"
 											Command="{Binding $parent[UserControl].((vm:PodListViewModel)DataContext).ShowDescribeCommand}"
+											CommandParameter="{Binding}"
+											Padding="5,0"
+											Height="20"/>
+									<Button Content="Events"
+											Command="{Binding $parent[UserControl].((vm:PodListViewModel)DataContext).ShowEventsCommand}"
 											CommandParameter="{Binding}"
 											Padding="5,0"
 											Height="20"/>
