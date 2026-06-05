@@ -1,12 +1,18 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
+using Avalonia.Media;
 using KubeTools4Dev.ViewModels;
 using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 
 namespace KubeTools4Dev.Views;
 
 /// <summary>
-/// Popup window that displays pod logs and describe output.
+/// Popup window that displays pod logs, describe output, and events.
 /// Multiple instances can be opened simultaneously for side-by-side viewing.
+/// Log lines are rendered as severity-colored <see cref="Run"/> inlines (built here from
+/// <see cref="PodDetailViewModel.PodLogsText"/>) so text stays selectable across lines.
 /// </summary>
 public partial class PodDetailWindow : Window
 {
@@ -28,7 +34,11 @@ public partial class PodDetailWindow : Window
     {
         base.OnOpened(e);
         if (DataContext is PodDetailViewModel vm)
+        {
+            vm.PropertyChanged += OnViewModelPropertyChanged;
+            RebuildLogInlines(vm.PodLogsText);
             vm.Initialize();
+        }
     }
 
     /// <inheritdoc/>
@@ -36,7 +46,59 @@ public partial class PodDetailWindow : Window
     {
         base.OnClosed(e);
         if (DataContext is PodDetailViewModel vm)
+        {
+            vm.PropertyChanged -= OnViewModelPropertyChanged;
             vm.Dispose();
+        }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PodDetailViewModel.PodLogsText) && DataContext is PodDetailViewModel vm)
+            RebuildLogInlines(vm.PodLogsText);
+    }
+
+    /// <summary>
+    /// Re-renders the displayed log text as one <see cref="Run"/> per line, colored by
+    /// <see cref="LogLineClassifier"/>. Runs once per Channels batch (the same cadence the
+    /// previous plain-text binding updated at), not per line.
+    /// </summary>
+    private void RebuildLogInlines(string text)
+    {
+        var inlines = LogText.Inlines ??= new InlineCollection();
+        inlines.Clear();
+        if (text.Length == 0)
+            return;
+
+        var errorBrush = ResolveBrush("SemiColorDanger", Brushes.Crimson);
+        var warningBrush = ResolveBrush("SemiColorWarning", Brushes.Orange);
+
+        var lines = text.Split(Environment.NewLine);
+        var runs = new List<Inline>(lines.Length);
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var run = new Run(i < lines.Length - 1 ? lines[i] + Environment.NewLine : lines[i]);
+            switch (LogLineClassifier.Classify(lines[i]))
+            {
+                case LogSeverity.Error: run.Foreground = errorBrush; break;
+                case LogSeverity.Warning: run.Foreground = warningBrush; break;
+                case LogSeverity.Debug: run.Foreground = Brushes.Gray; break;
+            }
+            runs.Add(run);
+        }
+        inlines.AddRange(runs);
+    }
+
+    /// <summary>Resolves a theme color resource to a brush, falling back to a fixed color
+    /// when the resource is missing (e.g. a future theme swap).</summary>
+    private IBrush ResolveBrush(string key, IBrush fallback)
+    {
+        if (this.TryFindResource(key, ActualThemeVariant, out var value))
+        {
+            if (value is IBrush brush) return brush;
+            if (value is Color color) return new SolidColorBrush(color);
+        }
+        return fallback;
     }
 
     private void LogsScrollViewer_ScrollChanged(object? sender, ScrollChangedEventArgs e)
