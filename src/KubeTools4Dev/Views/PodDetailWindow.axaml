@@ -12,41 +12,96 @@
         WindowStartupLocation="CenterOwner"
         CanResize="True">
 
+    <Window.Styles>
+        <Style Selector="TextBlock.eventWarning">
+            <Setter Property="Foreground" Value="{DynamicResource SemiColorWarning}"/>
+        </Style>
+    </Window.Styles>
+
     <Grid RowDefinitions="Auto,*">
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="12,10,12,0" Spacing="6">
             <TextBlock Text="{Binding Pod.Name}" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
             <TextBlock Text="{Binding Pod.Namespace, StringFormat='[{0}]'}" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
             <ComboBox ItemsSource="{Binding Containers}"
                       SelectedItem="{Binding SelectedContainer}"
-                      IsVisible="{Binding HasMultipleContainers}"
+                      IsVisible="{Binding ShowContainerPicker}"
                       FontSize="12" MinHeight="26" Padding="8,2"
                       VerticalAlignment="Center" Margin="12,0,0,0"/>
         </StackPanel>
 
-        <!-- Logs panel -->
-        <ScrollViewer Grid.Row="1" Margin="10"
-                      x:Name="LogsScrollViewer"
-                      ScrollChanged="LogsScrollViewer_ScrollChanged"
-                      IsVisible="{Binding IsLogsView}">
-            <SelectableTextBlock Text="{Binding PodLogsText}"
+        <TabControl Grid.Row="1" Margin="10,4,10,10" SelectedIndex="{Binding SelectedViewIndex}">
+
+            <!-- Logs tab -->
+            <TabItem Header="Logs">
+                <ScrollViewer Margin="0,6,0,0"
+                              x:Name="LogsScrollViewer"
+                              ScrollChanged="LogsScrollViewer_ScrollChanged">
+                    <SelectableTextBlock Text="{Binding PodLogsText}"
+                                         FontFamily="Consolas"
+                                         FontSize="12"
+                                         TextWrapping="Wrap"/>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Describe tab -->
+            <TabItem Header="Describe">
+                <Grid Margin="0,6,0,0" RowDefinitions="Auto,*">
+                    <ProgressBar Grid.Row="0" IsIndeterminate="True" IsVisible="{Binding IsDescribeLoading}" Height="4" Margin="0,0,0,4"/>
+                    <ScrollViewer Grid.Row="1">
+                        <TextBox Text="{Binding PodDescribeText}"
+                                 IsReadOnly="True"
                                  FontFamily="Consolas"
                                  FontSize="12"
-                                 TextWrapping="Wrap"/>
-        </ScrollViewer>
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 Background="Transparent"
+                                 BorderThickness="0"/>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
 
-        <!-- Describe panel -->
-        <Grid Grid.Row="1" Margin="10" RowDefinitions="Auto,*" IsVisible="{Binding !IsLogsView}">
-            <ProgressBar Grid.Row="0" IsIndeterminate="True" IsVisible="{Binding IsDescribeLoading}" Height="4" Margin="0,0,0,4"/>
-            <ScrollViewer Grid.Row="1">
-                <TextBox Text="{Binding PodDescribeText}"
-                         IsReadOnly="True"
-                         FontFamily="Consolas"
-                         FontSize="12"
-                         TextWrapping="Wrap"
-                         AcceptsReturn="True"
-                         Background="Transparent"
-                         BorderThickness="0"/>
-            </ScrollViewer>
-        </Grid>
+            <!-- Events tab -->
+            <TabItem Header="Events">
+                <Grid Margin="0,6,0,0" RowDefinitions="Auto,Auto,*">
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                        <ProgressBar Grid.Column="0" IsIndeterminate="True" IsVisible="{Binding IsEventsLoading}"
+                                     Height="4" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <Button Grid.Column="1" Content="Refresh"
+                                Command="{Binding RefreshEventsCommand}"
+                                FontSize="12" Height="24" Padding="8,0"/>
+                    </Grid>
+
+                    <TextBlock Grid.Row="1" Text="{Binding EventsError}"
+                               IsVisible="{Binding HasEventsError}"
+                               Foreground="{DynamicResource SemiColorDanger}"
+                               FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                    <TextBlock Grid.Row="1" Text="No events for this pod."
+                               IsVisible="{Binding ShowNoEvents}"
+                               FontSize="12" Opacity="0.6" Margin="0,6,0,0"/>
+
+                    <ScrollViewer Grid.Row="2" Margin="0,6,0,0">
+                        <ItemsControl ItemsSource="{Binding PodEvents}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PodEventRow">
+                                    <Border BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="0,0,0,1" Padding="0,6">
+                                        <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,Auto,*,Auto">
+                                            <TextBlock Grid.Column="0" Text="{Binding Type}"
+                                                       Classes.eventWarning="{Binding IsWarning}"
+                                                       FontWeight="Bold" FontSize="12"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Reason}"
+                                                       FontWeight="SemiBold" FontSize="12" Margin="8,0,0,0"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding AgeDisplay}"
+                                                       FontSize="11" Opacity="0.6" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Row="1" Grid.ColumnSpan="4" Text="{Binding Message}"
+                                                       FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+        </TabControl>
     </Grid>
 </Window>

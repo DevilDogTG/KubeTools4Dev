@@ -1,9 +1,11 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -11,8 +13,10 @@ using System.Threading.Tasks;
 namespace KubeTools4Dev.ViewModels;
 
 /// <summary>
-/// View model for the pod detail popup window, managing log streaming and describe output.
+/// View model for the pod detail popup window, managing the Logs / Describe / Events tabs.
 /// Each instance is independent and owns its own lifecycle and cancellation token.
+/// Tab content loads lazily on first activation; logs keep streaming when the user
+/// switches away so the tail is intact on return.
 /// </summary>
 public partial class PodDetailViewModel(
     ILogger<PodDetailViewModel> logger,
@@ -21,12 +25,24 @@ public partial class PodDetailViewModel(
     /// <summary>Maximum number of log lines retained in the window.</summary>
     internal const int MaxLogLines = 1000;
 
+    /// <summary>Tab index of the Logs view.</summary>
+    internal const int LogsViewIndex = 0;
+
+    /// <summary>Tab index of the Describe view.</summary>
+    internal const int DescribeViewIndex = 1;
+
+    /// <summary>Tab index of the Events view.</summary>
+    internal const int EventsViewIndex = 2;
+
     private readonly ILogger<PodDetailViewModel> _logger = logger;
     private readonly IKubernetesService _kubeService = kubeService;
     private readonly List<string> _logLines = [];
     private CancellationTokenSource? _logStreamCts;
     private int _streamGeneration;
     private bool _initialized;
+    private bool _logsStarted;
+    private bool _describeLoaded;
+    private bool _eventsLoaded;
 
     [ObservableProperty]
     private string _windowTitle = string.Empty;
@@ -34,8 +50,15 @@ public partial class PodDetailViewModel(
     [ObservableProperty]
     private PodViewModel _pod = null!;
 
-    /// <summary>Gets or sets a value indicating whether this window shows logs (true) or describe (false).</summary>
-    public bool IsLogsView { get; set; }
+    /// <summary>The selected tab: <see cref="LogsViewIndex"/>, <see cref="DescribeViewIndex"/>,
+    /// or <see cref="EventsViewIndex"/>. Switching lazily loads the tab's content.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLogsView))]
+    [NotifyPropertyChangedFor(nameof(ShowContainerPicker))]
+    private int _selectedViewIndex;
+
+    /// <summary>Gets a value indicating whether the Logs tab is selected.</summary>
+    public bool IsLogsView => SelectedViewIndex == LogsViewIndex;
 
     /// <summary>The accumulated log text shown in the window (selectable for copying).</summary>
     [ObservableProperty]
@@ -44,6 +67,7 @@ public partial class PodDetailViewModel(
     /// <summary>Names of the pod's containers; a picker is shown when there is more than one.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMultipleContainers))]
+    [NotifyPropertyChangedFor(nameof(ShowContainerPicker))]
     private IReadOnlyList<string> _containers = [];
 
     /// <summary>The container whose logs are streamed. Changing it restarts the stream.</summary>
@@ -53,45 +77,96 @@ public partial class PodDetailViewModel(
     /// <summary>Gets a value indicating whether the container picker should be visible.</summary>
     public bool HasMultipleContainers => Containers.Count > 1;
 
+    /// <summary>Gets a value indicating whether the container picker should be visible
+    /// (multi-container pod and the Logs tab is selected).</summary>
+    public bool ShowContainerPicker => HasMultipleContainers && IsLogsView;
+
     [ObservableProperty]
     private string _podDescribeText = string.Empty;
 
     [ObservableProperty]
     private bool _isDescribeLoading;
 
+    /// <summary>The pod's events shown in the Events tab, newest first.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowNoEvents))]
+    private IReadOnlyList<PodEventRow> _podEvents = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowNoEvents))]
+    private bool _isEventsLoading;
+
+    /// <summary>Error text for a failed events load; empty when the last load succeeded.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasEventsError))]
+    [NotifyPropertyChangedFor(nameof(ShowNoEvents))]
+    private string _eventsError = string.Empty;
+
+    /// <summary>Gets a value indicating whether the last events load failed.</summary>
+    public bool HasEventsError => EventsError.Length > 0;
+
+    /// <summary>Gets a value indicating whether the "no events" empty state should be shown.</summary>
+    public bool ShowNoEvents => !IsEventsLoading && !HasEventsError && PodEvents.Count == 0;
+
     /// <summary>
-    /// Starts the initial operation (log streaming or describe load) based on <see cref="IsLogsView"/>.
-    /// Must be called after <see cref="Pod"/> and <see cref="IsLogsView"/> are set.
+    /// Starts the initially selected tab's load. Must be called after <see cref="Pod"/> and
+    /// <see cref="SelectedViewIndex"/> are set.
     /// </summary>
     public void Initialize()
     {
-        WindowTitle = IsLogsView
-            ? $"Logs — {Pod.Name} [{Pod.Namespace}]"
-            : $"Describe — {Pod.Name} [{Pod.Namespace}]";
-
-        if (IsLogsView)
-        {
-            // Multi-container pods require an explicit container for the log API; default to
-            // the first one. _initialized stays false so this assignment does not restart the
-            // (not yet started) stream via OnSelectedContainerChanged.
-            Containers = Pod.ContainerNames;
-            SelectedContainer = Containers.Count > 0 ? Containers[0] : null;
-            _initialized = true;
-            _ = StartLogStreamAsync();
-        }
-        else
-        {
-            _initialized = true;
-            _ = LoadDescribeAsync();
-        }
+        // Multi-container pods require an explicit container for the log API; default to
+        // the first one. _initialized stays false so this assignment does not restart the
+        // (not yet started) stream via OnSelectedContainerChanged.
+        Containers = Pod.ContainerNames;
+        SelectedContainer = Containers.Count > 0 ? Containers[0] : null;
+        _initialized = true;
+        UpdateWindowTitle();
+        LoadSelectedView();
     }
 
     /// <summary>Restarts the log stream when the user picks a different container.</summary>
     partial void OnSelectedContainerChanged(string? value)
     {
-        if (_initialized && IsLogsView)
+        if (_initialized && _logsStarted)
             _ = StartLogStreamAsync();
     }
+
+    /// <summary>Lazily loads the newly selected tab's content.</summary>
+    partial void OnSelectedViewIndexChanged(int value)
+    {
+        if (!_initialized)
+            return;
+
+        UpdateWindowTitle();
+        LoadSelectedView();
+    }
+
+    /// <summary>Kicks off the selected tab's load unless it has already run.</summary>
+    private void LoadSelectedView()
+    {
+        switch (SelectedViewIndex)
+        {
+            case LogsViewIndex when !_logsStarted:
+                _logsStarted = true;
+                _ = StartLogStreamAsync();
+                break;
+            case DescribeViewIndex when !_describeLoaded:
+                _describeLoaded = true;
+                _ = LoadDescribeAsync();
+                break;
+            case EventsViewIndex when !_eventsLoaded:
+                _eventsLoaded = true;
+                _ = LoadEventsAsync();
+                break;
+        }
+    }
+
+    private void UpdateWindowTitle() => WindowTitle = SelectedViewIndex switch
+    {
+        DescribeViewIndex => $"Describe — {Pod.Name} [{Pod.Namespace}]",
+        EventsViewIndex => $"Events — {Pod.Name} [{Pod.Namespace}]",
+        _ => $"Logs — {Pod.Name} [{Pod.Namespace}]",
+    };
 
     /// <summary>Dispatches an action to the UI thread. Override in derived classes to control dispatch, e.g. in unit tests.</summary>
     protected virtual Task DispatchToUIAsync(Action action) =>
@@ -225,6 +300,37 @@ public partial class PodDetailViewModel(
         }
     }
 
+    /// <summary>Gets the current UTC instant. Override in derived classes to control time, e.g. in unit tests.</summary>
+    protected virtual DateTime UtcNow => DateTime.UtcNow;
+
+    /// <summary>Reloads the Events tab on user request.</summary>
+    [RelayCommand]
+    private Task RefreshEvents() => LoadEventsAsync();
+
+    internal async Task LoadEventsAsync()
+    {
+        IsEventsLoading = true;
+        EventsError = string.Empty;
+
+        try
+        {
+            var events = await _kubeService.GetPodEventsAsync(Pod.Namespace, Pod.Name);
+            var now = UtcNow;
+            PodEvents = events
+                .Select(e => new PodEventRow(e.Type, e.Reason, e.Message, e.Count, e.FormatAge(now), e.IsWarning))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            LogEventsError(ex, Pod.Name);
+            EventsError = $"Error loading events: {DescribeException(ex)}";
+        }
+        finally
+        {
+            IsEventsLoading = false;
+        }
+    }
+
     [LoggerMessage(Level = LogLevel.Error, Message = "Error streaming logs for {PodName}")]
     private partial void LogStreamError(Exception ex, string podName);
 
@@ -233,6 +339,9 @@ public partial class PodDetailViewModel(
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error loading describe output for {PodName}")]
     private partial void LogDescribeError(Exception ex, string podName);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Error loading events for {PodName}")]
+    private partial void LogEventsError(Exception ex, string podName);
 
     /// <inheritdoc/>
     public void Dispose()

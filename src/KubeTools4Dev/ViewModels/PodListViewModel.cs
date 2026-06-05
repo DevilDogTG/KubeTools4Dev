@@ -390,10 +390,13 @@ public partial class PodListViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
-    private void ShowLogs(PodViewModel pod) => OpenPodDetailWindow(pod, 0);
+    private void ShowLogs(PodViewModel pod) => OpenPodDetailWindow(pod, PodDetailViewModel.LogsViewIndex);
 
     [RelayCommand]
-    private void ShowDescribe(PodViewModel pod) => OpenPodDetailWindow(pod, 1);
+    private void ShowDescribe(PodViewModel pod) => OpenPodDetailWindow(pod, PodDetailViewModel.DescribeViewIndex);
+
+    [RelayCommand]
+    private void ShowEvents(PodViewModel pod) => OpenPodDetailWindow(pod, PodDetailViewModel.EventsViewIndex);
 
     private void OpenPodDetailWindow(PodViewModel pod, int tabIndex)
     {
