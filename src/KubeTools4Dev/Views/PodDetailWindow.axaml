@@ -16,6 +16,11 @@
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="12,10,12,0" Spacing="6">
             <TextBlock Text="{Binding Pod.Name}" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
             <TextBlock Text="{Binding Pod.Namespace, StringFormat='[{0}]'}" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
+            <ComboBox ItemsSource="{Binding Containers}"
+                      SelectedItem="{Binding SelectedContainer}"
+                      IsVisible="{Binding HasMultipleContainers}"
+                      FontSize="12" MinHeight="26" Padding="8,2"
+                      VerticalAlignment="Center" Margin="12,0,0,0"/>
         </StackPanel>
 
         <!-- Logs panel -->
@@ -23,13 +28,10 @@
                       x:Name="LogsScrollViewer"
                       ScrollChanged="LogsScrollViewer_ScrollChanged"
                       IsVisible="{Binding IsLogsView}">
-            <ItemsControl ItemsSource="{Binding PodLogsList}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding}" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <SelectableTextBlock Text="{Binding PodLogsText}"
+                                 FontFamily="Consolas"
+                                 FontSize="12"
+                                 TextWrapping="Wrap"/>
         </ScrollViewer>
 
         <!-- Describe panel -->
