@@ -58,9 +58,10 @@ public interface IKubernetesService
     /// </summary>
     /// <param name="namespaceName">Name of the namespace.</param>
     /// <param name="podName">Name of the pod.</param>
+    /// <param name="container">Container to stream logs from; required by the API when the pod has more than one container. <c>null</c> lets the API pick the only container.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>An async enumerable of log lines.</returns>
-    IAsyncEnumerable<string> StreamPodLogsAsync(string namespaceName, string podName, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<string> StreamPodLogsAsync(string namespaceName, string podName, string? container = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets the pod describe asynchronous.
