@@ -80,6 +80,12 @@ public partial class PodViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Gets the names of the pod's containers (init containers excluded), in spec order.
+    /// </summary>
+    public System.Collections.Generic.IReadOnlyList<string> ContainerNames =>
+        _pod.Spec?.Containers?.Select(c => c.Name).ToList() ?? [];
+
+    /// <summary>
     /// Refreshes the age.
     /// </summary>
     public void RefreshAge()

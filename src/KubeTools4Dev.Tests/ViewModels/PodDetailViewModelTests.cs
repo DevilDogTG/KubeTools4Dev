@@ -6,6 +6,7 @@ using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,32 +21,41 @@ public class PodDetailViewModelTests
     private readonly ILogger<PodDetailViewModel> _logger = Substitute.For<ILogger<PodDetailViewModel>>();
     private readonly IKubernetesService _kubeService = Substitute.For<IKubernetesService>();
 
-    private TestableViewModel MakeVm(bool isLogsView = true)
+    private TestableViewModel MakeVm(bool isLogsView = true, params string[] containers)
     {
         var vm = new TestableViewModel(_logger, _kubeService)
         {
-            Pod = MakePod("test-pod", "default"),
+            Pod = MakePod("test-pod", "default", containers),
             IsLogsView = isLogsView
         };
         return vm;
     }
 
-    private static PodViewModel MakePod(string name, string ns)
+    private static PodViewModel MakePod(string name, string ns, params string[] containers)
     {
         var pod = new V1Pod
         {
             Metadata = new V1ObjectMeta { Name = name, NamespaceProperty = ns },
-            Status = new V1PodStatus { Phase = "Running" }
+            Status = new V1PodStatus { Phase = "Running" },
+            Spec = new V1PodSpec
+            {
+                Containers = (containers.Length > 0 ? containers : new[] { "main" })
+                    .Select(c => new V1Container { Name = c })
+                    .ToList()
+            }
         };
         return new PodViewModel(pod);
     }
+
+    private IEnumerable<string> LogLines(PodDetailViewModel vm)
+        => vm.PodLogsText.Split(Environment.NewLine);
 
     // --- Initialize ---
 
     [Fact]
     public void Initialize_SetsLogsTitle_WhenIsLogsViewTrue()
     {
-        _kubeService.StreamPodLogsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _kubeService.StreamPodLogsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(EmptyLines());
 
         var vm = MakeVm(isLogsView: true);
@@ -63,6 +73,33 @@ public class PodDetailViewModelTests
         vm.Initialize();
 
         Assert.Equal("Describe — test-pod [default]", vm.WindowTitle);
+    }
+
+    [Fact]
+    public void Initialize_SelectsFirstContainer_AndHidesPickerForSingleContainer()
+    {
+        _kubeService.StreamPodLogsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(EmptyLines());
+
+        var vm = MakeVm(isLogsView: true, "app");
+        vm.Initialize();
+
+        Assert.Equal("app", vm.SelectedContainer);
+        Assert.False(vm.HasMultipleContainers);
+    }
+
+    [Fact]
+    public void Initialize_ShowsPickerForMultiContainerPod()
+    {
+        _kubeService.StreamPodLogsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(EmptyLines());
+
+        var vm = MakeVm(isLogsView: true, "app", "sidecar");
+        vm.Initialize();
+
+        Assert.True(vm.HasMultipleContainers);
+        Assert.Equal(["app", "sidecar"], vm.Containers);
+        Assert.Equal("app", vm.SelectedContainer);
     }
 
     // --- LoadDescribeAsync ---
@@ -107,38 +144,86 @@ public class PodDetailViewModelTests
     [Fact]
     public async Task StartLogStreamAsync_AddsConnectingMessage_Then_LogLines()
     {
-        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<CancellationToken>())
+        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(Lines("line-a", "line-b"));
 
         var vm = MakeVm(isLogsView: true);
         await vm.StartLogStreamAsync();
 
-        Assert.Contains("line-a", vm.PodLogsList);
-        Assert.Contains("line-b", vm.PodLogsList);
+        Assert.Contains("line-a", LogLines(vm));
+        Assert.Contains("line-b", LogLines(vm));
+        Assert.Contains("Connecting to log stream", vm.PodLogsText);
     }
 
     [Fact]
-    public async Task StartLogStreamAsync_CapsListAt1000Lines()
+    public async Task StartLogStreamAsync_CapsTextAtMaxLogLines()
     {
-        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<CancellationToken>())
-            .Returns(NLines(1005));
+        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(NLines(PodDetailViewModel.MaxLogLines + 5));
 
         var vm = MakeVm(isLogsView: true);
         await vm.StartLogStreamAsync();
 
-        Assert.True(vm.PodLogsList.Count <= 1001);
+        var lines = LogLines(vm).ToList();
+        Assert.True(lines.Count <= PodDetailViewModel.MaxLogLines);
+        Assert.Contains($"line-{PodDetailViewModel.MaxLogLines + 4}", lines);
+        Assert.DoesNotContain("line-0", lines);
     }
 
     [Fact]
-    public async Task StartLogStreamAsync_AddsErrorLine_OnException()
+    public async Task StartLogStreamAsync_AddsErrorLineWithExceptionType_OnException()
     {
-        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<CancellationToken>())
+        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(ThrowingLines(new InvalidOperationException("stream broken")));
 
         var vm = MakeVm(isLogsView: true);
         await vm.StartLogStreamAsync();
 
-        Assert.Contains(vm.PodLogsList, l => l.Contains("stream broken"));
+        Assert.Contains("stream broken", vm.PodLogsText);
+        Assert.Contains(nameof(InvalidOperationException), vm.PodLogsText);
+    }
+
+    [Fact]
+    public async Task StartLogStreamAsync_PassesSelectedContainer()
+    {
+        _kubeService.StreamPodLogsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(EmptyLines());
+
+        var vm = MakeVm(isLogsView: true, "app", "sidecar");
+        vm.Initialize();
+        await Task.Delay(50); // let the fire-and-forget initial stream settle
+
+        _ = _kubeService.Received().StreamPodLogsAsync("default", "test-pod", "app", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ChangingSelectedContainer_RestartsStreamWithNewContainer()
+    {
+        _kubeService.StreamPodLogsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(EmptyLines());
+
+        var vm = MakeVm(isLogsView: true, "app", "sidecar");
+        vm.Initialize();
+        await Task.Delay(50);
+
+        vm.SelectedContainer = "sidecar";
+        await Task.Delay(50);
+
+        _ = _kubeService.Received().StreamPodLogsAsync("default", "test-pod", "sidecar", Arg.Any<CancellationToken>());
+    }
+
+    // --- DescribeException ---
+
+    [Fact]
+    public void DescribeException_WalksInnerChain()
+    {
+        var ex = new InvalidOperationException("outer",
+            new System.Xml.XmlException("xml is unhappy"));
+
+        var result = PodDetailViewModel.DescribeException(ex);
+
+        Assert.Contains("InvalidOperationException: outer", result);
+        Assert.Contains("XmlException: xml is unhappy", result);
     }
 
     // --- Dispose ---
@@ -154,8 +239,8 @@ public class PodDetailViewModelTests
     [Fact]
     public async Task Dispose_CancelsActiveStream()
     {
-        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<CancellationToken>())
-            .Returns(x => BlockingLines(x.ArgAt<CancellationToken>(2)));
+        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(x => BlockingLines(x.ArgAt<CancellationToken>(3)));
 
         var vm = MakeVm(isLogsView: true);
         var streamTask = vm.StartLogStreamAsync();
