@@ -139,16 +139,19 @@ public class KubernetesService(
     /// </summary>
     /// <param name="namespaceName">Name of the namespace.</param>
     /// <param name="podName">Name of the pod.</param>
+    /// <param name="container">Container to stream logs from; required by the API when the pod has more than one container. <c>null</c> lets the API pick the only container.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>An async enumerable of log lines.</returns>
     public async IAsyncEnumerable<string> StreamPodLogsAsync(
-        string namespaceName, 
-        string podName, 
+        string namespaceName,
+        string podName,
+        string? container = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         using var stream = await Client.CoreV1.ReadNamespacedPodLogAsync(
             name: podName,
             namespaceParameter: namespaceName,
+            container: container,
             follow: true,
             tailLines: 1000,
             cancellationToken: cancellationToken);
