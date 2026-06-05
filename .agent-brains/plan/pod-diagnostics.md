@@ -33,8 +33,8 @@ Turn the pod detail window from a raw log pipe into a troubleshooting tool: filt
 - [x] C1: Bump Node-20 actions in `publish.yml` (and check `release.yml`/`tag.yml`) to Node-24 majors: `actions/checkout`, `actions/setup-dotnet`, `softprops/action-gh-release`. Verify with a workflow lint/dry run.
 
 ### D — Ship
-- [ ] D1: `sk-finish-feature` preflight + PR; `sk-pr-review` pass.
-- [ ] D2: Update memory/overview + backlog; release v1.4.0 via `sk-release` when approved.
+- [x] D1: `sk-finish-feature` preflight + PR; `sk-pr-review` pass.
+- [ ] D2: Update memory/overview + backlog; release v1.4.0 via `sk-release` when approved. _(memory refreshed 2026-06-05; release pending)_
 
 ## Progress Log
 _Updated as steps complete._
@@ -47,3 +47,4 @@ _Updated as steps complete._
 - 2026-06-05 — A2+A5 done (commit 7028d0f): `LogLineClassifier` (pure static, 80-char scan window, Error>Warning>Debug precedence) covering bracketed/MEL-console/Serilog/logfmt/full-word/panic formats; code-behind renders `PodLogsText` → severity-colored `Run` inlines on `SelectableTextBlock` (cross-line selection preserved; rebuild at Channels-batch cadence; `SemiColorDanger`/`SemiColorWarning` with fixed fallbacks). 28 tests. **All A+B+C items complete: 223 tests (102 Core + 121 UI), 0W/0E. Remaining: user smoke-test, then D1 (finish-feature → PR) and D2.**
 - 2026-06-05 — D1 (part 1): `sk-finish-feature` run — preflight green (clean tree, 0 behind main, build 0W/0E, 223/223 tests). Draft **PR #61** opened with head-sha marker `695d50f`. Next: `sk-pr-review` pass.
 - 2026-06-05 — D1 (part 2): `sk-pr-review` round 1 → **needs-work**: app theme is Material (not Semi) — `SemiColorWarning`/`SemiColorBorder` DynamicResource keys didn't exist, so Events-tab warning coloring + row separators rendered with no effect (`SemiColorDanger` was a manually defined app resource all along). Fixed in `ee359ec` (brushes defined following the SemiColorDanger convention) + documented the convergent ScrollChanged↔Follow loop. Round 2 → **approved** at `ee359ec`. D1 complete; PR #61 still draft, ready for user smoke-test then merge.
+- 2026-06-05 — **PR #61 rebase-merged into main** (`a322eb2`, merged 09:16Z); remote branch deleted, stale refs pruned. Memory/backlog refreshed. Remaining: v1.4.0 release via `sk-release`.

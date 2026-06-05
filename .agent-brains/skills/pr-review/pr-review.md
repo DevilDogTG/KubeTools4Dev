@@ -1,7 +1,7 @@
 ---
 id: pr-review
 name: PR Code Review
-version: 1.0
+version: 1.1
 compatibility: [claude, gemini, copilot, codex]
 ---
 
@@ -55,6 +55,11 @@ Per global §6.7, do not invoke automatically. Wait for explicit user confirmati
    - Search for `<!-- head-sha: SHA -->` in comments that contain `finish-feature-update`.
    - Use the last matching SHA as the diff base.
    - Fall back to `main` if no marker found.
+   - **First review** (no `pr-review-findings` comment exists yet): use `main` as the base
+     regardless of the marker — on a fresh PR the `finish-feature` head-sha equals HEAD, which
+     would yield an empty diff. The marker-based base only applies to **re-reviews**, where it
+     scopes the diff to commits pushed since the last `finish-feature` update. (Trap found and
+     worked around on PR #61, 2026-06-05.)
 
 7. Extract **last review state** from the latest `pr-review-findings` comment:
    - `<!-- review-sha: SHA -->` — SHA when last review ran.
