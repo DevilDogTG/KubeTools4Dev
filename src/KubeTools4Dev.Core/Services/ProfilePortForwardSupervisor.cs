@@ -29,6 +29,15 @@ public sealed partial class ProfilePortForwardSupervisor(
     /// <summary>Maximum number of attempts before an entry is marked <see cref="SupervisedForwardState.Failed"/>.</summary>
     internal static int MaxAttempts { get; set; } = 10;
 
+    /// <summary>
+    /// Minimum duration a forward must have been running for its preceding attempt count to be
+    /// forgiven. A forward that ran at least this long before dropping resets the retry window,
+    /// so occasional drops over a long app run (sleep/resume, API blips, pod redeploys) never
+    /// accumulate into <see cref="SupervisedForwardState.Failed"/> — only rapid consecutive
+    /// failures exhaust the budget.
+    /// </summary>
+    internal static TimeSpan StableRunThreshold { get; set; } = TimeSpan.FromMinutes(2);
+
     /// <summary>Keyed by <c>"{ns}/{svc}:{targetPort}"</c> — identity of a service-to-forward.</summary>
     private readonly ConcurrentDictionary<string, SupervisedForward> _entries = new();
 
@@ -179,6 +188,7 @@ public sealed partial class ProfilePortForwardSupervisor(
             SetState(sf, SupervisedForwardState.Starting, lastError);
 
             using var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(stopToken);
+            var runTimer = System.Diagnostics.Stopwatch.StartNew();
 
             try
             {
@@ -189,11 +199,12 @@ public sealed partial class ProfilePortForwardSupervisor(
                     sf.TargetPort,
                     sf.LocalPort,
                     attemptCts.Token).ConfigureAwait(false);
+                runTimer.Stop();
 
                 if (stopToken.IsCancellationRequested) break;
 
                 // Returned cleanly without cancellation = unexpected drop.
-                LogForwardDropped(sf.Key, attempt);
+                LogForwardDropped(sf.Key, attempt, runTimer.Elapsed.TotalSeconds);
                 lastError = null;
             }
             catch (OperationCanceledException) when (stopToken.IsCancellationRequested)
@@ -202,11 +213,21 @@ public sealed partial class ProfilePortForwardSupervisor(
             }
             catch (Exception ex)
             {
+                runTimer.Stop();
                 lastError = ex.Message;
-                LogForwardCrashed(sf.Key, attempt, ex.Message);
+                LogForwardCrashed(sf.Key, attempt, runTimer.Elapsed.TotalSeconds, ex.Message);
             }
 
             if (stopToken.IsCancellationRequested) break;
+
+            // A forward that ran stably before this drop must not consume the retry budget —
+            // otherwise rare drops over a long app run accumulate into a permanent Failed.
+            if (runTimer.Elapsed >= StableRunThreshold)
+            {
+                LogForwardRetryWindowReset(sf.Key, runTimer.Elapsed.TotalMinutes, attempt);
+                attempt = 0;
+                sf.AttemptCount = 0;
+            }
 
             if (attempt >= MaxAttempts)
             {
@@ -244,7 +265,8 @@ public sealed partial class ProfilePortForwardSupervisor(
 
     private static TimeSpan ComputeBackoff(int attempt)
     {
-        var index = Math.Min(attempt - 1, BackoffSchedule.Count - 1);
+        // attempt can be 0 right after a stable-run reset — clamp to the first entry.
+        var index = Math.Clamp(attempt - 1, 0, BackoffSchedule.Count - 1);
         return BackoffSchedule[index];
     }
 
