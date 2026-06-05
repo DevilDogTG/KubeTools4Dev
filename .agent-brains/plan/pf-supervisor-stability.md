@@ -1,6 +1,6 @@
 # Plan: Port-Forward Supervisor Stability Reset
 
-**Status:** active
+**Status:** complete
 **Created:** 2026-06-05
 **Branch:** bugfix/pf-supervisor-attempt-reset
 
@@ -13,11 +13,12 @@ A long-running supervised port-forward must survive occasional drops indefinitel
 Secondary: manual (unsupervised) forwards — `ServiceViewModel.StartForwarding` (lines 332-356) — never update status when `StartServicePortForwardAsync` *returns cleanly* (e.g., `AddressAlreadyInUse` break in `PortForwardService.cs:147-151`): UI shows zombie "Forwarding" on a dead listener.
 
 ## Checklist
-- [ ] S1 Add `StableRunThreshold` (internal static, default 2 min) to `ProfilePortForwardSupervisor`. In `RunSupervisedAsync`, time each `StartServicePortForwardAsync` call; if it ran ≥ threshold before dropping, reset `attempt = 0` (the drop that follows counts as attempt 1 of a fresh window). Log the reset.
-- [ ] S2 Include run-duration in `LogForwardDropped` / `LogForwardCrashed` so future drop diagnosis has data.
-- [ ] S3 Manual-path zombie fix: in `ServiceViewModel.StartForwarding`, after `await StartServicePortForwardAsync` returns without cancellation, post `Status = "Stopped"`, `IsForwarding = false`, stop timer.
-- [ ] S4 Tests (Core): (a) forward runs ≥ threshold then drops repeatedly > MaxAttempts times → never reaches `Failed`, attempt counter observed resetting; (b) rapid failures (< threshold) still exhaust at 10 → `Failed`; (c) reset logs snapshot state correctly. Tests (UI): manual clean-return → Status "Stopped" + toggle off. Use existing `FakePortForwardService` / supervisor test patterns (`ProfilePortForwardSupervisorTests.cs`).
-- [ ] S5 Preflight + PR via sk-finish-feature.
+- [x] S1 `StableRunThreshold` (internal static, default 2 min) added; `RunSupervisedAsync` times each run (Stopwatch) and resets `attempt = 0` after a stable run; `ComputeBackoff` clamps post-reset attempt 0 (`Math.Clamp` — would have crashed with `BackoffSchedule[-1]` otherwise); reset logged via `LogForwardRetryWindowReset`.
+- [x] S2 Run-duration added to `LogForwardDropped` / `LogForwardCrashed`.
+- [x] S3 Manual-path zombie fix in `ServiceViewModel`: clean return without cancellation toggles the row off ("Stopped"). Bonus: crash path no longer overwrites "Failed" with "Stopped"; post-cancel races no longer flash "Failed". Added `DispatchToUI`/`StartTimer`/`StopTimer` virtual seams.
+- [x] S4 Tests: Core +2 (`StableRun_DoesNotConsumeRetryBudget`, `StableRunBetweenRapidFailures_ResetsAttemptWindow`, flake-checked 4×), UI +3 (`ServiceViewModelTests`: clean-return / crash / user-stop). Plus `ClusterNodeViewModelTests.WaitForAsync` hardened against concurrent-mutation flake.
+- [x] S5 PR #56 — `sk-pr-review` ✅ approved at `ba4bdbb` (0🔴/0🟡/3🔵); rebase-merged 2026-06-05.
 
 ## Progress Log
 - 2026-06-05: Plan created from session-start triage. Root cause verified by direct code reading.
+- 2026-06-05: S1–S4 done in two atomic commits (`f8d2145` core, `6b440d4` ui) + flaky-test fix; PR #56 approved + rebase-merged (lands on main as `db1f9d1`/`88b839b`/`1d3825a`). Shipped in v1.3.6.

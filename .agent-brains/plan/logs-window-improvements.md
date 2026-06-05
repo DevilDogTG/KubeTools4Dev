@@ -1,6 +1,6 @@
 # Plan: Logs Window Improvements (selectable text + open-error fixes)
 
-**Status:** active
+**Status:** complete
 **Created:** 2026-06-05
 **Branch:** feature/logs-window-improvements
 
@@ -14,11 +14,12 @@
 - `PodDetailViewModel.StartLogStreamAsync` (lines 62-95) catches all and shows only `ex.Message` — type/inner chain lost.
 
 ## Checklist
-- [ ] L1 Selectable logs: replace per-line `ItemsControl`/`TextBlock` with a single `SelectableTextBlock` bound to a joined `PodLogsText` string (keeps the existing `ScrollViewer` auto-scroll code-behind working; allows cross-line selection + Ctrl+C). ViewModel keeps the 1000-line ring internally; rebuild text on append (batch if perf demands).
-- [ ] L2 Container support: extend `StreamPodLogsAsync` with optional `container` param. `PodDetailViewModel` loads pod's container list; if >1, show a ComboBox in the logs window header to pick the container (default: first); switching restarts the stream.
-- [ ] L3 Error diagnostics: in `StartLogStreamAsync` catch, surface `ex.GetType().Name` + walk inner exceptions into the UI message; log full exception via `LogStreamError`. (Captures the real "XML conversion" error if it recurs.)
-- [ ] L4 Tests: update existing `PodDetailViewModel` tests for `PodLogsText`; add multi-container default-selection + restart-on-switch tests; error-message format test.
-- [ ] L5 Preflight + PR via sk-finish-feature.
+- [x] L1 Selectable logs: `SelectableTextBlock` bound to `PodLogsText`; 1000-line ring buffer; appends batched via `System.Threading.Channels` (one text rebuild per drained batch — review fix); stream-generation stamp guards stale UI lambdas on container switch (review fix).
+- [x] L2 Container support: `StreamPodLogsAsync(…, string? container = null, …)`; header ComboBox visible when >1 container; first selected by default; switch restarts the stream. `PodViewModel.ContainerNames` added.
+- [x] L3 Error diagnostics: `DescribeException` walks the inner-exception chain (type + message per level) and appends the K8s API response body from `HttpOperationException` (carries the real reason, e.g. "a container name must be specified"); trailing cancel-race catch logs at debug level (review fix).
+- [x] L4 Tests: PodDetailViewModel suite reworked for `PodLogsText` + 5 new tests (picker default/visibility, container pass-through, restart-on-switch, error detail); deterministic lock-protected polling instead of `Task.Delay` waits (review fix); flake-checked 5×.
+- [x] L5 PR #57 — `sk-pr-review` first pass ⚠️ needs-work at `68da20e` (3🟡/2🔵); all findings fixed in `f70e1a6`; re-review ✅ approved; rebase-merged 2026-06-05.
 
 ## Progress Log
 - 2026-06-05: Plan created from session-start triage.
+- 2026-06-05: L1–L4 done (`05901fa` core, `68da20e` ui). Review findings addressed in `f70e1a6` (generation stamp, channel batching, deterministic test waits). PR #57 approved + rebase-merged. Shipped in v1.3.6.
