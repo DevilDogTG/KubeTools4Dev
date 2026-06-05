@@ -131,6 +131,7 @@ Contributor workflows are managed as AI agent skills stored in [`.agent-brains/s
 |-------|-------------|
 | `sk-finish-feature` | Runs preflights (clean tree, rebase from main, build, test) then creates or updates the GitHub PR with an AI-generated description. |
 | `sk-pr-review` | Reviews the PR diff with AI and posts structured findings (🔴 Critical / 🟡 Warning / 🔵 Info) as a GitHub comment. |
+| `sk-release` | Analyzes changes since the last tag, recommends the version bump (major/minor/patch), generates release notes, and drives release → tag → publish end-to-end. |
 
 ## Author
 

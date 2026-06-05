@@ -22,6 +22,10 @@ mono_crash.*
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
+# Agent-brains skill folder "release" is source, not build output — re-include
+# it from the [Rr]elease/ pattern above.
+!.agent-brains/skills/release/
+!.agent-brains/skills/release/**
 x64/
 x86/
 [Ww][Ii][Nn]32/

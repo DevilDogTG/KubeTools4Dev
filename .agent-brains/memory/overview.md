@@ -12,6 +12,7 @@ KubeTools4Dev is a cross-platform desktop application built with Avalonia UI and
 Trunk-based development off `main`.
 - **Release workflow**: `sk-finish-feature` agent skill — runs preflight checks (clean tree, rebase from main, `-warnaserror` build, `dotnet test`) then creates/updates the PR via `gh`.
 - **PR review**: `sk-pr-review` agent skill — reads `<!-- finish-feature-update -->` marker for base SHA, runs AI code review, posts `<!-- pr-review-findings -->` comment with 🔴/🟡/🔵 severity findings and markers. Detects re-run guard via `review-sha`.
+- **Release**: `sk-release` agent skill (added 2026-06-05) — analyzes commits/PRs since the last tag, recommends the bump type (Conventional Commits: breaking→major, feat→minor, else patch), generates user-facing release notes, dispatches `release.yml`, merges the release PR, and verifies tag + publish + artifacts. Includes the manual-PR recovery path for the "Open PR" failure mode.
 - **Version Management**: Uses a hybrid model where both `version.json` (at root) and `src/KubeTools4Dev/KubeTools4Dev.csproj` are maintained.
 - **Automated Releases**:
   - `release.yml`: Manual trigger for version bumping (patch/minor/major). Updates both version files and opens a release PR.
