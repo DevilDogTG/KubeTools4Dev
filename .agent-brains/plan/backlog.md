@@ -1,17 +1,19 @@
 # Backlog
 
 ## Pending
-_(none)_
+- **GitHub Actions Node 20 deprecation** — publish.yml run annotations (v1.3.6): `actions/checkout@v4`, `actions/setup-dotnet@v4`, `softprops/action-gh-release@v2` run on Node 20; GitHub forces Node 24 starting **2026-06-16** and removes Node 20 from runners **2026-09-16**. Bump action versions (or set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` and verify) before the June cutoff.
 
 ## In Progress
-- [linux-installer](./linux-installer.md) — Phase A + Phase B + B7 end-to-end test all complete as of 2026-06-04 (v1.3.5 seeded the apt repo successfully). Only **B6** remains: replace the manual `.deb` download instructions in the README with the apt-source `signed-by` snippet from Part 3 of `docs/maintainer/apt-repo-setup.md`. _2026-06-05: B6 in progress on `docs/readme-apt-source-install`._
-- [pf-supervisor-stability](./pf-supervisor-stability.md) — long-running supervised forwards eventually hit `Failed (10/10)` because the retry counter never resets after a stable run; user must stop/start. Fix: stability-threshold attempt reset + manual-path zombie-status fix. Created 2026-06-05.
-- [logs-window-improvements](./logs-window-improvements.md) — selectable/copyable log text (SelectableTextBlock) + multi-container log support + richer stream-error diagnostics (suspected cause of the reported "XML conversion" open error). Created 2026-06-05.
+_(none)_
 
 ## Atomic Plans
 _(none)_
 
 ## Completed (this session)
+- [linux-installer](./linux-installer.md) — full Linux install story: `.deb` per release + GPG-signed apt repo on GitHub Pages. B6 (README apt-source snippet) closed the plan via PR #55 ✅ merged 2026-06-05. All items A1–A4, B1–B7, C1 complete.
+- [pf-supervisor-stability](./pf-supervisor-stability.md) — supervised forwards no longer accumulate into `Failed (10/10)`: retry window resets after a stable run (≥2 min); manual-forward zombie "Forwarding" status fixed. PR #56 ✅ approved + merged 2026-06-05. Shipped in v1.3.6.
+- [logs-window-improvements](./logs-window-improvements.md) — selectable/copyable log text, multi-container picker (root cause of the "error opening logs"), full exception-chain diagnostics. PR #57 ✅ approved (after one needs-work round) + merged 2026-06-05. Shipped in v1.3.6.
+- **Release v1.3.6** — PR #58 merged 2026-06-05; tag + publish green (Windows installer, portable zip, `.deb`, apt repo). Note: `release.yml` "Open PR" step failed on dispatch because release-notes input was interpolated raw into bash (backticks executed); recovered manually, workflow fixed in the session-end PR.
 - [profile-supervisor](./profile-supervisor.md) — ▶ Forward on a profile enters supervised mode (auto-retry dropped forwards) with bounded backoff; tri-state Forward/Stop/Resume toggle; theme-aware banner. PR #46 ✅ merged.
 - [refresh-memory-2026-05-29](./refresh-memory-2026-05-29.md) — Aligned `memory/overview.md` and backlog with `main` at v1.3.2.
 
