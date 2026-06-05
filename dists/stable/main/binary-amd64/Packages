@@ -17,3 +17,22 @@ Description: Kubernetes tools for developers
  streaming logs, describing resources, and managing port-forward
  profiles - without leaving the kubeconfig you already use.
 
+Package: kubetools4dev
+Architecture: amd64
+Version: 1.3.6
+Priority: optional
+Section: devel
+Maintainer: DevDogs <noreply@devildogtg.dmnsn.com>
+Depends: libc6, libicu76 | libicu74 | libicu72 | libicu71 | libicu70 | libicu67 | libicu66
+Filename: pool/main/k/kubetools4dev/KubeTools4Dev_1.3.6_amd64.deb
+Size: 43468522
+MD5sum: 53569d984366a73ab752efa18f4c99b7
+SHA1: ab18b99f3e20696a9542be11cc6e4f2043ae81fd
+SHA256: ef4c20452850b738a34f63de2c9eccccad760129158eba6d4ba294555904bf73
+SHA512: 5c53ff61ec42300fa24805fe0f498dc975efaa565efd615638b42822ff02715863153d2c62046bd48c76eaf34d61bdd0a371f61401111e48bd07bdfbf4d0c392
+Homepage: https://github.com/DevilDogTG/KubeTools4Dev
+Description: Kubernetes tools for developers
+ Cross-platform Avalonia desktop UI for monitoring Kubernetes pods,
+ streaming logs, describing resources, and managing port-forward
+ profiles - without leaving the kubeconfig you already use.
+

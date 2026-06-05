@@ -1,28 +1,28 @@
 Architectures: amd64
 Codename: stable
 Components: main
-Date: Thu, 04 Jun 2026 09:46:06 +0000
+Date: Fri, 05 Jun 2026 03:54:39 +0000
 Description: KubeTools4Dev apt repository
 Label: KubeTools4Dev
 Origin: DevDogs
 Suite: stable
 MD5Sum:
- b88a9c4d8b0a7220e53837745ccd29da              186 Release
- 494d31dec9c1c945cf87a303d21b30d6              906 main/binary-amd64/Packages
- c1d2428d7870aa2f8af811933d6123a5              614 main/binary-amd64/Packages.gz
- c9d350d0193143c92998da1672ae55ed              688 main/binary-amd64/Packages.xz
+ ceeaae5c33f6536a7da2feffab7b1f86              186 Release
+ 6736a8795dea5c3f53cdffe888ceb895             1812 main/binary-amd64/Packages
+ db74552a51967133374798a993d75fdd              812 main/binary-amd64/Packages.gz
+ 9f00e23847735e6be63b37a1e3a51c94              868 main/binary-amd64/Packages.xz
 SHA1:
- 8871093fd05aff2695f1dc204487938b422e0dc8              186 Release
- bee8e95a11741b1a05cf1f3744dd2bbbf8bf6d5d              906 main/binary-amd64/Packages
- a369974e4a2499fc844a25ec5342d636a523b75d              614 main/binary-amd64/Packages.gz
- 7fb6aee192db1fefb92093d8029d84929ecd6191              688 main/binary-amd64/Packages.xz
+ df32a8a75230fc572f1bd28939983e9eb4b8d6f3              186 Release
+ 218fccebb5fe7f4eb85fa1e84361c78d1030a38e             1812 main/binary-amd64/Packages
+ d7cfb801ce78ef111f1eeedbd068266cee23b288              812 main/binary-amd64/Packages.gz
+ 9769812567b79e0556608df31375c50b7fe2b596              868 main/binary-amd64/Packages.xz
 SHA256:
- 6bb87ff2c85e4c6756db10f065a5d62bc44c3d710851751c9d30785e68195764              186 Release
- 13ff2a1e9d72d2eda45dd2f5612b467f06e8df09c174bdb3bcd2e6133c4a4165              906 main/binary-amd64/Packages
- a46381f6fe99ea04fa72a01555a9ab21f61eb5610bd068d8a846d3c1fbdc26c2              614 main/binary-amd64/Packages.gz
- 81be03c09e00f1a67b6cbfeecc846c84b6cef7fbd18dadf6888598c90ed853cb              688 main/binary-amd64/Packages.xz
+ d91f462716e3103a3305cd92a8b0d7e7fe1f23041fd99cf651c13b3ab42fa735              186 Release
+ 3f85485e98f3e133683e21920000eac8c63d265b41c3705d77fd6998b1b3ec58             1812 main/binary-amd64/Packages
+ 600b4cad4a2b71af75c44403d4c957072553b18b8b59f6ea81401aa313824ccf              812 main/binary-amd64/Packages.gz
+ 37808f52eaeb589c3c772b453467fb5252dc9b129ca47963de7b5bc8d4528dac              868 main/binary-amd64/Packages.xz
 SHA512:
- 3dfd556f5ae73d358f35fac786b64a5cc00153e34602171bd8f23cb89fd9abe0aebccee62abf480533069442d9332a9b823d66635030db851889f1a90954a05e              186 Release
- 7d4ba499e103089184298a6c9f45ebddd647d79aebbff9993f856f1b330c064af4a119e2638a963dc210beeeaa6218e40472067f4092c0b2d1c24f13ae7c494a              906 main/binary-amd64/Packages
- 0a51dc57ce88b09291cd6c896e28cdc64a89ece9db94bcf761a6842b663f1afbfb11529d238102b33ca18d08a3a8fff9b0416c707b69c6fd9ed3be09827cf22b              614 main/binary-amd64/Packages.gz
- bc1c432797f76009f5df54f83a78a328ff3bb6947b3e8a2f55c88ee053ae58213b4f5ec7140bea53e0319cadf8589aa09f03800bb9c0440997615782f6adc50b              688 main/binary-amd64/Packages.xz
+ 1b8b0956fc4e8723180713e0a857fa7c3c85f21f34c57e71300da90d9d368f518525d3c823f979156ff10ef1fcae35e14a1c11767a61d49beb06b2788c4831c1              186 Release
+ 6e71ae9d8ab41c2d415cfbff333bf7bffd9738c4781ced6302e76a3cbe6eb1a0eef0e96e3f42e48e8fe97b4517fb16fea98cbf6682a3e02e029932ffb6982585             1812 main/binary-amd64/Packages
+ b2353b01e00aadfc427c79bfa783abed535f05b818b8995ee2712f8c3f4932aadaf128f58ce2abe4627a50a476a2373d78cc3cdd10ed5a5e9e6f8009667001e2              812 main/binary-amd64/Packages.gz
+ e0b1ace3e687e9b674910fc958539d62ed1493d1c2988d88f6d94c5c41e1b5c1c0cf5db32cd85e554110e834565704ff44b0140cd0cdee32fcd15d3d7a0900ff              868 main/binary-amd64/Packages.xz
