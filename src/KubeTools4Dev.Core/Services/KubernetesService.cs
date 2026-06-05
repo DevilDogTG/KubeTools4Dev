@@ -1,6 +1,7 @@
 using DMNSN.Core;
 using k8s;
 using k8s.Models;
+using KubeTools4Dev.Core.Models;
 using KubeTools4Dev.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -178,21 +179,21 @@ public class KubernetesService(
         try
         {
             var pod = await Client.CoreV1.ReadNamespacedPodAsync(podName, namespaceName);
-            var events = await Client.CoreV1.ListNamespacedEventAsync(namespaceName, fieldSelector: $"involvedObject.name={podName}");
-            
+            var events = await ListPodEventsAsync(namespaceName, podName);
+
             var yaml = k8s.KubernetesYaml.Serialize(pod);
-            
+
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("--- POD YAML ---");
             sb.AppendLine(yaml);
             sb.AppendLine();
             sb.AppendLine("--- EVENTS ---");
-            
+
             foreach (var evt in events.Items)
             {
                 sb.AppendLine($"[{evt.Type}] {evt.Reason} - {evt.Message} ({evt.LastTimestamp})");
             }
-            
+
             return sb.ToString();
         }
         catch (Exception ex)
@@ -201,6 +202,28 @@ public class KubernetesService(
             return $"Error: {ex.Message}";
         }
     }
+
+    /// <summary>
+    /// Gets the Kubernetes events involving the specified pod, newest first.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="podName">Name of the pod.</param>
+    /// <returns>The pod's events as display-ready projections, newest first.</returns>
+    public async Task<IReadOnlyList<PodEventInfo>> GetPodEventsAsync(string namespaceName, string podName)
+    {
+        var events = await ListPodEventsAsync(namespaceName, podName);
+        return PodEventInfo.FromEvents(events.Items);
+    }
+
+    /// <summary>
+    /// Lists the raw events whose involved object is the specified pod. Shared by
+    /// <see cref="GetPodDescribeAsync"/> and <see cref="GetPodEventsAsync"/>.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="podName">Name of the pod.</param>
+    /// <returns>The raw event list from the API server.</returns>
+    private Task<Corev1EventList> ListPodEventsAsync(string namespaceName, string podName) =>
+        Client.CoreV1.ListNamespacedEventAsync(namespaceName, fieldSelector: $"involvedObject.name={podName}");
 
     /// <summary>
     /// Gets the services asynchronous.
