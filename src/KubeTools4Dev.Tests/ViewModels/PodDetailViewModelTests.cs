@@ -233,6 +233,77 @@ public class PodDetailViewModelTests
         Assert.True(condition(), "Timed out waiting for condition.");
     }
 
+    // --- Log filter ---
+
+    [Fact]
+    public async Task LogFilter_ShowsOnlyMatchingLines_CaseInsensitive()
+    {
+        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Lines("[Error] boom", "[Warning] meh", "[Information] hello"));
+
+        var vm = MakeVm();
+        await vm.StartLogStreamAsync();
+
+        vm.LogFilter = "error";
+
+        var lines = LogLines(vm).ToList();
+        Assert.Contains("[Error] boom", lines);
+        Assert.DoesNotContain("[Warning] meh", lines);
+        Assert.DoesNotContain("[Information] hello", lines);
+    }
+
+    [Fact]
+    public async Task LogFilter_Cleared_RestoresAllLines()
+    {
+        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Lines("alpha", "beta"));
+
+        var vm = MakeVm();
+        await vm.StartLogStreamAsync();
+
+        vm.LogFilter = "alpha";
+        Assert.DoesNotContain("beta", LogLines(vm));
+
+        vm.LogFilter = string.Empty;
+        Assert.Contains("alpha", LogLines(vm));
+        Assert.Contains("beta", LogLines(vm));
+        Assert.Equal(string.Empty, vm.LogFilterStatus);
+        Assert.False(vm.HasLogFilter);
+    }
+
+    [Fact]
+    public async Task LogFilter_AppliesToLinesArrivingAfterItWasSet()
+    {
+        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Lines("noise-1", "signal-1", "noise-2", "signal-2"));
+
+        var vm = MakeVm();
+        vm.LogFilter = "signal";
+        await vm.StartLogStreamAsync();
+
+        var lines = LogLines(vm).ToList();
+        Assert.Contains("signal-1", lines);
+        Assert.Contains("signal-2", lines);
+        Assert.DoesNotContain("noise-1", lines);
+        Assert.DoesNotContain("noise-2", lines);
+    }
+
+    [Fact]
+    public async Task LogFilterStatus_ReportsMatchAndTotalCounts()
+    {
+        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Lines("match-a", "other", "match-b"));
+
+        var vm = MakeVm();
+        await vm.StartLogStreamAsync();
+
+        vm.LogFilter = "match";
+
+        // 4 total lines: the "Connecting..." banner + 3 streamed.
+        Assert.Equal("2 / 4 lines", vm.LogFilterStatus);
+        Assert.True(vm.HasLogFilter);
+    }
+
     // --- LoadEventsAsync / Events tab ---
 
     private void StubEvents(params PodEventInfo[] events) =>

@@ -60,9 +60,24 @@ public partial class PodDetailViewModel(
     /// <summary>Gets a value indicating whether the Logs tab is selected.</summary>
     public bool IsLogsView => SelectedViewIndex == LogsViewIndex;
 
-    /// <summary>The accumulated log text shown in the window (selectable for copying).</summary>
+    /// <summary>The accumulated log text shown in the window (selectable for copying).
+    /// When <see cref="LogFilter"/> is set, only matching lines are shown; the underlying
+    /// ring buffer keeps every line.</summary>
     [ObservableProperty]
     private string _podLogsText = string.Empty;
+
+    /// <summary>Case-insensitive substring filter applied to the displayed log lines.
+    /// Empty shows all lines. Display-only: arriving lines are always buffered.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLogFilter))]
+    private string _logFilter = string.Empty;
+
+    /// <summary>Gets a value indicating whether a log filter is active.</summary>
+    public bool HasLogFilter => LogFilter.Length > 0;
+
+    /// <summary>Match summary shown while a filter is active, e.g. <c>42 / 1000 lines</c>.</summary>
+    [ObservableProperty]
+    private string _logFilterStatus = string.Empty;
 
     /// <summary>Names of the pod's containers; a picker is shown when there is more than one.</summary>
     [ObservableProperty]
@@ -259,7 +274,25 @@ public partial class PodDetailViewModel(
         }
     }
 
-    private void RebuildLogText() => PodLogsText = string.Join(Environment.NewLine, _logLines);
+    /// <summary>Re-applies the display filter when the user edits it. Runs on the UI thread
+    /// (TextBox binding), the same thread all <c>_logLines</c> mutations are dispatched to.</summary>
+    partial void OnLogFilterChanged(string value) => RebuildLogText();
+
+    private void RebuildLogText()
+    {
+        if (LogFilter.Length == 0)
+        {
+            PodLogsText = string.Join(Environment.NewLine, _logLines);
+            LogFilterStatus = string.Empty;
+            return;
+        }
+
+        var matches = _logLines
+            .Where(l => l.Contains(LogFilter, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        PodLogsText = string.Join(Environment.NewLine, matches);
+        LogFilterStatus = $"{matches.Count} / {_logLines.Count} lines";
+    }
 
     /// <summary>
     /// Builds a diagnostic message for a failed log stream: exception types, messages, the
