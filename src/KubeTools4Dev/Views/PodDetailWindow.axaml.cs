@@ -124,7 +124,11 @@ public partial class PodDetailWindow : Window
 
     private void FollowToggle_IsCheckedChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        // Turning Follow on jumps straight to the newest line.
+        // Turning Follow on jumps straight to the newest line. This also fires when the
+        // scroll heuristic above sets IsFollowingLogs=true at the bottom; the resulting
+        // ScrollToEnd re-enters ScrollChanged with an unchanged extent, which recomputes
+        // IsFollowingLogs to the same value — the loop converges in one pass. Keep that
+        // invariant in mind when editing either handler.
         if (sender is Avalonia.Controls.Primitives.ToggleButton { IsChecked: true })
             LogsScrollViewer.ScrollToEnd();
     }
