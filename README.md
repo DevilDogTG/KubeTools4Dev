@@ -38,12 +38,40 @@ Pre-built installers are attached to each [GitHub Release](https://github.com/De
 ### Windows
 Download `KubeTools4Dev-Setup-X.Y.Z.exe` and run it. A portable `.zip` is also published if you prefer not to install.
 
-### Linux (Ubuntu / Debian)
+### Linux (Ubuntu / Debian) — apt repository
+
+```bash
+# 1. Trust the signing key (one-time)
+sudo install -d /etc/apt/keyrings
+curl -fsSL https://devildogtg.github.io/KubeTools4Dev/KubeTools4Dev.gpg \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/kubetools4dev.gpg
+
+# 2. Register the repo (one-time)
+echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/kubetools4dev.gpg] \
+https://devildogtg.github.io/KubeTools4Dev/ stable main" \
+  | sudo tee /etc/apt/sources.list.d/kubetools4dev.list
+
+# 3. Install — and `apt upgrade` will pick up every future release
+sudo apt update
+sudo apt install kubetools4dev
+kubetools4dev   # or launch from your application menu
+```
+
+The `signed-by=` form scopes trust of the signing key to this one repository (the modern replacement for the deprecated `apt-key add` flow). `arch=amd64` keeps `apt update` from probing for architectures we don't publish.
+
+To remove the repository later:
+
+```bash
+sudo rm /etc/apt/sources.list.d/kubetools4dev.list \
+       /etc/apt/keyrings/kubetools4dev.gpg
+sudo apt update
+```
+
+#### Manual download (air-gapped fallback)
 Download `KubeTools4Dev_X.Y.Z_amd64.deb` from the release page, then:
 
 ```bash
 sudo apt install ./KubeTools4Dev_X.Y.Z_amd64.deb
-kubetools4dev   # or launch from your application menu
 ```
 
 Uninstall with `sudo apt remove kubetools4dev`.
@@ -51,7 +79,7 @@ Uninstall with `sudo apt remove kubetools4dev`.
 Requires `libicu` (any of 66/70/72/74 — present on every supported Ubuntu and Debian). `kubectl` is **not** required at runtime; the app talks to your cluster directly through your `~/.kube/config`.
 
 ### WSL2 (Ubuntu)
-The same `.deb` works inside WSL Ubuntu. On **Windows 11**, WSLg displays the Avalonia window automatically and the app appears in the Windows Start menu. On **Windows 10**, install an X server (VcXsrv / X410) and export `DISPLAY` before launching.
+The apt repository (and the manual `.deb`) works identically inside WSL Ubuntu and WSL Debian. On **Windows 11**, WSLg displays the Avalonia window automatically and the app appears in the Windows Start menu. On **Windows 10**, install an X server (VcXsrv / X410) and export `DISPLAY` before launching.
 
 Note: your Linux-side `~/.kube/config` is **separate** from the Windows-side one. If you already manage clusters from PowerShell, copy or symlink it once:
 
