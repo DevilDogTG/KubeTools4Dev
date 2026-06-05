@@ -59,7 +59,9 @@
                     <ScrollViewer Grid.Row="1" Margin="0,6,0,0"
                                   x:Name="LogsScrollViewer"
                                   ScrollChanged="LogsScrollViewer_ScrollChanged">
-                        <SelectableTextBlock Text="{Binding PodLogsText}"
+                        <!-- Inlines are built in code-behind (severity-colored Runs from
+                             PodLogsText); no Text binding so the two never fight. -->
+                        <SelectableTextBlock x:Name="LogText"
                                              FontFamily="Consolas"
                                              FontSize="12"
                                              TextWrapping="Wrap"/>
