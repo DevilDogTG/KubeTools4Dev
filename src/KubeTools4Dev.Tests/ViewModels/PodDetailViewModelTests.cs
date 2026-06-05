@@ -186,30 +186,48 @@ public class PodDetailViewModelTests
     [Fact]
     public async Task StartLogStreamAsync_PassesSelectedContainer()
     {
+        var requestedContainers = new List<string?>();
         _kubeService.StreamPodLogsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(EmptyLines());
+            .Returns(ci =>
+            {
+                lock (requestedContainers) requestedContainers.Add(ci.ArgAt<string?>(2));
+                return EmptyLines();
+            });
 
         var vm = MakeVm(isLogsView: true, "app", "sidecar");
         vm.Initialize();
-        await Task.Delay(50); // let the fire-and-forget initial stream settle
 
+        await WaitUntilAsync(() => { lock (requestedContainers) return requestedContainers.Contains("app"); });
         _ = _kubeService.Received().StreamPodLogsAsync("default", "test-pod", "app", Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task ChangingSelectedContainer_RestartsStreamWithNewContainer()
     {
+        var requestedContainers = new List<string?>();
         _kubeService.StreamPodLogsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(EmptyLines());
+            .Returns(ci =>
+            {
+                lock (requestedContainers) requestedContainers.Add(ci.ArgAt<string?>(2));
+                return EmptyLines();
+            });
 
         var vm = MakeVm(isLogsView: true, "app", "sidecar");
         vm.Initialize();
-        await Task.Delay(50);
+        await WaitUntilAsync(() => { lock (requestedContainers) return requestedContainers.Contains("app"); });
 
         vm.SelectedContainer = "sidecar";
-        await Task.Delay(50);
 
+        await WaitUntilAsync(() => { lock (requestedContainers) return requestedContainers.Contains("sidecar"); });
         _ = _kubeService.Received().StreamPodLogsAsync("default", "test-pod", "sidecar", Arg.Any<CancellationToken>());
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 5000)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (!condition() && sw.ElapsedMilliseconds < timeoutMs)
+            await Task.Delay(10);
+        Assert.True(condition(), "Timed out waiting for condition.");
     }
 
     // --- DescribeException ---

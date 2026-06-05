@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace KubeTools4Dev.ViewModels;
@@ -24,6 +25,7 @@ public partial class PodDetailViewModel(
     private readonly IKubernetesService _kubeService = kubeService;
     private readonly List<string> _logLines = [];
     private CancellationTokenSource? _logStreamCts;
+    private int _streamGeneration;
     private bool _initialized;
 
     [ObservableProperty]
@@ -102,8 +104,14 @@ public partial class PodDetailViewModel(
         var token = _logStreamCts.Token;
         var container = SelectedContainer;
 
+        // Generation stamp: a superseded stream may still have UI work queued behind the new
+        // stream's reset (dispatch-order race on container switch); stale lambdas check the
+        // stamp and leave the new stream's buffer alone.
+        var generation = Interlocked.Increment(ref _streamGeneration);
+
         await DispatchToUIAsync(() =>
         {
+            if (generation != Volatile.Read(ref _streamGeneration)) return;
             _logLines.Clear();
             _logLines.Add(container is not null && HasMultipleContainers
                 ? $"Connecting to log stream for {Pod.Name} [{container}]..."
@@ -113,18 +121,45 @@ public partial class PodDetailViewModel(
 
         try
         {
-            await foreach (var line in _kubeService.StreamPodLogsAsync(Pod.Namespace, Pod.Name, container, token))
+            // A channel decouples the network read from UI updates: during bursts (e.g. the
+            // initial tailLines backlog) the reader drains every available line into ONE batch,
+            // so the text rebuild runs once per batch instead of once per line. On quiet
+            // streams each line still flushes immediately.
+            var channel = Channel.CreateUnbounded<string>(
+                new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+
+            var producer = Task.Run(async () =>
             {
-                if (token.IsCancellationRequested) break;
+                try
+                {
+                    await foreach (var line in _kubeService.StreamPodLogsAsync(Pod.Namespace, Pod.Name, container, token))
+                        channel.Writer.TryWrite(line);
+                    channel.Writer.Complete();
+                }
+                catch (Exception ex)
+                {
+                    // Surfaces to the reader loop below via WaitToReadAsync.
+                    channel.Writer.Complete(ex);
+                }
+            }, token);
+
+            while (await channel.Reader.WaitToReadAsync(token))
+            {
+                var batch = new List<string>();
+                while (channel.Reader.TryRead(out var line))
+                    batch.Add(line);
 
                 await DispatchToUIAsync(() =>
                 {
-                    _logLines.Add(line);
+                    if (generation != Volatile.Read(ref _streamGeneration)) return;
+                    _logLines.AddRange(batch);
                     if (_logLines.Count > MaxLogLines)
                         _logLines.RemoveRange(0, _logLines.Count - MaxLogLines);
                     RebuildLogText();
                 });
             }
+
+            await producer;
         }
         catch (OperationCanceledException)
         {
@@ -136,13 +171,16 @@ public partial class PodDetailViewModel(
             var detail = DescribeException(ex);
             await DispatchToUIAsync(() =>
             {
+                if (generation != Volatile.Read(ref _streamGeneration)) return;
                 _logLines.Add($"Error streaming logs: {detail}");
                 RebuildLogText();
             });
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Stream was restarted/cancelled mid-flight (e.g. container switch) — ignore.
+            // Stream was restarted/cancelled mid-flight (e.g. container switch). Not shown to
+            // the user, but logged at debug level in case a real fault coincides with cancel.
+            LogStreamEndedAfterCancellation(Pod.Name, ex.Message);
         }
     }
 
@@ -189,6 +227,9 @@ public partial class PodDetailViewModel(
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error streaming logs for {PodName}")]
     private partial void LogStreamError(Exception ex, string podName);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Log stream for {PodName} ended after cancellation: {Reason}")]
+    private partial void LogStreamEndedAfterCancellation(string podName, string reason);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error loading describe output for {PodName}")]
     private partial void LogDescribeError(Exception ex, string podName);
