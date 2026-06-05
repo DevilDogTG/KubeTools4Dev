@@ -257,8 +257,19 @@ public class ClusterNodeViewModelTests
     private static async Task WaitForAsync(Func<bool> condition, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
-        while (!condition() && DateTime.UtcNow < deadline)
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                if (condition()) return;
+            }
+            catch (InvalidOperationException)
+            {
+                // The watch task mutated the collection while the condition was enumerating
+                // it ("Collection was modified") — treat as not-yet-satisfied and re-poll.
+            }
             await Task.Delay(10);
+        }
     }
 
     private static async IAsyncEnumerable<(k8s.WatchEventType Type, k8s.Models.V1Namespace Item)> WatchEvents(
