@@ -90,8 +90,10 @@ jobs:
       - name: Open PR → main
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          # Passed via env, NOT inline-interpolated into the script: backticks or quotes in
+          # user-supplied notes would otherwise be executed by bash (caught on v1.3.6 dispatch).
+          NOTES: ${{ inputs.release_notes }}
         run: |
-          NOTES="${{ inputs.release_notes }}"
           BODY="## Release ${{ steps.version.outputs.tag }}
 
           **Version bump**: \`${{ steps.version.outputs.current }}\` → \`${{ steps.version.outputs.new }}\`
