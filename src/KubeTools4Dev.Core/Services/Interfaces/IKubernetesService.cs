@@ -1,5 +1,6 @@
 using k8s;
 using k8s.Models;
+using KubeTools4Dev.Core.Models;
 
 namespace KubeTools4Dev.Core.Services.Interfaces;
 
@@ -70,6 +71,14 @@ public interface IKubernetesService
     /// <param name="podName">Name of the pod.</param>
     /// <returns>A string representing the describe output.</returns>
     Task<string> GetPodDescribeAsync(string namespaceName, string podName);
+
+    /// <summary>
+    /// Gets the Kubernetes events involving the specified pod, newest first.
+    /// </summary>
+    /// <param name="namespaceName">Name of the namespace.</param>
+    /// <param name="podName">Name of the pod.</param>
+    /// <returns>The pod's events as display-ready projections, newest first.</returns>
+    Task<IReadOnlyList<PodEventInfo>> GetPodEventsAsync(string namespaceName, string podName);
 
     /// <summary>
     /// Gets the services asynchronous.
