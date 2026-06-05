@@ -4,7 +4,7 @@
 - **GitHub Actions Node 20 deprecation** — publish.yml run annotations (v1.3.6): `actions/checkout@v4`, `actions/setup-dotnet@v4`, `softprops/action-gh-release@v2` run on Node 20; GitHub forces Node 24 starting **2026-06-16** and removes Node 20 from runners **2026-09-16**. Bump action versions (or set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` and verify) before the June cutoff.
 
 ## In Progress
-_(none)_
+- [pod-diagnostics](./pod-diagnostics.md) — logs filter/search + severity highlighting + follow-toggle + save-to-file, plus pod Events viewer (3rd view in pod detail). Includes the Node 20 CI bump (C1, deadline 2026-06-16). Target: v1.4.0.
 
 ## Atomic Plans
 _(none)_
