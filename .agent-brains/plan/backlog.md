@@ -4,7 +4,9 @@
 _(none)_
 
 ## In Progress
-- [linux-installer](./linux-installer.md) — Phase A + Phase B + B7 end-to-end test all complete as of 2026-06-04 (v1.3.5 seeded the apt repo successfully). Only **B6** remains: replace the manual `.deb` download instructions in the README with the apt-source `signed-by` snippet from Part 3 of `docs/maintainer/apt-repo-setup.md`.
+- [linux-installer](./linux-installer.md) — Phase A + Phase B + B7 end-to-end test all complete as of 2026-06-04 (v1.3.5 seeded the apt repo successfully). Only **B6** remains: replace the manual `.deb` download instructions in the README with the apt-source `signed-by` snippet from Part 3 of `docs/maintainer/apt-repo-setup.md`. _2026-06-05: B6 in progress on `docs/readme-apt-source-install`._
+- [pf-supervisor-stability](./pf-supervisor-stability.md) — long-running supervised forwards eventually hit `Failed (10/10)` because the retry counter never resets after a stable run; user must stop/start. Fix: stability-threshold attempt reset + manual-path zombie-status fix. Created 2026-06-05.
+- [logs-window-improvements](./logs-window-improvements.md) — selectable/copyable log text (SelectableTextBlock) + multi-container log support + richer stream-error diagnostics (suspected cause of the reported "XML conversion" open error). Created 2026-06-05.
 
 ## Atomic Plans
 _(none)_
