@@ -5,8 +5,8 @@ KubeTools4Dev is a cross-platform desktop application built with Avalonia UI and
 ## Project Structure
 - **KubeTools4Dev**: The primary Avalonia application, housing the ViewModels, Views, and UI logic.
 - **KubeTools4Dev.Core**: The core library containing models, configuration settings, and services (e.g., `KubernetesService`, `PortForwardService`, `SettingsService`).
-- **KubeTools4Dev.Core.Tests**: xUnit + NSubstitute test project (87 tests across 8 files). `InternalsVisibleTo` in Core csproj. Fakes live in `Fakes/`.
-- **KubeTools4Dev.Tests**: xUnit + NSubstitute test project targeting the UI assembly (77 tests across 7 files). `InternalsVisibleTo` in KubeTools4Dev csproj. Tests use `protected virtual DispatchToUIAsync` (or `DispatchToUI`) hook to bypass Avalonia dispatcher; `ServiceViewModel`/`PodDetailViewModel` also expose virtual timer/dispatch seams so tests run without an Avalonia dispatcher loop.
+- **KubeTools4Dev.Core.Tests**: xUnit + NSubstitute test project (102 tests across 9 files). `InternalsVisibleTo` in Core csproj. Fakes live in `Fakes/`.
+- **KubeTools4Dev.Tests**: xUnit + NSubstitute test project targeting the UI assembly (121 tests across 8 files). `InternalsVisibleTo` in KubeTools4Dev csproj. Tests use `protected virtual DispatchToUIAsync` (or `DispatchToUI`) hook to bypass Avalonia dispatcher; `ServiceViewModel`/`PodDetailViewModel` also expose virtual timer/dispatch seams so tests run without an Avalonia dispatcher loop.
 
 ## Developer Workflow (Modern Release Flow)
 Trunk-based development off `main`.
@@ -27,15 +27,21 @@ Trunk-based development off `main`.
 - **FakeClusterConnectionManager**: Do NOT use `async Task` with `Task.Yield()` in fake constructors — this causes `AsyncTestSyncContext` to defer the continuation to the thread pool, making tests flaky. Use synchronous initialization instead.
 - **xUnit `AsyncTestSyncContext` + captured `SynchronizationContext.Current`**: ViewModels in `Core` that capture `SynchronizationContext.Current` at construction time for UI dispatching will pick up xUnit's `AsyncTestSyncContext` inside `async Task` tests. `Post()` on that context defers work to the thread pool, causing tests to assert before the post runs. Mitigation: in the dispatcher (e.g., `OnClusterStatusChanged`), add a same-context shortcut — `if (_uiContext is null || SynchronizationContext.Current == _uiContext) applyInline(); else _uiContext.Post(...)`. This keeps tests synchronous while still dispatching properly in production. See `ClusterNodeViewModel.cs`.
 
+## UI / Theming Notes
+- **Theme is Material.Avalonia** (`MaterialTheme BaseTheme="Dark"` in `App.axaml`) — the `SemiColor*` resource names are a local convention, NOT the Semi theme. `SemiColorDanger` (#FFD32F2F), `SemiColorWarning` (#FFFFA000), `SemiColorBorder` (#40808080) are hand-defined in `Application.Resources`. `DynamicResource` fails silently on missing keys → define new keys in App.axaml or use code-behind `TryFindResource` with a fixed fallback brush (see `PodDetailWindow.ResolveBrush`). Caught in PR #61 review.
+- **Severity-colored logs**: `LogLineClassifier` (pure static, 80-char scan window) + code-behind `Run`-inline rendering on `SelectableTextBlock` — chosen over ItemsControl-per-line to preserve cross-line selection/copy (PR #57 feature). Rebuild happens at Channels-batch cadence.
+- **Pod detail tabs**: lazy one-shot per-tab loads via `_logsStarted/_describeLoaded/_eventsLoaded` flags; `SelectedViewIndex` consts on `PodDetailViewModel`. Log stream survives tab switches deliberately.
+
 ## Current Version
 - v1.3.6 (released 2026-06-05) — supervisor retry-window reset, selectable logs, multi-container log support. Published to GitHub Release (Setup.exe, Portable.zip, .deb) and the apt repo.
+- **Unreleased on `main`**: pod-diagnostics feature set (PR #61) — pending v1.4.0 release.
 
 ## Open PRs
-_(none — PRs #55 / #56 / #57 / #58 all merged 2026-06-05)_
+_(none — PR #61 merged 2026-06-05)_
 
 ## Release Flow Gotchas
 - **`release.yml` notes quoting**: the `release_notes` input is consumed in the "Open PR → main" step. It must be passed via `env:` (fixed 2026-06-05) — the original inline `NOTES="${{ inputs.release_notes }}"` let backticks in notes execute as bash command substitution (caught on the v1.3.6 dispatch; branch+bump had already pushed, so recovery = open the release PR manually — `tag.yml` only requires a merged PR from a `release/*` head).
-- **Node 20 deprecation**: publish.yml actions (`checkout@v4`, `setup-dotnet@v4`, `action-gh-release@v2`) run on Node 20 — GitHub forces Node 24 from 2026-06-16. Tracked in backlog Pending.
+- **Node 20 deprecation**: RESOLVED 2026-06-05 (PR #61) — all workflows bumped to Node-24 majors (`checkout@v6`, `setup-dotnet@v5`, `action-gh-release@v3`). Verify the v1.4.0 publish run shows no deprecation annotations (first live run on the new versions).
 
 ## Linux / WSL Packaging Notes
 - **Cross-platform settings path**: `Environment.SpecialFolder.ApplicationData` already resolves correctly on Linux to `$XDG_CONFIG_HOME` (`~/.config`). No OS detection needed in `Program.cs` for the user settings location.
@@ -47,6 +53,7 @@ _(none — PRs #55 / #56 / #57 / #58 all merged 2026-06-05)_
 - **`gpg --import-ownertrust` requires the full 40-char fingerprint** — not the long key ID. The maintainer guide stores `APT_REPO_GPG_KEY_ID` as the 16-char long key id (works fine for `--default-key`, `--list-keys`, etc.), but `--import-ownertrust` errors with `invalid fingerprint`. `publish.yml` derives the fingerprint inside the job: `FPR=$(gpg --with-colons --fingerprint "$GPG_KEY_ID" | awk -F: '/^fpr:/ {print $10; exit}')`. Caught and fixed in PR #52 after `publish-apt-repo` failed on the first v1.3.4 attempt (job ran ~18s, no `gh-pages` mutation, so recovery was clean — just cut v1.3.5 with the fix and let the next publish seed the repo).
 
 ## Recently Merged
+- PR #61 (`feature/pod-diagnostics`) — rebase-merged 2026-06-05 (`a322eb2`). Pod diagnostics: tabbed pod detail window (Logs/Describe/Events, lazy per-tab loads, stream survives tab switches), Events viewer (`GetPodEventsAsync` + `PodEventInfo` with timestamp/count fallback chains), log filter (display-only over ring buffer), severity-colored `Run` inlines (`LogLineClassifier`, 80-char scan window), follow toggle, save-to-file (full-buffer export), Node-24 action bumps. 223 tests (102 Core/121 UI). Review caught: app theme is **Material, not Semi** — `SemiColor*` keys are hand-defined app resources in App.axaml (`SemiColorDanger/Warning/Border`); DynamicResource fails silently on missing keys.
 - PR #58 (`release/v1.3.6`) — rebase-merged 2026-06-05. Patch bump 1.3.5 → 1.3.6. All publish jobs green (apt repo updated 2nd time).
 - PR #57 (`feature/logs-window-improvements`) — rebase-merged 2026-06-05. Selectable/copyable log text (`SelectableTextBlock` + `PodLogsText`), multi-container log picker (`StreamPodLogsAsync` gained optional `container` param — fixes "error opening logs" on sidecar pods), full exception-chain + API-response-body diagnostics. Review pattern: first `sk-pr-review` pass was needs-work (stale-line race on container switch, O(n²) per-line text rebuild, wall-clock test waits) — fixed via stream-generation stamp + `System.Threading.Channels` batched appends + lock-protected polling.
 - PR #56 (`bugfix/pf-supervisor-attempt-reset`) — rebase-merged 2026-06-05. `StableRunThreshold` (2 min): supervised forward retry window resets after a stable run, so only rapid consecutive failures exhaust `MaxAttempts`; `ComputeBackoff` clamps post-reset attempt 0. Manual forwards: clean task return now toggles row off (was zombie "Forwarding"); "Failed" no longer overwritten by "Stopped". `ServiceViewModel` gained `DispatchToUI`/`StartTimer`/`StopTimer` virtual seams.
