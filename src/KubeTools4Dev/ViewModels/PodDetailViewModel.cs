@@ -79,6 +79,12 @@ public partial class PodDetailViewModel(
     [ObservableProperty]
     private string _logFilterStatus = string.Empty;
 
+    /// <summary>Whether the logs view auto-scrolls to the newest line. The view turns this
+    /// off when the user scrolls up and back on when they return to the bottom; the Follow
+    /// toggle sets it explicitly.</summary>
+    [ObservableProperty]
+    private bool _isFollowingLogs = true;
+
     /// <summary>Names of the pod's containers; a picker is shown when there is more than one.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMultipleContainers))]
@@ -277,6 +283,29 @@ public partial class PodDetailViewModel(
     /// <summary>Re-applies the display filter when the user edits it. Runs on the UI thread
     /// (TextBox binding), the same thread all <c>_logLines</c> mutations are dispatched to.</summary>
     partial void OnLogFilterChanged(string value) => RebuildLogText();
+
+    /// <summary>Gets the full unfiltered buffer for saving to a file — the active display
+    /// filter never narrows an export.</summary>
+    public string GetFullLogText() => string.Join(Environment.NewLine, _logLines);
+
+    /// <summary>Gets the suggested file name for a log export, e.g.
+    /// <c>my-pod-app-20260605-143000.log</c> (container omitted for single-container pods).</summary>
+    public string SuggestedLogFileName
+    {
+        get
+        {
+            var container = HasMultipleContainers && SelectedContainer is not null ? $"-{SelectedContainer}" : string.Empty;
+            return $"{Pod.Name}{container}-{UtcNow:yyyyMMdd-HHmmss}.log";
+        }
+    }
+
+    /// <summary>Appends a locally generated line (e.g. a save-failure notice) to the log
+    /// buffer. Must be called on the UI thread.</summary>
+    internal void AddLocalLogLine(string line)
+    {
+        _logLines.Add(line);
+        RebuildLogText();
+    }
 
     private void RebuildLogText()
     {

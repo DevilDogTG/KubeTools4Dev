@@ -34,7 +34,7 @@
             <!-- Logs tab -->
             <TabItem Header="Logs">
                 <Grid Margin="0,6,0,0" RowDefinitions="Auto,*">
-                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto">
                         <TextBox Grid.Column="0"
                                  Text="{Binding LogFilter}"
                                  PlaceholderText="Filter logs..."
@@ -44,6 +44,17 @@
                                    IsVisible="{Binding HasLogFilter}"
                                    FontSize="11" Opacity="0.6"
                                    VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        <ToggleButton Grid.Column="2" Content="Follow"
+                                      IsChecked="{Binding IsFollowingLogs}"
+                                      IsCheckedChanged="FollowToggle_IsCheckedChanged"
+                                      FontSize="12" Height="26" Padding="8,0"
+                                      Margin="8,0,0,0"
+                                      ToolTip.Tip="Auto-scroll to the newest line"/>
+                        <Button Grid.Column="3" Content="Save..."
+                                Click="SaveLogs_Click"
+                                FontSize="12" Height="26" Padding="8,0"
+                                Margin="6,0,0,0"
+                                ToolTip.Tip="Save the full log buffer to a file"/>
                     </Grid>
                     <ScrollViewer Grid.Row="1" Margin="0,6,0,0"
                                   x:Name="LogsScrollViewer"
