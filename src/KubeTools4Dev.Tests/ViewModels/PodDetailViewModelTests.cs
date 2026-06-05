@@ -304,6 +304,70 @@ public class PodDetailViewModelTests
         Assert.True(vm.HasLogFilter);
     }
 
+    // --- Follow toggle / save helpers ---
+
+    [Fact]
+    public void IsFollowingLogs_DefaultsToTrue()
+    {
+        var vm = MakeVm();
+        Assert.True(vm.IsFollowingLogs);
+    }
+
+    [Fact]
+    public async Task GetFullLogText_IgnoresActiveFilter()
+    {
+        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Lines("alpha", "beta"));
+
+        var vm = MakeVm();
+        await vm.StartLogStreamAsync();
+        vm.LogFilter = "alpha";
+
+        Assert.DoesNotContain("beta", LogLines(vm));
+        Assert.Contains("beta", vm.GetFullLogText());
+        Assert.Contains("alpha", vm.GetFullLogText());
+    }
+
+    [Fact]
+    public void SuggestedLogFileName_SingleContainer_OmitsContainer()
+    {
+        _kubeService.StreamPodLogsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(EmptyLines());
+
+        var vm = MakeVm(PodDetailViewModel.LogsViewIndex, "app");
+        vm.Initialize();
+
+        Assert.Equal("test-pod-20260605-120000.log", vm.SuggestedLogFileName);
+    }
+
+    [Fact]
+    public void SuggestedLogFileName_MultiContainer_IncludesSelectedContainer()
+    {
+        _kubeService.StreamPodLogsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(EmptyLines());
+
+        var vm = MakeVm(PodDetailViewModel.LogsViewIndex, "app", "sidecar");
+        vm.Initialize();
+
+        Assert.Equal("test-pod-app-20260605-120000.log", vm.SuggestedLogFileName);
+    }
+
+    [Fact]
+    public async Task AddLocalLogLine_AppendsAndRespectsFilter()
+    {
+        _kubeService.StreamPodLogsAsync("default", "test-pod", Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Lines("alpha"));
+
+        var vm = MakeVm();
+        await vm.StartLogStreamAsync();
+        vm.LogFilter = "saving";
+
+        vm.AddLocalLogLine("Error saving logs: disk full");
+
+        Assert.Contains("Error saving logs: disk full", LogLines(vm));
+        Assert.Contains("disk full", vm.GetFullLogText());
+    }
+
     // --- LoadEventsAsync / Events tab ---
 
     private void StubEvents(params PodEventInfo[] events) =>
